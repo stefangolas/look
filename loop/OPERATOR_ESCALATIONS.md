@@ -2693,3 +2693,15 @@ uncommitted - left for the orchestrator, no dispatch impact.
   behind this. RESULT only copy is `loop/slots/0/wt/RESULT.json` (preserved through this cycle's
   janitor reclaim; still preserve before any re-fork). Also carried: RG-23/RG-9 authoring; substrate
   stack (watchdog/supervisor/overnight) down; TOR-C flip-or-pin.
+- [operator 2026-09-13T22:40Z] carry (unchanged disposition) + NEW live activity: slot 0
+  FHC-G6-CERT-COST-SCALE remains FINISHED-UNLANDED (`19cfd68` NOT an ancestor of HEAD `f2e5868`;
+  RESULT status DONE + top-level `spec_gap` = packet stop condition; tests 3/3 green; done-when
+  fmt/clippy fail on pre-existing drift outside `write_allow`). **A LIVE agent (opencode `37844`,
+  session `ses_f672d94d2ffe2kEMYEJYJogHmk`) is actively re-running scoped checks in slot 0's
+  worktree** (cargoq START 18:34:53 local `cargo test -p truck123d --test cert_cost_scale --locked`;
+  measurement children 29860/8420 progressing) - this is orchestrator/session activity, NOT a
+  registered worker; do NOT disturb it. Adjudication remains: (a) land the instrumentation-only
+  `19cfd68` + route the gap to `docs/F1_HYPERCAR_GAP_REGISTER.md`, or (b) hold/re-fork. FHC-G1 ->
+  FHC-D -> FHC-E chained behind this. RESULT only copy is `loop/slots/0/wt/RESULT.json` (still
+  preserve before any re-fork). Also carried: RG-23/RG-9 authoring; substrate stack
+  (watchdog/supervisor/overnight) down; TOR-C flip-or-pin.

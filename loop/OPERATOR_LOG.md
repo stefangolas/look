@@ -10323,3 +10323,44 @@ STATE/log commit.
   stack down; RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + slots 1/2 idle
   residue + slots 3-7 landed residue / HEAD `80577cc` + this cycle's STATE/log/escalation commit.
+
+## [operator 2026-09-13T22:40Z] cycle
+
+- Health (step 1): heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last 18:31:46 local),
+  operator runner exactly 1 (27876) - a naive `CommandLine -match` shows 2 only because the
+  operator's own query shell matches its own command line. cargoq UP (ping ok, queued 0, running
+  true = the live slot-0 test). Watchdog/supervisor/overnight 0 (carried dead, NOT restarted).
+  Disk 19.2 GB free (above 15 GB goal); **RAM 2.81 GB free (BELOW the 3 GB floor, transient - the
+  live slot-0 cargo test + measurement children)**. No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet (last 2026-09-11).
+- Land (step 2): nothing. HEAD `f2e5868` (advanced from `80577cc`; the 22:16Z operator STATE/log
+  commit, loop/ only, no packet code). Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD (`git merge-base --is-ancestor`
+  TRUE). Slot 0 FHC-G6 `19cfd68` NOT an ancestor; RESULT status DONE but top-level `spec_gap`
+  (packet stop condition) + done-when fmt/clippy fail on pre-existing drift outside `write_allow`
+  -> do NOT land; escalation carried. No root `RESULT.json` poison.
+- Unblock (step 3): no slot IDLE/DEAD with work to resume. Slot 1 = clean IDLE dead duplicate
+  (reset-only NO-OP; redispatch inappropriate - same packet, SPEC_GAP). Slot 2 = IDLE residue (row
+  DONE, landed de6bfc6). No active QUESTION.md (slot 5's is a stale 2026-09-05 CC-013 artifact).
+- **NEW observation: a LIVE agent is working slot 0 FHC-G6.** opencode `37844` (`-s
+  ses_f672d94d2ffe2kEMYEJYJogHmk`, alive since 2026-09-12 23:44 local) is actively re-running
+  scoped checks in slot 0's worktree: child powershell `1496` started 18:34:53 local ran `cargo fmt
+  --check -p truck123d` then `cargo test -p truck123d --test cert_cost_scale --locked` (cargoq START
+  18:34:57 local), spawning measurement children 29860/8420 (CPU 18->79 s / 14->74 s over ~1.5 min)
+  = progressing, not hung. It is NOT a registered worker (slot 0 `worker.pid` 15276 dead;
+  `events.jsonl` frozen 16:53 local; `slot_status` pid=-) and is NOT writing slot events =
+  orchestrator/session activity, not a dispatch. Did NOT disturb it.
+- Registry hygiene (step 4): re-derived by script (360 rows, last-wins): 265 DONE / 84 READY / 10
+  BLOCKED / 1 SUPERSEDED. All 10 BLOCKED owner/semantic parked, none mechanically flippable.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR
+  CHECK FAILED (packet files absent from `loop/packets/`); FHC-G1/D/E chained on G6; `dispatched 0`
+  = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T22:40Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): carry appended for slot 0 FHC-G6 (unchanged disposition), now noting the
+  live agent re-running its scoped checks. Carried: substrate stack down; RG-23/RG-9 authoring;
+  slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + a live agent
+  re-running its scoped checks + slots 1/2 idle residue + slots 3-7 landed residue / HEAD `f2e5868`
+  + this cycle's STATE/log commit.

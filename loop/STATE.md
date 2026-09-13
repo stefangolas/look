@@ -75,20 +75,24 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T22:16Z]: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier) +
-> 2 IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
-> FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `80577cc` (**NEW since 21:52Z** - a repo-level CI commit `.github/workflows/release.yml`
-> "release on every push to main as a rolling prerelease"; parent = the 21:52Z operator commit
-> `0d38510`; **no packet code**). Board otherwise unchanged; all re-derived by command.
+> LATEST GROUND TRUTH [operator 2026-09-13T22:40Z]: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier,
+> with a LIVE agent re-running its scoped tests) + 2 IDLE residue (slot 1 FHC-G6 clean dead
+> duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched. HEAD `f2e5868` (**NEW since 22:16Z** -
+> the 22:16Z operator STATE/log commit, loop/ only; parent `80577cc` the CI commit; **no packet
+> code**). Board re-derived by command; no material change except HEAD and a live agent on slot 0.
 > **slot 0 FHC-G6** still FINISHED-UNLANDED: commit `19cfd68` on `packet/FHC-G6-CERT-COST-SCALE`
 > (bd_bridge.rs +78/-5, new tests/cert_cost_scale.rs +584); wt-root `RESULT.json` status DONE with a
 > top-level `spec_gap` (packet stop condition: dominant phase = per-patch interval certification; no
-> whitelisted bd_bridge-only fix; needs a smarter bracket decomposition), tests 3/3 green (cargoq
-> last job `test -p truck123d --test cert_cost_scale` exit 0), `pre_existing_drift` fmt/clippy fail
-> outside `write_allow`. Packet done-when does not pass -> **NOT landed; orchestrator adjudication
-> still open** (land instrumentation + route the gap, or hold/re-fork). `19cfd68` is NOT an ancestor
-> of HEAD (unlanded). RESULT preserved through this cycle's janitor reclaim.
+> whitelisted bd_bridge-only fix; needs a smarter bracket decomposition), tests 3/3 green;
+> `pre_existing_drift` fmt/clippy fail outside `write_allow`. Packet done-when does not pass ->
+> **NOT landed; orchestrator adjudication open** (land instrumentation + route the gap, or
+> hold/re-fork). `19cfd68` is NOT an ancestor of HEAD (unlanded). **A LIVE agent (opencode `37844`,
+> session `ses_f672d94d2ffe2kEMYEJYJogHmk`, alive since 2026-09-12 23:44 local) is actively
+> re-running scoped checks in slot 0's worktree** - cargoq START 18:34:53 local `cargo test -p
+> truck123d --test cert_cost_scale --locked`, measurement subprocesses 29860/8420 burning CPU. It is
+> NOT a registered worker (slot 0 `worker.pid` 15276 dead; `events.jsonl` frozen 16:53 local) and is
+> NOT writing slot events - it is orchestrator/session activity on FHC-G6. Do NOT disturb.
 > **slot 1** CLEAN IDLE dead duplicate (same packet, pid=-, changed=0, detached `fd40760`);
 > reset-only NO-OP, redispatch inappropriate (same packet, SPEC_GAP). **slot 2** IDLE residue
 > (TTC-RECENSUS-F1-R3 row DONE, landed de6bfc6). Neither blocking.
@@ -105,15 +109,16 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 > 5"; RG-23/RG-9 **ANCHOR CHECK FAILED** (packet files absent); FHC-G1/D/E chained on G6;
 > `dispatched 0` = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT run it live).
 > **SUBSTRATE: supervisor, watchdog, and overnight driver remain ALL DEAD (carried, escalated).**
-> Heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last written 22:11Z), operator runner exactly
-> 1 (27876) - a naive process match shows "2" only because the operator's own query shell matches
-> its own command line. cargoq UP (ping ok, queued 0, running false). **Operator ran `janitor.py
-> ensure --need 15`: reclaimed ~10.2 GB (repo-root target 1.5 GB + slot 0 targets 2.6 + 6.1 GB),
-> disk 9.7 -> 21.2 GB free; RAM 2.4 -> 5.1 GB free (killed 2 opencode-parented language servers).**
-> No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last entry 2026-09-11). Slot 5 wt
-> holds a STALE `QUESTION.md` (CC-013-CORRESPONDENCE, 2026-09-05) - landed-slot residue, not active.
-> Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + slots 1/2 idle
-> residue + slots 3-7 landed residue / HEAD `80577cc` + this cycle's STATE/log/escalation commit.
+> Heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last written 18:31:46 local), operator runner
+> exactly 1 (27876) - a naive process match shows "2" only because the operator's own query shell
+> matches its own command line. cargoq UP (ping ok, queued 0, running true = slot-0 live test).
+> Disk 19.2 GB free (above 15 GB goal); **RAM 2.81 GB free (BELOW the 3 GB floor - transient, the
+> live slot-0 test/measurement children)**. No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log`
+> quiet (last entry 2026-09-11). Slot 5 wt holds a STALE `QUESTION.md` (CC-013-CORRESPONDENCE,
+> 2026-09-05) - landed-slot residue, not active.
+> Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + a live agent
+> re-running its scoped checks + slots 1/2 idle residue + slots 3-7 landed residue / HEAD `f2e5868`
+> + this cycle's STATE/log commit.
 
 
 ## Pick up here
@@ -158,7 +163,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- [operator 2026-09-13T22:16Z] board: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier, SPEC_GAP) + 2
+- [operator 2026-09-13T22:40Z] board: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier, SPEC_GAP) + 2
+  IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED
+  landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD
+  `f2e5868` (advanced from `80577cc`; the 22:16Z operator STATE/log commit, loop/ only; no packet
+  code). Board re-derived by command.
+- [operator 2026-09-13T22:40Z] **NEW: a LIVE agent is working slot 0 FHC-G6.** opencode `37844`
+  (`-s ses_f672d94d2ffe2kEMYEJYJogHmk`, alive since 2026-09-12 23:44 local) is actively re-running
+  scoped checks in slot 0's worktree: child powershell `1496` started 18:34:53 local ran `cargo fmt
+  --check -p truck123d` then `cargo test -p truck123d --test cert_cost_scale --locked` (cargoq START
+  18:34:57 local), spawning measurement children 29860/8420 (CPU 18->79 s / 14->74 s over ~1.5 min,
+  WS 340-460 MB) = progressing, not hung. It is NOT a registered worker (slot 0 `worker.pid` 15276
+  dead; `events.jsonl` frozen 16:53 local; `slot_status` pid=-) and is NOT writing slot events =
+  orchestrator/session activity, not a dispatch. Do NOT disturb. The slot-0 FHC-G6 branch commit
+  `19cfd68` is still NOT an ancestor of HEAD.
+- [operator 2026-09-13T22:40Z] health: heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last
+  18:31:46 local), operator runner exactly 1 (27876); a naive `CommandLine -match` reports 2 only
+  because the operator's own query shell matches its own command line. cargoq UP (ping ok, queued 0,
+  running true = the live slot-0 test). Watchdog/supervisor/overnight 0 (carried dead, not
+  restarted). Disk 19.2 GB free (above 15 GB goal); **RAM 2.81 GB free (BELOW the 3 GB floor,
+  transient - the live slot-0 cargo test + measurement children)**. No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last 2026-09-11).
+- [operator 2026-09-13T22:40Z] slots 1/2 IDLE residue (no work, no RESULT, no question): slot 1 a
+  clean dead duplicate of FHC-G6 (redispatch inappropriate - same packet, SPEC_GAP); slot 2
+  TTC-RECENSUS-F1-R3 row DONE (landed de6bfc6). No unblock action. Slots 3-7 FINISHED landed
+  residue; worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE). Nothing landable.
+- [operator 2026-09-13T22:40Z] Registry re-derived by script (360 rows, last-wins): 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED; all 10 BLOCKED owner/semantic parked, none mechanically
+  flippable. Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it); `--dry-run
+  --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR
+  CHECK FAILED (packet files absent); FHC-G1/D/E chained on G6; `dispatched 0` = REAL idle.
+- [operator 2026-09-13T22:40Z] board: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier, SPEC_GAP) + 2
   IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
   FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched;
   HEAD `80577cc` (NEW repo-level CI commit `.github/workflows/release.yml`, parent `0d38510`; no
