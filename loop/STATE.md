@@ -75,38 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T16:02Z]: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE
+> LATEST GROUND TRUTH [operator 2026-09-13T16:25Z]: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE
 > dead duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `2fdf11a` (orchestrator commit: warm-build cap + G6 duplicate saga + LOOK_SHARED_TARGET
-> switched on; advanced from `bd09376`, no packet code).
-> **slot 0 FHC-G6 still WORKING.** opencode 14252 (session `ses_f64d2e588ffeYAPndGa9CJ43Gw`)
-> alive at CPU 502.6 s / WS 505 MB; events.jsonl 9.7 min old; its prior measurement child
-> (python 24408 `measure_row.py ... build_suspension_rear`) has EXITED and no child is live now
-> (worker between calls). Dirty `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. Do NOT
-> touch - the packet is an expensive-measurement task.
-> **slot 1 is now a CLEAN IDLE dead duplicate** (corrects the 15:37Z "dead, needs kill+reset"):
-> opencode 26668 / cmd 25232 are GONE, worktree clean (changed=0, detached `fd40760`), no
-> RESULT/commit/QUESTION. `run_packet --reset-only` would be a NO-OP ("slot 1 is clean"). The
-> redispatch still cannot complete: branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's
-> dirty worktree. No operator action (nothing to kill, nothing to reset).
+> HEAD `6aec8e3` (the 16:02Z operator STATE/log/escalation commit; advanced from `2fdf11a`,
+> no packet code).
+> **slot 0 FHC-G6 still WORKING (alive, slow).** opencode 14252 (session
+> `ses_f64d2e588ffeYAPndGa9CJ43Gw`) alive at CPU 535.5 s / WS 471.8 MB (CPU +32.9 s over the
+> 22 min since 16:02Z); events.jsonl 32 min old (mtime 11:52:06 local); NO child live, NO
+> cargo/rustc now (last cargoq job DONE 11:50:10 `cargo build --release -p truck123d`). Dirty
+> `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. Do NOT touch - alive worker,
+> expensive-measurement task.
+> **slot 1 is a CLEAN IDLE dead duplicate** (unchanged from 16:02Z): pid=-, changed=0, detached
+> `fd40760`, no RESULT/commit/QUESTION. `run_packet --reset-only` = NO-OP ("slot 1 is clean").
+> Redispatch still cannot complete: branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's
+> dirty worktree. No operator action.
 > Frontier: FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files are MISSING
-> (gen_packet --check = FileNotFoundError; only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in
-> loop/packets) -> authoring item. Slots 2-7 FINISHED/IDLE landed residue; all worker commits
-> ancestors of HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811; slot 4 status
-> LANDED-WITH-FINDINGS, slot 7 LANDED - neither landable, both already merged). Nothing landable.
-> Registry (script): 360 rows = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
-> BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none mechanically flippable
+> (dispatch_ready reports "ANCHOR CHECK FAILED" with empty detail = gen_packet FileNotFoundError;
+> only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in loop/packets) -> authoring item. Slots 2-7
+> FINISHED/IDLE landed residue; all worker commits ancestors of HEAD (re-verified e6553db/
+> 3c2109b/ee97499/713f205/5cf4811; slot 4 status LANDED-WITH-FINDINGS, slot 7 LANDED - neither
+> landable, both already merged). Nothing landable.
+> Registry (script, last-wins over 360 unique ids): 265 DONE / 84 READY / 10 BLOCKED / 1
+> SUPERSEDED. BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none mechanically flippable
 > (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
 > SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, MONO-10 owner candidate, RDEF-M4/M5 owner inputs).
-> `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned
-> packets: 5; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT
-> run it live).
-> Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight
-> 1 (24864), cargoq UP (ping ok, queued 0, running false). Carried: TWO supervisor.py (19172 +
-> 27828) + THREE cargoq/server.py (28544 + 34564 + 31804). Disk 14.8 GB free (above 8 GB floor,
-> below 15 GB goal); RAM 3.0 GB free (at floor); no `%TEMP%/look-verify-baseline-*` leaks.
-> Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE duplicate / HEAD `2fdf11a` + this cycle's
-> STATE/log/escalation commit.
+> `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned
+> packets: 4; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT
+> run it live). Note it now counts 0 running (slot 0 reads STALLED not RUNNING) - the duplicate
+> risk is real but gated by the held branch.
+> Health: heartbeat exactly 1 (27872; the apparent second was the operator's own query shell),
+> watchdog 1 (29264), operator runner 1 (27876), overnight 1 (24864), cargoq UP (ping ok,
+> queued 0, running false). Carried: TWO supervisor.py (19172 + 27828) + THREE cargoq/server.py
+> (28544 + 34564 + 31804). Disk 14.77 GB free (above 8 GB floor, below 15 GB goal); RAM
+> 3.11 GB free (at floor); no `%TEMP%/look-verify-baseline-*` leaks.
+> Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE duplicate / HEAD `6aec8e3` + this cycle's
+> STATE/log commit.
 
 
 ## Pick up here
@@ -151,6 +154,32 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T16:25Z] board: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE dead duplicate
+  (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD
+  `6aec8e3` (the 16:02Z operator STATE/log/escalation commit; advanced from `2fdf11a`, no
+  packet code). Board unchanged from 16:02Z - re-derived by command.
+- [operator 2026-09-13T16:25Z] **slot 0 FHC-G6 WORKING (alive, slow)**: opencode 14252
+  (`ses_f64d2e588ffeYAPndGa9CJ43Gw`) alive CPU 535.5 s / WS 471.8 MB; events.jsonl 32 min old
+  (mtime 11:52:06 local); no child live, no cargo/rustc now; last cargoq job DONE 11:50:10
+  (`cargo build --release -p truck123d`); dirty `truck123d/src/bd_bridge.rs`; no
+  RESULT/commit/QUESTION. Do NOT touch.
+- [operator 2026-09-13T16:25Z] **slot 1 CLEAN IDLE dead duplicate** (unchanged): pid=-,
+  changed=0, detached `fd40760`; `run_packet --reset-only` = NO-OP; redispatch blocked by slot
+  0's held branch `packet/FHC-G6-CERT-COST-SCALE`.
+- [operator 2026-09-13T16:25Z] Slots 2-7 FINISHED/IDLE landed residue; all worker commits
+  ancestors of HEAD (re-verified `e6553db`/`3c2109b`/`ee97499`/`713f205`/`5cf4811`). Nothing
+  landable.
+- [operator 2026-09-13T16:25Z] Registry (script, last-wins over 360 unique ids): 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED; BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none
+  flippable. RG-23/RG-9 packet files MISSING -> authoring item.
+- [operator 2026-09-13T16:25Z] Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it).
+  `--dry-run --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned packets: 4;
+  dispatched 0" = REAL idle.
+- [operator 2026-09-13T16:25Z] Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator
+  runner 1 (27876), overnight 1 (24864), cargoq UP (ping ok, queued 0, running false); carried
+  TWO supervisor.py (19172 + 27828) + THREE cargoq/server.py (28544 + 34564 + 31804). Disk
+  14.77 GB free (above 8 GB floor, below 15 GB goal); RAM 3.11 GB free (at floor); no
+  `%TEMP%/look-verify-baseline-*` leaks.
 - [operator 2026-09-13T16:02Z] board: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE dead duplicate
   (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD
   `2fdf11a` (orchestrator warm-build/G6/LOOK_SHARED_TARGET commit; advanced from `bd09376`).
