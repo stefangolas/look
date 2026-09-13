@@ -2563,3 +2563,24 @@ uncommitted - left for the orchestrator, no dispatch impact.
   targets -> 17.99 GB free. Not an escalation (routine janitor action; slot 0 live/protected).
 - No other new judgment items this cycle. Carried unchanged: RG-23/RG-9 authoring; slot-4/7 wt
   RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T19:57Z - operator cycle 21: NEW - slot 0 FHC-G6 worker ALIVE but its bash tool call is hung on a 0-CPU cargoq test (19 min); operator did NOT kill
+
+- What: slot 0 (frontier packet FHC-G6-CERT-COST-SCALE) worker opencode `18632` (cmd `15276`) is
+  alive but its in-flight tool call has not returned for ~19 min. Evidence it is HUNG, not the
+  usual expensive measurement: the cargoq job
+  `cargo test --profile quick -p truck123d --lib tmp_microbench_patch_cert_scaling` (cwd
+  `slots/0/wt`, START 15:37:30 local) has **no DONE line in `loop/cargoq/server.log`**; the spawned
+  test exe `33784` (`truck123d-01311bf50ba025c6.exe tmp_microbench_patch_cert_scaling --nocapture`,
+  created 15:38:16 local) has burned **0.00 s CPU / 3 threads / 7 MB for ~19 min**; cargo 31524 /
+  29484 and cargoq client python 27580 are all at 0 CPU; no rustc. events.jsonl frozen at 19:38Z.
+- Why the operator did NOT kill/reset: the worker process is ALIVE (charter: never restart a worker
+  that is alive; and the frontier branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty
+  worktree so a reset/redispatch is not available). Killing `33784`/`27580` might free the tool
+  call, but it is a judgment call on a live frontier worker -> escalated rather than acted.
+- Exact command a human/orchestrator should start from: inspect
+  `C:\Users\stefa\look\loop\cargoq\server.log` tail and the process tree under pid `15276`; if the
+  job is confirmed wedged, `Stop-Process -Id 33784` (the hung test exe) is the minimal unblock; do
+  NOT kill opencode `18632` unless you also intend to re-fork slot 0. Priority: high (frontier).
+- Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
+  slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.

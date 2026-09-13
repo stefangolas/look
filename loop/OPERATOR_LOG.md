@@ -10040,3 +10040,42 @@ STATE/log commit.
   RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 idle residue + slots 3-7 landed residue /
   HEAD `419ffd0` + this cycle's STATE/log commit.
+
+## 2026-09-13T19:57Z - operator cycle 21: slot 0 FHC-G6 worker ALIVE but BLOCKED on a hung cargoq test (0-CPU test exe, 19 min); substrate still down (carried); nothing to land/flip; real idle
+
+- Health sweep (step 1): `slot_status.py` = slot 0 STALLED (events 17.1 min old, changed=1, no
+  commit), slot 1 IDLE, slot 2 IDLE, slots 3-7 FINISHED. Dispatcher `http://127.0.0.1:8231/ping` =
+  `{"ok": true, "queued": 0, "running": true}`. Heartbeat = exactly 1 (powershell 27872; my count of
+  2 was my own query process matching the regex - re-checked, no race). Watchdog = 0 real processes
+  (only msedgewebview2 "watchdog" false matches) - carried dead. Disk 18.8 GB free (> 15 goal);
+  RAM 5.1 GB free (> 3 floor). Operator runner pid file `loop/operator_runner.pid` present.
+- Landing (step 2): slots 3-7 FINISHED with RESULT.json; branch tips
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all reachable from HEAD `368ea26`
+  (`git merge-base --is-ancestor` True) and `loop/results/<ID>.json` already filed. RESULT statuses
+  3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED. Nothing landable.
+- Unblock (step 3): slot 0 worker is ALIVE (cmd 15276 -> opencode 18632, started 14:38:51 local)
+  but its in-flight bash tool call is BLOCKED. Evidence: opencode CPU delta 0.06 s / 4 s; events
+  frozen at 19:38Z (17.1 min); child powershell 2076 -> cargoq client python 27580 -> cargo 31524 /
+  29484, all 0 CPU / 0 rustc; cargoq job
+  `cargo test --profile quick -p truck123d --lib tmp_microbench_patch_cert_scaling` START 15:37:30
+  local with NO DONE in `cargoq/server.log`; test exe `33784`
+  (`truck123d-01311bf50ba025c6.exe tmp_microbench_patch_cert_scaling --nocapture`, created
+  15:38:16 local) has burned 0.00 s CPU / 3 threads / 7 MB for ~19 min = hung at startup, not a
+  measurement. Dirty `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Did NOT kill (worker
+  alive, frontier, branch `packet/FHC-G6-CERT-COST-SCALE` held by slot 0). ESCALATED. Slot 1 CLEAN
+  IDLE dead duplicate: reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2 IDLE
+  residue (row DONE). No other stuck workers.
+- Registry hygiene (step 4): `dispatch_ready --dry-run` = "slots: 8 (0 running, 7 free);
+  slot-assigned packets: 4"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files still MISSING - authoring
+  item); FHC-G6 flagged "DEAD dispatch ... would reset + delete + redispatch" for slot 1 (blocked:
+  branch held by slot 0); FHC-G1/D/E chained on G6. Nothing flippable.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). Dry-run `dispatched 0` =
+  REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T19:57Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): (a) NEW - slot 0 FHC-G6 tool call hung ~19 min on a 0-CPU cargoq test exe;
+  operator did not kill; needs a human/orchestrator decision to kill `33784`/`27580` or let it ride.
+  (b) substrate stack still down - carried unchanged. Carried: RG-23/RG-9 authoring; slot-4/7 wt
+  RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED + slots 1/2 idle residue + slots 3-7 landed residue /
+  HEAD `368ea26` + this cycle's STATE/log/escalation commit.
