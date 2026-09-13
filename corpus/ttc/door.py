@@ -3845,6 +3845,25 @@ def _build_truck_module():
     bd.Mode = types.SimpleNamespace(ADD="union", SUBTRACT="subtract", INTERSECT="intersect")
     bd.__dict__["Box"] = Box
 
+    def _unmapped_name(name):
+        """PEP 562 module-level catch-all: a name the vocabulary table does
+        not answer refuses TYPED (FHC-G7 metadata: E_UNMAPPED_NAME,
+        phase authoring) instead of an untyped AttributeError -- the last
+        untyped name axis, closed. The code table in marshal.rs and
+        docs/REFUSALS.md is the registration point."""
+        exc = _T123D.Refused(
+            "'" + name + "' is not in the drop-in vocabulary - "
+            "unknown-name typed refusal"
+        )
+        exc.payload = {"case": "unsupported_envelope", "envelope": "non_canonical_carrier"}
+        exc.refusal_code = "E_UNMAPPED_NAME"
+        exc.verb = name
+        exc.carrier = "unmapped_name"
+        exc.phase = "authoring"
+        raise exc
+
+    bd.__getattr__ = _unmapped_name
+
     class _ShapeMixin:
         @staticmethod
         def cast(wrapped):

@@ -110,6 +110,7 @@ mirrors it as data (`REFUSAL_CODES`) for the door-side `_refuse` path.
 | `E_CONTRADICTORY` | `contradictory` | Conflicting evidence on a property. |
 | `E_COLLAPSED` | `collapsed` | An exact object collapsed. |
 | `E_FORWARD_TOLERANCE_EXCEEDED` | `forward_tolerance_exceeded` | The forward tolerance was exceeded. |
+| `E_UNMAPPED_NAME` | door `__getattr__` catch-all | An authoring name outside the drop-in vocabulary (PEP 562 module catch-all; verb = the name, carrier `unmapped_name`, phase `authoring`). |
 
 The door additionally uses semantic codes for refusals whose payload case is
 the generic envelope slug:
