@@ -236,6 +236,16 @@ def main():
     warm_env = dict(env)
     qdir = REPO_ROOT / 'loop' / 'cargoq'
     warm_env['PATH'] = str(qdir) + os.pathsep + env.get('PATH', '')
+    # Spike cap: the workspace all-targets check spawns rustc at full
+    # machine parallelism; at low free RAM parallel rustcs die mid-expansion
+    # and the warm build exits 101 with a rotating spurious cascade
+    # (E0463 crate-not-found / trait-not-in-scope / random test-crate
+    # errors, a DIFFERENT signature each cycle). The dispatch worker env
+    # has carried CARGO_BUILD_JOBS=2 since session 50/51 -- give the warm
+    # build the same cap. Evidence: 2026-09-12 21:16-23:41, slot-0 warm
+    # builds failed 4+ cycles while a scoped slot-1 build on a warm target
+    # passed green on the same HEAD.
+    warm_env.setdefault('CARGO_BUILD_JOBS', '2')
     res = subprocess.run(['cargo', 'check', '--workspace', '--all-targets'], cwd=str(wt), env=warm_env)
     elapsed_min = (time.monotonic() - start) / 60
 
