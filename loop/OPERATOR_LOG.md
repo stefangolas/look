@@ -9849,3 +9849,38 @@ STATE/log commit.
   remains) + the RG-23/RG-9 authoring blocker. Carried items unchanged.
 - Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slot 1 CLEAN IDLE duplicate / HEAD `f477c92` + this
   cycle's STATE/log/escalation commit.
+
+## 2026-09-13T17:58Z - operator cycle 16: quiet healthy cycle; slot 0 FHC-G6 progressing; nothing to land/unblock/flip; real idle
+
+- Board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE dead duplicate (slot 1) / 0
+  landed / 0 unblocked / 0 flipped / 0 dispatched; HEAD `9838486` (the 17:35Z operator commit; no
+  packet code).
+- Health sweep (step 1): heartbeat exactly 1 (27872; the two extra `dispatch_heartbeat` regex hits
+  24612/8892 were this operator's own query shells), watchdog 1 (29264), operator runner 1 (27876),
+  cargoq UP (ping ok, queued 0, running false). Disk 18.58 GB free (above 8 GB floor AND 15 GB
+  goal); RAM 4.05 GB free (above 3 GB floor); no look-verify-baseline leaks; fallback.log quiet
+  since 2026-09-11.
+- Land (step 2): NOTHING. Slots 3/5/6 RESULT DONE, slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED;
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `9838486`
+  (re-verified via git merge-base --is-ancestor). Nothing landable.
+- Unblock (step 3): slot 0 CORRECT - FHC-G6 worker is HEALTHY and progressing: opencode 26336 (cmd
+  35764) alive, live measurement child 25388 (`measure_row.py ... build_suspension_rear`; ancestry
+  25388->4272->26336 confirmed), CPU +6.05 s / 6 s (~1 core, total 2150.8 s, WS 434 MB). Dirty
+  truck123d/src/bd_bridge.rs; no RESULT/commit/QUESTION. Did NOT touch. Orphan 35748 (probe.py
+  power_unit, parent dead) still spinning - escalated, not killed. Slot 1 IDLE clean dead duplicate:
+  reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2 IDLE (row DONE). No other
+  stuck workers.
+- Registry hygiene (step 4): 360 unique ids = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
+  READY-without-landed-marker (dispatch_ready's `landed()` predicate) = 6 {RG-23, RG-9, FHC-G6,
+  FHC-G1, FHC-D, FHC-E}. BLOCKED = 10, all owner/semantic parked, none flippable. RG-23/RG-9 packet
+  files MISSING -> authoring item. Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned packets: 4; dispatched 0" = REAL
+  idle. Re-derived the dispatcher's candidate filter directly (imported dispatch_ready): the 84
+  READY rows a naive `landed <hex>` grep flags are all `landed()==True` (their notes carry the
+  uppercase LANDED marker), so the 6 READY-without-marker rows are the whole candidate set.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T17:58Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): carried the slot-0/orphan and RG-23/RG-9 items unchanged; no new item.
+- Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slot 1 CLEAN IDLE duplicate / HEAD `9838486` + this
+  cycle's STATE/log/escalation commit.

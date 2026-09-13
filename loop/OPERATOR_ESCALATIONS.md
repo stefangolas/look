@@ -2498,3 +2498,17 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - All other carried human items unchanged: duplicate supervisors (19172 + 27828) + duplicate
   cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
   non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T17:58Z - operator cycle 16: carried - FHC-G6 progressing (do not reset); orphan 35748; RG-23/RG-9 unauthored
+
+- No NEW escalations this cycle. Carried items re-verified by command:
+- Slot 0 FHC-G6 HEALTHY (opencode 26336, live child 25388 measuring build_suspension_rear at ~1
+  core). Do NOT reset/kill. Frontier FHC-G1/D/E stay chained behind it; the dead slot-1 duplicate
+  cannot redispatch until slot 0 commits and frees `packet/FHC-G6-CERT-COST-SCALE`.
+- Orphan `35748` (`probe.py f1 lib.power_unit`, parent 1872 dead) still spins ~1 core, output
+  `power_unit.stl` ABSENT. Safe to reclaim: `Stop-Process -Id 35748`. Priority: low.
+- RG-23-CERTIFIED-ENTRY-WIRING / RG-9-REFLECT-SOLID-PRODUCTION remain READY with empty `packet`
+  and missing files; dispatch_ready prints "ANCHOR CHECK FAILED" (gen_packet FileNotFoundError).
+  Needs authoring (orchestrator). Priority: medium (frontier filler while FHC-G6 runs).
+- All other carried human items unchanged: duplicate supervisors + duplicate cargoq/server.py;
+  slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
