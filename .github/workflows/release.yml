@@ -3,7 +3,14 @@ name: release-binaries
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     tags: ["v*"]
+
+# Rolling prereleases: consecutive main pushes would race on the moving
+# `rolling` tag; serialize and cancel the superseded run.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -142,7 +149,13 @@ jobs:
           retention-days: 14
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Stable releases: a pushed v* tag (the manual release-matrix gate in
+    # AGENTS.md still applies to those). Rolling prereleases: every push to
+    # main publishes the build matrix under the moving `rolling` tag so
+    # installable binaries never lag main. Prerelease marking keeps the
+    # rolling assets out of GitHub's latest-stable resolution, so
+    # install.sh / install.ps1 keep resolving versioned releases only.
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -153,8 +166,20 @@ jobs:
           pattern: look-*
           path: release
           merge-multiple: true
-      - name: Publish GitHub Release
+      - name: Publish stable GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "look $GITHUB_REF_NAME"
+      - name: Publish rolling prerelease
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete rolling --yes --cleanup-tag || true
+          gh release create rolling release/* \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "look rolling (main @ $GITHUB_SHA)" \
+            --notes "Automated build of main @ $GITHUB_SHA. This is a rolling prerelease: it is replaced on every push to main and may be unstable. For stable builds use the latest versioned release."
