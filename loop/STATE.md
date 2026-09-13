@@ -75,7 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T00:04Z]: 1 RUNNING / 0 landed-this-cycle /
+> LATEST GROUND TRUTH [operator 2026-09-13T00:38Z]: 0 RUNNING workers / 0 landed-this-cycle /
+> 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `19a1606` (integration/kernel-bg tip).
+> **FHC-B-MULTI-CONTOUR-SECTIONS is FINISHED in slot 1** (RESULT status DONE, commit
+> `a43f7fc`, branch `packet/FHC-B-MULTI-CONTOUR-SECTIONS`, NOT yet an ancestor of HEAD,
+> worktree clean). **The overnight driver (pid 24864) is ACTIVELY LANDING IT RIGHT NOW**
+> (`cargo test --locked -p truck123d --test multi_contour_sections --manifest-path
+> loop/slots/1/wt/Cargo.toml`, cargo pid 18012, building as of 00:38Z) - DO NOT MERGE it,
+> a merge now races a double-merge. The operator's independent re-run of that named test is
+> GREEN (cargoq server.log 20:38:16 DONE exit=0 in 651s; worker's own run 20:06:02 exit=0),
+> but the driver's 20:21:48 cycle logged slot 1 "scoped check NOT green (check -p truck123d
+> failed); left for morning" - discrepancy escalated (likely a baseline fmt/clippy gate or a
+> 0xC0000409 RAM crash, not the named test; see OPERATOR_ESCALATIONS 00:38Z).
+> **FHC-G6-CERT-COST-SCALE remains the blocked frontier** (slot 0 IDLE, no work): write-set
+> clash with FHC-B on `truck123d/src/bd_bridge.rs`; dispatches once FHC-B lands.
+> Slot 2 IDLE (TTC-RECENSUS-F1-R3, no work). Slots 3-7 FINISHED landed residue; slot 4
+> LANDED-WITH-FINDINGS. Nothing else operator-landable.
+> Health: RAM 1.7-2.3 GB free (BELOW the 3 GB floor - carried HIGH; heavy baseline
+> chrome+Dropbox+Discord+MsMpEng+2 opencode), Disk 17.6 GB free (above the 8 GB floor AND
+> the 15 GB janitor goal). Heartbeat 1 (27872, LIVE), watchdog 1 (29264), operator runner
+> (this instance), overnight driver 1 (24864), cargoq UP (ping ok; running the driver's
+> FHC-B check). No `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet since 09-11.
+> Janitor: slot 0 outer 0.98 GB, slot 1 outer 0.98 GB + inner wt 1.85 GB. TWO supervisor.py
+> (19172 + 27828) = carried duplication. Carried: RG-23/RG-9 unauthored; F1-AUTHORING-ARMS
+> LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt
+> RESULT residue; duplicate registry lines; schedule.py 'needs' crash; warm-build RAM headroom.
+> Leaving: 0 RUNNING / FHC-B being landed by the driver (slot 1) / HEAD `19a1606` + this
+> cycle's STATE/log commit.
+
+> PRIOR GROUND TRUTH [operator 2026-09-13T00:04Z]: 1 RUNNING / 0 landed-this-cycle /
 > 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `a383405` (integration/kernel-bg
 > tip; the 23:42Z operator cycle's STATE/log commit).
 > **FHC-B-MULTI-CONTOUR-SECTIONS is still RUNNING healthy in slot 1** (cmd pid 38624;
@@ -156,12 +184,11 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 RUNNING: FHC-B-MULTI-CONTOUR-SECTIONS in slot 1 (cmd pid 38624; events 7.5 min old
-  at 20:04 local, last event a step_start after a clippy diagnostic; 3 changed files
-  incl. new `truck123d/tests/multi_contour_sections.rs`; its named test running through
-  cargoq). Alive and progressing - do not touch. The earlier warm-build failures (19:02:
-  G6 slot-1 `target-lexicon` 180 errors; FHC-B slot-2 0xc0000409) did NOT recur after the
-  janitor target wipe.
+- 0 RUNNING workers [operator 2026-09-13T00:38Z]. FHC-B-MULTI-CONTOUR-SECTIONS (slot 1)
+  is FINISHED (RESULT DONE, commit `a43f7fc`, not an ancestor of HEAD, clean worktree);
+  the overnight driver (24864) is ACTIVELY LANDING IT (cargo pid 18012) - DO NOT MERGE
+  until the driver's attempt resolves. Operator's named-test re-run GREEN (server.log
+  20:38:16 exit=0); driver's 20:21:48 "not green" discrepancy escalated 00:38Z.
 - Slot 0 IDLE: FHC-G6-CERT-COST-SCALE frontier, no work (clean detached HEAD at base).
   Held by a write-set clash with the RUNNING FHC-B on `truck123d/src/bd_bridge.rs`;
   dispatches when FHC-B lands. `dispatch_ready --dry-run` also shows it as a dead

@@ -9112,3 +9112,47 @@ flip-or-pin; slot-1/2/4/7 wt RESULT residue; duplicate registry lines; schedule.
 
 Leaving: 1 RUNNING (FHC-B, slot 1, progressing) / HEAD a383405 + this cycle's STATE/log
 commit; heartbeat 1 (27872, LIVE); disk 16.9 GB; RAM ~1.85 GB.
+
+---
+
+## [operator 2026-09-13T00:38Z] cycle: FHC-B finished; DRIVER ACTIVELY LANDING IT - not touched
+
+Health: heartbeat exactly 1 (27872, LIVE), watchdog 1 (29264), overnight driver 1
+(24864), operator runner (this instance), cargoq UP (ping ok). Two supervisor.py
+(19172 + 27828) = carried duplication (only ONE overnight.py child = no double-merge
+this cycle). Disk 17.6 GB free (above floor+goal); RAM 1.7-2.3 GB (BELOW 3 GB floor -
+carried HIGH). No %TEMP%/look-verify-baseline-* leaks; fallback.log quiet since 09-11.
+
+Board: 0 RUNNING workers / 0 landed-this-cycle / 0 unblocked / 0 flipped.
+- Slot 1 FHC-B-MULTI-CONTOUR-SECTIONS: FINISHED, RESULT.json status DONE, commit
+  a43f7fc (branch packet/FHC-B-MULTI-CONTOUR-SECTIONS, NOT an ancestor of HEAD),
+  worktree clean. Named test is GREEN.
+- Slots 3-7 FINISHED landed residue; slot 4 F1-AUTHORING-ARMS LANDED-WITH-FINDINGS.
+- Slot 0 IDLE (FHC-G6, held by write-set clash on truck123d/src/bd_bridge.rs with
+  FHC-B); slot 2 IDLE (TTC-RECENSUS-F1-R3).
+
+Landing (step 2): did NOT land FHC-B. The overnight driver (pid 24864) is ACTIVELY
+running its own scoped landing check right now - cargo test --locked -p truck123d
+--test multi_contour_sections --manifest-path loop/slots/1/wt/Cargo.toml (cargo pid
+18012, building) - so a merge by me would race a double-merge. My independent operator
+re-run of the SAME named test completed GREEN (cargoq server.log 20:38:16 DONE exit=0
+in 651s; the worker's own run 20:06:02 exit=0). NOTE the driver's 20:21:48 cycle
+logged slot 1 "scoped check NOT green (check -p truck123d failed); left for morning" -
+that contradicts the operator named-test green; see ESCALATIONS (likely a baseline
+fmt/clippy gate or a 0xC0000409 RAM crash, not the named test). Let the driver finish.
+
+Unblock (step 3): nothing. No IDLE/DEAD worker holding work; no QUESTION; slot 0/2
+clean at base.
+
+Registry (step 4): nothing mechanically flippable. READY without landed marker =
+exactly 6 (RG-23/RG-9 unauthored; FHC chain G6/G1/B/C). BLOCKED-with-all-needs-landed
+= the intentionally parked set (BG-CK-SPLINE-CENSUS owner-cancelled; MONO-10 /
+RDEF-M4 / RDEF-M5 owner/adjudication-gated; carried). Left BLOCKED.
+
+Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch and is LIVE).
+
+STATE (step 6): updated LATEST GROUND TRUTH + "State of the machine" to this cycle.
+
+Leaving: 0 RUNNING / FHC-B being landed by the driver (slot 1) / HEAD 19a1606 +
+this cycle's STATE/log commit. Do NOT merge FHC-B in the next cycle until the
+driver's attempt has resolved.

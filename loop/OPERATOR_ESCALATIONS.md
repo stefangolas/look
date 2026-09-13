@@ -2299,3 +2299,25 @@ uncommitted - left for the orchestrator, no dispatch impact.
   wave is no longer intended). Both write sets clash with G6's
   `truck123d/src/bd_bridge.rs` in any case.
 - Priority: low. No dispatch impact until G6 lands and frees the write set.
+
+## 2026-09-13 00:38 UTC (operator): LOW/MED - FHC-B scoped-check verdict disagrees between driver and operator; driver landing it now
+
+- What: slot 1 FHC-B-MULTI-CONTOUR-SECTIONS finished with RESULT status DONE and
+  commit a43f7fc (not yet an ancestor of integration/kernel-bg). The operator's
+  independent re-run of the packet's named test is GREEN (cargoq server.log
+  2026-09-13 20:38:16 DONE exit=0 in 651s; worker's own 20:06:02 exit=0). But the
+  overnight driver's 20:21:48 cycle logged "slot 1: scoped check NOT green (check
+  -p truck123d failed); left for morning". The packet's other done-when items
+  (cargo fmt --check -p truck123d, cargo clippy -p truck123d --all-targets -- -D
+  warnings) are KNOWN baseline-broken per RESULT notes (fmt: pre-existing
+  out-of-scope truck123d/tests/ttc_hazard_battery.rs; clippy: 383 pre-existing
+  errors in bd_bridge.rs, 0 new). Also seen: cargo test -p truck123d --lib exited
+  3221225781 (0xC0000409) twice at 20:15 under RAM pressure.
+- Why operator did not land: the driver (pid 24864) is ACTIVELY running the same
+  named test as its landing check (cargo pid 18012), so a merge now would risk a
+  double-merge. Left to the driver.
+- Exact command a human should start from if the driver parks it again:
+  git -C loop/slots/1/wt log --oneline -1 (expect a43f7fc) then run the named test
+  and, if green, merge --no-ff; or confirm which of the driver's scoped checks
+  failed (loop/overnight.log 20:21:48; loop/cargoq/server.log around 19:55-20:21).
+- Priority: low/medium. If a43f7fc is genuinely green, one merge unblocks FHC-G6.
