@@ -1,4 +1,4 @@
-﻿//! The showcase harness: BREP census + volume, certificate/report JSON,
+//! The showcase harness: BREP census + volume, certificate/report JSON,
 //! STL + STEP export, and the report schema both the Rust battery and the
 //! future truck123d suite assert against.
 
@@ -205,7 +205,12 @@ pub fn write_solid_stl(solid: &Solid, path: &Path) -> Result<(), String> {
 }
 
 /// Records one export attempt into the report's export list.
-pub fn record_export(report: &mut ShowcaseReport, kind: &str, path: &Path, result: Result<(), String>) {
+pub fn record_export(
+    report: &mut ShowcaseReport,
+    kind: &str,
+    path: &Path,
+    result: Result<(), String>,
+) {
     report.exports.push(ExportReport {
         kind: kind.to_string(),
         path: path.display().to_string(),

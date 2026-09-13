@@ -1,18 +1,14 @@
+use showcases::spine::{CompositeSpec, composite_path, shift_to_ground};
 use truck_base::cgmath64::*;
 use truck_geometry::base::ParametricCurve;
 use truck_geometry::nurbs::{BSplineCurve, KnotVec};
-use showcases::spine::{CompositeSpec, composite_path, shift_to_ground};
 
 fn max_interpolant_deviation(spec: &CompositeSpec, averaging: bool) -> (usize, f64, f64) {
     let mut path = composite_path(spec);
     shift_to_ground(&mut path, 0.0);
     let n = path.samples.len();
     let total = path.total_length;
-    let params: Vec<(f64, Point3)> = path
-        .samples
-        .iter()
-        .map(|(s, p)| (s / total, *p))
-        .collect();
+    let params: Vec<(f64, Point3)> = path.samples.iter().map(|(s, p)| (s / total, *p)).collect();
 
     let mut knots = vec![0.0f64; 4];
     if averaging {
@@ -27,14 +23,13 @@ fn max_interpolant_deviation(spec: &CompositeSpec, averaging: bool) -> (usize, f
     }
     knots.extend_from_slice(&[1.0; 4]);
     let knot_vec = KnotVec::from(knots);
-    let spline =
-        match BSplineCurve::try_interpole(knot_vec, params.clone()) {
-            Ok(s) => s,
-            Err(e) => {
-                println!("  interpole failed: {e:?}");
-                return (n, f64::NAN, f64::NAN);
-            }
-        };
+    let spline = match BSplineCurve::try_interpole(knot_vec, params.clone()) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("  interpole failed: {e:?}");
+            return (n, f64::NAN, f64::NAN);
+        }
+    };
 
     let mut at_samples = 0.0f64;
     for (t, p) in &params {

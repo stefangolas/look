@@ -103,10 +103,6 @@ pub mod builder;
 /// BG-CAD-P1-UTILITY: certified utility surface + planar face construction.
 pub mod cad;
 mod closed_sweep;
-/// PB-001-SELECTORS: scoped selector layer over live topology (deterministic
-/// face/edge enumeration over `EntityId` identity, per-face facts, and
-/// `BlendSpec`-compatible edge names).
-pub mod selectors;
 /// declare errors
 pub mod errors;
 /// BG-SOL-S2-EXTRUDE: direct certified extrude of a planar arrangement.
@@ -123,6 +119,10 @@ mod multi_sweep;
 pub mod primitive;
 /// BG-CAD-P5-REVOLVE: revolve of line-edge profiles via the carrier table.
 pub mod revolve;
+/// PB-001-SELECTORS: scoped selector layer over live topology (deterministic
+/// face/edge enumeration over `EntityId` identity, per-face facts, and
+/// `BlendSpec`-compatible edge names).
+pub mod selectors;
 /// BG-CG-009-BREP: the authored-topology spine sweep constructor — side faces
 /// per profile edge on the whole-sweep closed value (`SpineFrameSweep`),
 /// trajectory edges shared by identity, caps via `try_attach_plane`. No

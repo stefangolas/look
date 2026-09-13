@@ -24,7 +24,11 @@ fn three_frame_laws_realize_with_matching_volumes() {
     for facet in &report.facets {
         if facet.law == "radial" {
             assert!(
-                facet.refusal.as_deref().unwrap_or_default().contains("FrameSingular"),
+                facet
+                    .refusal
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("FrameSingular"),
                 "ORI-FRAME-ORTHONORMALITY-GATE-001 closed by CC-DEF-BREP-FIXES: \
                  RadialAboutAxis now refuses tangents with a radial component — \
                  the drop and runout qualify; got {:?}",
@@ -47,10 +51,21 @@ fn three_frame_laws_realize_with_matching_volumes() {
             assert!(b.refusal.is_some(), "radial BREP must refuse typed");
             continue;
         }
-        assert!(b.refusal.is_none(), "BREP refused for {}: {:?}", b.law, b.refusal);
-        assert_eq!(b.edge_nonpair_uses, 0, "closed shell: every edge used exactly twice");
+        assert!(
+            b.refusal.is_none(),
+            "BREP refused for {}: {:?}",
+            b.law,
+            b.refusal
+        );
+        assert_eq!(
+            b.edge_nonpair_uses, 0,
+            "closed shell: every edge used exactly twice"
+        );
         assert_eq!(b.edge_orientation_sum, 0, "consistent orientation");
-        assert_eq!(b.face_count, 6, "4 side faces + 2 caps, station-independent");
+        assert_eq!(
+            b.face_count, 6,
+            "4 side faces + 2 caps, station-independent"
+        );
     }
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -130,7 +145,8 @@ fn facet_volume_near_analytic_estimate() {
     let cross_section_area = (table.chute_width + table.chute_width * table.chute_top_fraction)
         / 2.0
         * table.chute_wall_height;
-    let widening_integral = 1.0 + (table.runout_widening - 1.0) / 2.0
+    let widening_integral = 1.0
+        + (table.runout_widening - 1.0) / 2.0
         + (table.runout_widening - 1.0) * (table.runout_widening - 1.0) / 3.0;
     let estimate = cross_section_area * report.spine_total_length * widening_integral;
     assert!(
@@ -164,7 +180,11 @@ fn determinism_same_table_same_report() {
         ))
         .expect("serialize")
     };
-    assert_eq!(strip(&r1), strip(&r2), "determinism: identical tables must produce identical certificates");
+    assert_eq!(
+        strip(&r1),
+        strip(&r2),
+        "determinism: identical tables must produce identical certificates"
+    );
     std::fs::remove_dir_all(&d1).ok();
     std::fs::remove_dir_all(&d2).ok();
 }
@@ -187,7 +207,8 @@ fn exports_record_outcomes() {
 }
 
 #[test]
-fn cc_ports_defer_with_typed_refusals() {    let table = WaterslideTable {
+fn cc_ports_defer_with_typed_refusals() {
+    let table = WaterslideTable {
         stations: 24,
         spine_samples: 48,
         ..WaterslideTable::default()

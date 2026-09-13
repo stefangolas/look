@@ -4050,8 +4050,9 @@ fn reflect_solid(solid: &SolidSpec, axis: &str) -> Result<SolidSpec, Refusal> {
             amount,
             both,
         } => {
-            let reflect_ring =
-                |ring: &Vec<ProfileEdge>| ring.iter().map(|e| reflect_profile_edge(e, axis)).collect();
+            let reflect_ring = |ring: &Vec<ProfileEdge>| {
+                ring.iter().map(|e| reflect_profile_edge(e, axis)).collect()
+            };
             SolidSpec::SectionPrism {
                 profile: reflect_ring(profile),
                 holes: holes.iter().map(reflect_ring).collect(),

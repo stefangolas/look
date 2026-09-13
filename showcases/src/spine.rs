@@ -288,11 +288,8 @@ pub fn spline_from_path(path: &CompositePath) -> Result<Curve, SpineError> {
     knots.extend_from_slice(&[1.0; 4]);
     let knot_vec = KnotVec::from(knots);
     let total = path.total_length;
-    let parameter_points: Vec<(f64, Point3)> = path
-        .samples
-        .iter()
-        .map(|(s, p)| (s / total, *p))
-        .collect();
+    let parameter_points: Vec<(f64, Point3)> =
+        path.samples.iter().map(|(s, p)| (s / total, *p)).collect();
     let spline = BSplineCurve::try_interpole(knot_vec, parameter_points)
         .map_err(|e| SpineError::Interpolation(format!("{e}")))?;
     Ok(Curve::from(spline))

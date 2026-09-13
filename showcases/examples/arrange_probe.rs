@@ -9,10 +9,7 @@ fn loop_curves(pts: &[(f64, f64)]) -> Vec<Curve> {
         .map(|i| {
             let a = pts[i];
             let b = pts[(i + 1) % n];
-            Curve::from(Line(
-                Point3::new(a.0, a.1, 0.0),
-                Point3::new(b.0, b.1, 0.0),
-            ))
+            Curve::from(Line(Point3::new(a.0, a.1, 0.0), Point3::new(b.0, b.1, 0.0)))
         })
         .collect()
 }
@@ -56,7 +53,13 @@ fn main() {
     );
     probe(
         "outer-wall-5gon",
-        &[(0.5, 0.0), (0.875, 0.5), (1.0, 1.0), (0.75, 1.5), (0.5, 1.75)],
+        &[
+            (0.5, 0.0),
+            (0.875, 0.5),
+            (1.0, 1.0),
+            (0.75, 1.5),
+            (0.5, 1.75),
+        ],
     );
     probe(
         "outer-wall-4gon-truncated",

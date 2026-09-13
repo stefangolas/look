@@ -1,8 +1,8 @@
-use truck_base::cgmath64::{Point3, Vector3};
-use truck_geometry::constructive::*;
 use showcases::profile::u_chute;
 use showcases::spine::{CompositeSpec, composite_path, shift_to_ground, spline_from_path};
+use truck_base::cgmath64::{Point3, Vector3};
 use truck_geometry::constructive::SpineCurve;
+use truck_geometry::constructive::*;
 
 fn main() {
     let spec = CompositeSpec {
@@ -25,15 +25,42 @@ fn main() {
     println!("chute vertices: {}", chute.vertices.len());
     let a = 50.0f64.to_radians();
     let laws: Vec<(&str, FrameLaw)> = vec![
-        ("parallel", FrameLaw::ParallelTransport { initial_normal: Vector3::new(a.sin(), 0.0, a.cos()) }),
-        ("architectural", FrameLaw::ArchitecturalUp { up: Vector3::unit_z() }),
-        ("radial", FrameLaw::RadialAboutAxis { origin: Point3::new(0.0, 0.0, 0.0), axis: Vector3::unit_z() }),
-        ("fixed", FrameLaw::FixedPlane { normal: Vector3::unit_y() }),
+        (
+            "parallel",
+            FrameLaw::ParallelTransport {
+                initial_normal: Vector3::new(a.sin(), 0.0, a.cos()),
+            },
+        ),
+        (
+            "architectural",
+            FrameLaw::ArchitecturalUp {
+                up: Vector3::unit_z(),
+            },
+        ),
+        (
+            "radial",
+            FrameLaw::RadialAboutAxis {
+                origin: Point3::new(0.0, 0.0, 0.0),
+                axis: Vector3::unit_z(),
+            },
+        ),
+        (
+            "fixed",
+            FrameLaw::FixedPlane {
+                normal: Vector3::unit_y(),
+            },
+        ),
     ];
     for (name, law) in laws {
         let recipe = SpineFrameRecipe::new(
             spine.clone(),
-            ProfileLaw::Scale { profile: chute.clone(), scale: ScalarLaw::Linear { start: 1.0, end: 1.35 } },
+            ProfileLaw::Scale {
+                profile: chute.clone(),
+                scale: ScalarLaw::Linear {
+                    start: 1.0,
+                    end: 1.35,
+                },
+            },
             law,
         );
         let mut failures = 0;

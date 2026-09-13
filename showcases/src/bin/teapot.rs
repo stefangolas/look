@@ -23,7 +23,10 @@ fn main() {
 
     match build(&table, &out_dir, &LandedPorts) {
         Ok(report) => {
-            println!("{}", serde_json::to_string_pretty(&report).expect("report json"));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).expect("report json")
+            );
         }
         Err(e) => {
             eprintln!("teapot build failed: {e}");

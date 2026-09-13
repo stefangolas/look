@@ -20,7 +20,7 @@ use truck_shapeops::facade::revolve;
 use crate::cc_ports::{CanalCert, CcPorts, RadiusLaw};
 use crate::harness::{
     BrepReport, CcPortReport, FacetReport, ShowcaseReport, brep_volume, census_summary,
-    record_export, write_report, write_step, write_stl, write_solid_stl,
+    record_export, write_report, write_solid_stl, write_step, write_stl,
 };
 use crate::profile::regular_polygon;
 use crate::spine::spline_through_points;
@@ -58,11 +58,7 @@ pub struct TeapotTable {
 
 impl Default for TeapotTable {
     fn default() -> Self {
-        let body_stations: Vec<(f64, f64)> = vec![
-            (0.0, 0.5),
-            (2.0, 2.5),
-            (4.0, 0.5),
-        ];
+        let body_stations: Vec<(f64, f64)> = vec![(0.0, 0.5), (2.0, 2.5), (4.0, 0.5)];
         TeapotTable {
             body_stations,
             wall_thickness: 0.25,
@@ -195,22 +191,21 @@ fn realize_tube(
     breps: &mut Vec<BrepReport>,
 ) -> Option<Solid> {
     let (s0, s1) = recipe.spine.domain();
-    let station_list =
-        match (SamplingPolicy::UniformCount { spine: stations }).resolve(s0, s1) {
-            Ok(list) => list,
-            Err(e) => {
-                facets.push(FacetReport {
-                    law: name.to_string(),
-                    triangle_count: 0,
-                    quad_count: 0,
-                    signed_volume: f64::NAN,
-                    winding_violations: 0,
-                    verdict: "NotRealized".to_string(),
-                    refusal: Some(format!("{e:?}")),
-                });
-                return None;
-            }
-        };
+    let station_list = match (SamplingPolicy::UniformCount { spine: stations }).resolve(s0, s1) {
+        Ok(list) => list,
+        Err(e) => {
+            facets.push(FacetReport {
+                law: name.to_string(),
+                triangle_count: 0,
+                quad_count: 0,
+                signed_volume: f64::NAN,
+                winding_violations: 0,
+                verdict: "NotRealized".to_string(),
+                refusal: Some(format!("{e:?}")),
+            });
+            return None;
+        }
+    };
     match truck_modeling::facet_sweep::facet_sweep(recipe, &station_list, ring) {
         Ok(result) => facets.push(FacetReport {
             law: name.to_string(),
@@ -280,7 +275,11 @@ fn facet_stl(
 }
 
 /// Builds the teapot into `out_dir`.
-pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<ShowcaseReport, String> {
+pub fn build(
+    t: &TeapotTable,
+    out_dir: &Path,
+    ports: &dyn CcPorts,
+) -> Result<ShowcaseReport, String> {
     std::fs::create_dir_all(out_dir).map_err(|e| e.to_string())?;
 
     let mut report = ShowcaseReport {
@@ -391,8 +390,22 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
             write_step(handle, &out_dir.join("teapot_handle.step")),
         );
     }
-    facet_stl(&mut report, out_dir, "teapot_spout", &spout_recipe, t.spout_ring, t.stations);
-    facet_stl(&mut report, out_dir, "teapot_handle", &handle_recipe, t.handle_ring, t.stations);
+    facet_stl(
+        &mut report,
+        out_dir,
+        "teapot_spout",
+        &spout_recipe,
+        t.spout_ring,
+        t.stations,
+    );
+    facet_stl(
+        &mut report,
+        out_dir,
+        "teapot_handle",
+        &handle_recipe,
+        t.handle_ring,
+        t.stations,
+    );
 
     match (&body, &spout) {
         (Ok(Certified { value: body, .. }), Some(spout)) => {
@@ -405,7 +418,12 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
             );
             report.booleans.push(CcPortReport {
                 port: "boolean_union_body_spout".to_string(),
-                status: if union.is_ok() { "certified" } else { "refused" }.to_string(),
+                status: if union.is_ok() {
+                    "certified"
+                } else {
+                    "refused"
+                }
+                .to_string(),
                 detail: Some(match &union {
                     Ok(u) => format!("union faces={}", u.value.face_iter().count()),
                     Err(e) => format!("{e:?}"),
@@ -422,7 +440,12 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
     let loft_spout = ports.loft(&[], &Default::default());
     report.cc_ports.push(CcPortReport {
         port: "loft_spout_variant".to_string(),
-        status: if loft_spout.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if loft_spout.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &loft_spout {
             Ok(_) => "loft realized".to_string(),
             Err(e) => format!("{e:?}"),
@@ -432,7 +455,11 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
         let blend = ports.blend_var_radius(
             spout,
             (
-                Point3::new(t.spout_points[0].0, t.spout_points[0].1, t.spout_points[0].2),
+                Point3::new(
+                    t.spout_points[0].0,
+                    t.spout_points[0].1,
+                    t.spout_points[0].2,
+                ),
                 Point3::new(
                     t.spout_points[t.spout_points.len() - 1].0,
                     t.spout_points[t.spout_points.len() - 1].1,
@@ -443,7 +470,12 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
         );
         report.cc_ports.push(CcPortReport {
             port: "junction_blend_var_radius".to_string(),
-            status: if blend.is_ok() { "certified" } else { "deferred" }.to_string(),
+            status: if blend.is_ok() {
+                "certified"
+            } else {
+                "deferred"
+            }
+            .to_string(),
             detail: Some(match &blend {
                 Ok(_) => "blend realized".to_string(),
                 Err(e) => format!("{e:?}"),
@@ -453,9 +485,17 @@ pub fn build(t: &TeapotTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sho
     let canal: Outcome<CanalCert> = ports.canal_regularity(&spout_spine, t.spout_r1);
     report.cc_ports.push(CcPortReport {
         port: "canal_regularity_spout_spine".to_string(),
-        status: if canal.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if canal.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &canal {
-            Ok(c) => format!("regular={} min_r={}", c.value.regular, c.value.min_curvature_radius),
+            Ok(c) => format!(
+                "regular={} min_r={}",
+                c.value.regular, c.value.min_curvature_radius
+            ),
             Err(e) => format!("{e:?}"),
         }),
     });
