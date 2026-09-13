@@ -9543,3 +9543,11 @@ residue; F1 non_z_axis pin; TOR-C flip-or-pin.
 
 Leaving: slot 0 ACTIVE G6 + slot 1 STALLED G6 (duplicate, carried/escalated) / HEAD `6bb17b3` +
 this cycle's STATE/log commit.
+
+CORRECTION (re-checked before exit, per the "rewrite STATE last, then check it against
+reality" rule): by end of cycle BOTH slots read STALLED in `slot_status.py` - slot 0 events 12.4
+min old (grew ~1.5 min during the cycle) and slot 1 events 15.7 min old (grew ~1.4 min), both
+still alive and slowly advancing, uncommitted `bd_bridge.rs`, no RESULT/commit/QUESTION, zero
+cargo/rustc, cargoq running=false. Neither is dead (events growing), so no reset. STATE.md
+corrected to "2 STALLED-but-ALIVE" and HEAD `fbba6ab` (this cycle's commit). Final re-check:
+HEAD `fbba6ab`, heartbeat 1 (27872), cargoq ping ok queued 0 running false.

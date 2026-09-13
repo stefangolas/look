@@ -75,17 +75,19 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T15:11Z]: 1 ACTIVE + 1 STALLED worker, BOTH FHC-G6
+> LATEST GROUND TRUTH [operator 2026-09-13T15:11Z]: 2 STALLED-but-ALIVE workers, BOTH FHC-G6
 > (DUPLICATE dispatch, carried) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `6bb17b3` (predecessor operator 14:49Z commit; no packet code moved this cycle).
-> **DUPLICATE FHC-G6 still live:** slot 0 RUNNING/ACTIVE (cmd pid 35812 -> opencode 14252,
-> session `ses_f64d2e588ffeYAPndGa9CJ43Gw`, worktree `packet/FHC-G6-CERT-COST-SCALE`@45575f6,
-> uncommitted `truck123d/src/bd_bridge.rs` edit; no RESULT/commit/QUESTION; events 10.9 min old;
-> cargoq running=false = its quick test finished) while slot 1 is STALLED-but-ALIVE (cmd pid
-> 25232 -> opencode 26668, session `ses_f650755e6ffeXNsMpdBvyxH7IM`, detached `fd40760`,
-> uncommitted `bd_bridge.rs` edit; no RESULT/commit/QUESTION; events 14.3 min old). Neither
-> killed/reset (both opencode processes alive; resetting touches the live packet branch) -
-> duplicate remains ESCALATED (14:49Z). slot 0 covers the frontier.
+> HEAD `fbba6ab` (this cycle's operator commit; `6bb17b3` = predecessor 14:49Z; no packet code
+> moved this cycle).
+> **DUPLICATE FHC-G6 still live (both events growing, slowly reasoning - not dead):** slot 0
+> STALLED-but-ALIVE (cmd pid 35812 -> opencode 14252, session `ses_f64d2e588ffeYAPndGa9CJ43Gw`,
+> worktree `packet/FHC-G6-CERT-COST-SCALE`@45575f6, uncommitted `truck123d/src/bd_bridge.rs`
+> edit; no RESULT/commit/QUESTION; events 12.4 min old, grew ~1.5 min over the cycle) while slot 1
+> is STALLED-but-ALIVE (cmd pid 25232 -> opencode 26668, session
+> `ses_f650755e6ffeXNsMpdBvyxH7IM`, detached `fd40760`, uncommitted `bd_bridge.rs` edit; no
+> RESULT/commit/QUESTION; events 15.7 min old, grew ~1.4 min). cargoq running=false; zero
+> cargo/rustc. Neither killed/reset (both opencode processes alive and advancing; resetting
+> touches the live packet branch) - duplicate remains ESCALATED (14:49Z).
 > Frontier: FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files are MISSING
 > (unauthored -> anchor-check FAIL). Slots 3-7 FINISHED landed residue, all commits ancestors of
 > HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811); RESULT statuses 3=DONE 4=LANDED-WITH-FINDINGS
@@ -151,14 +153,15 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- [operator 2026-09-13T15:11Z] board: 1 ACTIVE + 1 STALLED (both FHC-G6, duplicate) / 0
-  landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD `6bb17b3`.
-- [operator 2026-09-13T15:11Z] **DUPLICATE FHC-G6 still live, carried/escalated.** slot 0 ACTIVE
-  (cmd 35812 -> opencode 14252, session `ses_f64d2e588ffeYAPndGa9CJ43Gw`, `packet/FHC-G6-CERT-COST-SCALE`@45575f6,
-  uncommitted `bd_bridge.rs`, events 10.9 min old, cargoq running=false). slot 1 STALLED-but-ALIVE
-  (cmd 25232 -> opencode 26668, session `ses_f650755e6ffeXNsMpdBvyxH7IM`, detached `fd40760`,
-  uncommitted `bd_bridge.rs`, events 14.3 min old, no RESULT/commit/QUESTION). Neither killed/reset;
-  slot 0 covers the frontier. See OPERATOR_ESCALATIONS 14:49Z.
+- [operator 2026-09-13T15:11Z] board: 2 STALLED-but-ALIVE (both FHC-G6, duplicate) / 0
+  landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD `fbba6ab`.
+- [operator 2026-09-13T15:11Z] **DUPLICATE FHC-G6 still live, carried/escalated.** slot 0
+  STALLED-but-ALIVE (cmd 35812 -> opencode 14252, session `ses_f64d2e588ffeYAPndGa9CJ43Gw`,
+  `packet/FHC-G6-CERT-COST-SCALE`@45575f6, uncommitted `bd_bridge.rs`, events 12.4 min old and
+  growing, cargoq running=false). slot 1 STALLED-but-ALIVE (cmd 25232 -> opencode 26668, session
+  `ses_f650755e6ffeXNsMpdBvyxH7IM`, detached `fd40760`, uncommitted `bd_bridge.rs`, events 15.7 min
+  old and growing, no RESULT/commit/QUESTION). Neither killed/reset (both alive and advancing).
+  See OPERATOR_ESCALATIONS 14:49Z + 15:11Z carry.
 - [operator 2026-09-13T15:11Z] Slots 3-7 FINISHED landed residue (e6553db/3c2109b/ee97499/713f205/5cf4811);
   `git merge-base --is-ancestor` True for all against HEAD; RESULT statuses 3=DONE 4=LANDED-WITH-FINDINGS
   5=DONE 6=DONE 7=LANDED - nothing landable. Slot 2 IDLE (TTC-RECENSUS-F1-R3 row DONE, no work).
