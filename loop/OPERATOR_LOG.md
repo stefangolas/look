@@ -10001,3 +10001,42 @@ STATE/log commit.
   RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 idle residue + slots 3-7 landed residue /
   HEAD `6779f48` + this cycle's STATE/log commit.
+
+## 2026-09-13T19:30Z - operator cycle 20: quiet healthy cycle; disk reclaimed by janitor; slot 0 FHC-G6 progressing; substrate still down (carried); nothing to land/unblock/flip; real idle
+
+- Health (step 1): heartbeat exactly 1 (27872; the 2nd match was this operator's own query shell),
+  last cycle 19:29:15Z dispatched 0; operator runner 1 (27876); cargoq UP (ping ok, queued 0,
+  running true = slot-0 build). Watchdog = 0 processes (carried substrate-down escalation; NOT
+  restarted). Disk was 13.98 GB free (below 15 GB goal) -> ran `python loop/janitor.py ensure
+  --need 15`, which reclaimed ~4.5 GB of idle slot-1 dead-duplicate targets -> **17.99 GB free**
+  (slot 0 live/protected). RAM 3.47 GB free (above the 3 GB floor). No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- Board (step 1): 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 2 IDLE residue (slot 1 FHC-G6 dead
+  duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7). HEAD
+  `419ffd0` (advanced from `6779f48`; the 19:09Z operator commit, loop/ only; no new packet code).
+- Land (step 2): NOTHING landable. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/
+  5cf4811 all re-verified ancestors of HEAD `419ffd0` via `git merge-base --is-ancestor`; RESULT
+  statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED. loop/results/ already
+  holds the filed copies.
+- Unblock (step 3): slot 0 CORRECT - FHC-G6 worker HEALTHY/progressing. cmd 15276 -> opencode 18632
+  alive; events 10.1 min old; live children this scan: cargoq job `cargoq.py test --profile quick
+  --lib tmp_microbench_patch_cert_scaling` (pid 30520) with `rustc` compiling wgpu_core /
+  truck_certified, plus measurement chain powershell 10100 -> `measure_profile.py` 36524 -> 34100.
+  Dirty `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Did NOT touch. Slot 1 IDLE clean
+  dead duplicate (pid=-, changed=0, detached `fd40760` = ancestor): reset-only NO-OP, redispatch
+  blocked by slot 0's held branch. Slot 2 IDLE residue (row DONE): no work, not blocking. No other
+  stuck workers.
+- Registry hygiene (step 4): 360 unique ids = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED
+  (re-derived by census script). All 10 BLOCKED rows have needs landed but are deliberately
+  owner/semantic parked (OWNER_BLOCKED, owner-cancelled, SUPERSEDED, SPEC_GAP, human-gated,
+  orchestrator-held, owner inputs) - none flippable. RG-23/RG-9 packet files MISSING (confirmed:
+  gen_packet FileNotFoundError) -> authoring item. Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5; dispatched 0" (RG-23/
+  RG-9 packet files MISSING; FHC-G1/D/E chained on G6) = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T19:30Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): substrate stack still down - carried unchanged (no new evidence). Carried:
+  RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 idle residue + slots 3-7 landed residue /
+  HEAD `419ffd0` + this cycle's STATE/log commit.

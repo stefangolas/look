@@ -2549,3 +2549,17 @@ uncommitted - left for the orchestrator, no dispatch impact.
   NOT restart (same reasoning as the 18:28Z item: the supervisor would also restart the overnight
   driver, which is an orchestration decision; the stop may be intentional). See the 18:28Z item for
   the exact restart commands. Priority: medium. No other new judgment items this cycle.
+
+## 2026-09-13T19:30Z - operator cycle 20: substrate-down item CARRIED unchanged; disk pressure resolved by janitor
+
+- Re-verified this cycle: watchdog = 0 processes, `watchdog.lock` still holds stale pid `29264`,
+  `watchdog.log` silent since 2026-09-10T22:30Z; supervisor = 0 processes, `supervisor.log` last
+  action 09-13 09:38:57; overnight = 0 processes, `overnight.log` last 09-13 14:16:31. Operator did
+  NOT restart (same reasoning as the 18:28Z item: the supervisor would also restart the overnight
+  driver, which is an orchestration decision; the stop may be intentional). See the 18:28Z item for
+  the exact restart commands. Priority: medium.
+- Disk was 13.98 GB free (below the 15 GB goal); the operator ran the documented
+  `python loop/janitor.py ensure --need 15`, which reclaimed ~4.5 GB of idle slot-1 dead-duplicate
+  targets -> 17.99 GB free. Not an escalation (routine janitor action; slot 0 live/protected).
+- No other new judgment items this cycle. Carried unchanged: RG-23/RG-9 authoring; slot-4/7 wt
+  RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
