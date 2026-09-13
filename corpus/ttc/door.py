@@ -142,6 +142,7 @@ REFUSAL_CODES = {
     "contradictory": "E_CONTRADICTORY",
     "collapsed": "E_COLLAPSED",
     "forward_tolerance_exceeded": "E_FORWARD_TOLERANCE_EXCEEDED",
+    "nesting_invalid": "E_NESTING_INVALID",
 }
 
 # The register's category boundaries (docs/F1_HYPERCAR_GAP_REGISTER.md): the
@@ -184,6 +185,8 @@ KNOWN_GAPS = (
      "rational-patch flux proof obligation - FHC-G1"),
     ("E_NOT_A_KERNEL_ROW", None, None, "3",
      "drop-in data-row surface - mechanical"),
+    ("E_NESTING_INVALID", None, "face_boolean", "4b",
+     "planar multi-contour section nesting (crossing/outside rings) - FHC-B"),
 )
 
 
@@ -1400,7 +1403,7 @@ class Face:
     boundary points (data), so a face placed by an authoring frame sits at its
     world location and ``extrude``/``loft``/``revolve`` read it from there."""
 
-    __slots__ = ("edges", "wire", "label", "color", "_occ")
+    __slots__ = ("edges", "wire", "label", "color", "_occ", "contours")
 
     def __init__(self, obj=None, *args, **kwargs):
         self.label = ""
@@ -1412,6 +1415,8 @@ class Face:
         elif isinstance(obj, Face):
             self.wire = obj.wire
             self.edges = list(obj.edges)
+            self.contours = [list(ring) for ring in obj.contours]
+            return
         elif obj is None and args and isinstance(args[0], Wire):
             self.wire = args[0]
             self.edges = list(args[0].edges)
@@ -1426,6 +1431,10 @@ class Face:
                 carrier="face_data_row",
                 phase="authoring",
             )
+        # A single recorded boundary is the landed single-ring section; a
+        # planar profile boolean replaces `contours` with the outer + hole
+        # rings (the multi-contour section).
+        self.contours = [self.edges]
 
     def faces(self):
         """The face selection of a recorded planar region.
@@ -1437,18 +1446,52 @@ class Face:
         return [self]
 
     def _profile_boolean(self, other, verb):
-        """A planar sketch boolean (the corpus's `Circle(a) - Circle(b)`
-        annular profile) is not a recorded kernel-engine carrier: the landed
-        arms consume ONE closed loop, so a multi-loop profile refuses typed
-        naming the missing carrier rather than dying untyped."""
-        _refuse(
-            "a planar profile boolean is not a kernel-engine row",
-            code="E_UNSUPPORTED_ENVELOPE",
-            verb=verb,
-            carrier="face_boolean",
-            phase="admission",
-        )
-        return None
+        """Record a planar two-contour section (the corpus's `Circle(a) -
+        Circle(b)` annular profile).
+
+        The landed section representation is one or more oriented rings: the
+        outer boundary is this face's boundary and the tool boundary is the
+        hole. Contour correspondence and nesting (the tool ring strictly inside
+        the outer ring, no crossings) are validated here as data; anything
+        ambiguous refuses typed with `E_NESTING_INVALID`. There is no 2D
+        boolean machinery: a genuine boolean is a different carrier."""
+        if verb not in ("cut", "subtract") or not isinstance(other, Face):
+            _refuse(
+                "a planar profile boolean outside the recorded two-contour section "
+                "is not a kernel-engine row",
+                code="E_UNSUPPORTED_ENVELOPE",
+                verb=verb,
+                carrier="face_boolean",
+                phase="admission",
+            )
+        outer = [list(ring) for ring in self.contours]
+        inner = [list(ring) for ring in other.contours]
+        if len(outer) != 1 or len(inner) != 1:
+            _refuse(
+                "a planar profile boolean of a multi-contour sketch is not a "
+                "kernel-engine row",
+                code="E_NESTING_INVALID",
+                verb=verb,
+                carrier="face_boolean",
+                phase="admission",
+            )
+        if not _contour_encloses(outer[0], inner[0]):
+            _refuse(
+                "a planar profile boolean whose contours are not strictly nested "
+                "is not a kernel-engine row",
+                code="E_NESTING_INVALID",
+                verb=verb,
+                carrier="face_boolean",
+                phase="admission",
+            )
+        result = Face.__new__(Face)
+        result.label = ""
+        result.color = None
+        result._occ = None
+        result.edges = list(outer[0])
+        result.wire = Wire(result.edges)
+        result.contours = [list(outer[0]), list(inner[0])]
+        return result
 
     def __sub__(self, other):
         return self._profile_boolean(other, "cut")
@@ -1468,7 +1511,7 @@ class Face:
         `BRepBndLib.Add_s`) then bounds the B-spline control net -- the
         documented control-net ENCLOSURE the corpus tolerates."""
         if self._occ is None:
-            self._occ = _occ_face(self.edges)
+            self._occ = _occ_face(self.contours)
         return self._occ
 
     @property
@@ -1497,6 +1540,109 @@ class Face:
 
     def __repr__(self):
         return f"Face({len(self.edges)} edges)"
+
+
+def _contour_samples(edges, count=64):
+    """Sample one recorded contour as planar 3-D points (data only).
+
+    A single circle/ellipse edge samples its exact conic; a line/spline
+    boundary samples its recorded vertices. The samples serve the nesting
+    validation (no geometry is invented)."""
+    if len(edges) == 1 and edges[0].kind == "circle":
+        edge = edges[0]
+        n = _vnormalize(edge.normal.to_tuple())
+        u = _perp_any(n)
+        v = _vcross(n, u)
+        c = edge.center.to_tuple()
+        out = []
+        for k in range(count):
+            theta = 2.0 * math.pi * k / count
+            out.append(
+                (
+                    c[0] + edge.radius * (math.cos(theta) * u[0] + math.sin(theta) * v[0]),
+                    c[1] + edge.radius * (math.cos(theta) * u[1] + math.sin(theta) * v[1]),
+                    c[2] + edge.radius * (math.cos(theta) * u[2] + math.sin(theta) * v[2]),
+                )
+            )
+        return out
+    if len(edges) == 1 and edges[0].kind == "ellipse":
+        edge = edges[0]
+        n = _vnormalize(edge.normal.to_tuple())
+        u = _vnormalize(edge.x_dir.to_tuple())
+        v = _vcross(n, u)
+        c = edge.center.to_tuple()
+        out = []
+        for k in range(count):
+            theta = 2.0 * math.pi * k / count
+            ct, st = math.cos(theta), math.sin(theta)
+            out.append(
+                (
+                    c[0] + edge.x_radius * ct * u[0] + edge.y_radius * st * v[0],
+                    c[1] + edge.x_radius * ct * u[1] + edge.y_radius * st * v[1],
+                    c[2] + edge.x_radius * ct * u[2] + edge.y_radius * st * v[2],
+                )
+            )
+        return out
+    out = []
+    for edge in edges:
+        for point in edge.points:
+            out.append(point.to_tuple())
+    return out
+
+
+def _contour_contains(edges, point):
+    """Whether `point` lies strictly inside one recorded contour (data only)."""
+    if len(edges) == 1 and edges[0].kind == "circle":
+        edge = edges[0]
+        c = edge.center.to_tuple()
+        d = _vsub(point, c)
+        radial = _vsub(d, _vscaled(_vnormalize(edge.normal.to_tuple()),
+                                  _vdot(d, _vnormalize(edge.normal.to_tuple()))))
+        return _vlen(radial) < edge.radius
+    if len(edges) == 1 and edges[0].kind == "ellipse":
+        edge = edges[0]
+        c = edge.center.to_tuple()
+        n = _vnormalize(edge.normal.to_tuple())
+        u = _vnormalize(edge.x_dir.to_tuple())
+        v = _vcross(n, u)
+        d = _vsub(point, c)
+        x = _vdot(d, u) / edge.x_radius
+        y = _vdot(d, v) / edge.y_radius
+        return (x * x + y * y) < 1.0
+    # A line/spline boundary: project into its own plane and use the even-odd
+    # ray crossing on the recorded vertices.
+    samples = _contour_samples(edges)
+    if len(samples) < 3:
+        return False
+    n = _vnormalize(_vcross(_vsub(samples[1], samples[0]),
+                            _vsub(samples[2], samples[0])))
+    u = _perp_any(n)
+    v = _vcross(n, u)
+    poly = [(_vdot(p, u), _vdot(p, v)) for p in samples]
+    q = (_vdot(point, u), _vdot(point, v))
+    inside = False
+    j = len(poly) - 1
+    for i in range(len(poly)):
+        a = poly[i]
+        b = poly[j]
+        if (a[1] > q[1]) != (b[1] > q[1]):
+            x = (b[0] - a[0]) * (q[1] - a[1]) / (b[1] - a[1]) + a[0]
+            if q[0] < x:
+                inside = not inside
+        j = i
+    return inside
+
+
+def _contour_encloses(outer, inner):
+    """Whether the inner contour lies strictly inside the outer contour with no
+    crossing (the annulus nesting condition, exact for the recorded conics)."""
+    samples = _contour_samples(inner)
+    if not samples:
+        return False
+    for point in samples:
+        if not _contour_contains(outer, point):
+            return False
+    return True
 
 
 def _occ_edge(edge):
@@ -1536,13 +1682,22 @@ def _occ_edge(edge):
     return None
 
 
-def _occ_face(edges):
-    """The OCC face of a recorded boundary: replay the edges and make the face."""
+def _occ_face(contours):
+    """The OCC face of a recorded section: replay the rings and make the face.
+
+    A single ring is the landed planar face; a multi-contour section makes the
+    OCC face with its hole wires (the probe/area path only)."""
     import build123d as occ
 
-    if not edges:
+    if not contours or not contours[0]:
         _refuse("an OCC bounds probe of an empty face boundary is not a kernel-engine row")
-    return occ.make_face(occ.Wire([_occ_edge(edge) for edge in edges]))
+    outer = occ.Wire([_occ_edge(edge) for edge in contours[0]])
+    if len(contours) == 1:
+        return occ.make_face(outer)
+    inners = [
+        occ.Wire([_occ_edge(edge) for edge in ring]) for ring in contours[1:]
+    ]
+    return occ.Face(outer, inners)
 
 
 def _occ_bounding_box(face):
@@ -1605,31 +1760,47 @@ def _place_face(frame, face):
     placed._occ = None
     placed.edges = _place_edges(frame, face.edges)
     placed.wire = Wire(placed.edges)
+    placed.contours = [_place_edges(frame, ring) for ring in face.contours]
     return placed
 
 
 def make_face(*objs, **kwargs):
-    """build123d ``make_face(wire)``: record a planar Face bounded by one wire.
+    """build123d ``make_face(wire)``: record a planar Face bounded by one or
+    more wires.
 
-    The recorded surface is elementary (the plane the boundary lies in); a
-    spline-trimmed boundary records its defining spline samples in the wire's
-    trim edges. Carriers outside the wire form refuse typed.
+    A single wire records the landed single-ring section. Multiple wires (the
+    corpus's two-ring sketch) record a multi-contour section: the first contour
+    is the outer boundary and each following contour is a hole. The recorded
+    surface is elementary (the plane the boundaries lie in); carriers outside
+    the wire form refuse typed.
     """
-    edges = []
+    contours = []
+    loose = []
     for obj in objs:
         if isinstance(obj, Wire):
-            edges.extend(obj.edges)
+            contours.append(list(obj.edges))
         elif isinstance(obj, Face):
-            edges.extend(obj.edges)
+            contours.extend([list(ring) for ring in obj.contours])
         elif isinstance(obj, Edge):
-            edges.append(obj)
+            loose.append(obj)
         elif obj is None:
             continue
         else:
             _refuse("make_face is not a corpus kernel-engine carrier")
-    if not edges:
+    if loose:
+        contours.append(loose)
+    if not contours or not contours[0]:
         _refuse("make_face is not a corpus kernel-engine carrier")
-    return Face(Wire(edges))
+    if len(contours) == 1:
+        return Face(Wire(contours[0]))
+    face = Face.__new__(Face)
+    face.label = ""
+    face.color = None
+    face._occ = None
+    face.edges = list(contours[0])
+    face.wire = Wire(face.edges)
+    face.contours = [list(ring) for ring in contours]
+    return face
 
 
 # ---------------------------------------------------------------------------
@@ -2372,6 +2543,19 @@ def revolve(shape, axis=None, revolution_arc=360.0, start_angle=0.0, **kwargs):
     ):
         _refuse("a revolve profile must close on itself")
     solid = {"kind": "lathe", "profile": profile, "arc_deg": arc_deg}
+    contours = getattr(shape, "contours", [edges])
+    if len(contours) > 1:
+        # The multi-contour section: each following ring is a hole revolved
+        # through the same per-patch machinery with the opposite flux sign.
+        holes = []
+        for ring in contours[1:]:
+            if _is_z_axis(unit):
+                holes.append(_legacy_z_profile(ring))
+            else:
+                hole, _ = _axis_profile(ring, unit)
+                holes.append(hole)
+        solid["kind"] = "section_lathe"
+        solid["holes"] = holes
     start_deg = _num(start_angle)
     if start_deg != 0.0:
         solid["start_deg"] = start_deg
@@ -3006,6 +3190,50 @@ def _place_loop(loop, base_frame, frame):
     return placed
 
 
+def _extrude_multi_contour(contours, amount, both):
+    """Record an extruded multi-contour section (the annular extrude idiom).
+
+    The outer contour and each hole ring are recorded exactly (never
+    flattened); the kernel's planar cap is the matched quad strip between
+    corresponding rings. A contour outside the recorded line/conic vocabulary
+    refuses typed."""
+
+    def record_ring(ring):
+        out = []
+        for edge in ring:
+            if edge.kind in ("line", "circle", "ellipse", "arc"):
+                out.append(_edge3(edge))
+            else:
+                _refuse("this profile edge carrier is not a kernel-engine row")
+        if not out:
+            _refuse("Face extrusion is not yet a kernel-engine row")
+        return out
+
+    profile = record_ring(contours[0])
+    single_conic = len(profile) == 1 and profile[0].get("kind") in ("circle", "ellipse")
+    if len(profile) < 3 and not single_conic:
+        _refuse("Face extrusion is not yet a kernel-engine row")
+    holes = [record_ring(ring) for ring in contours[1:]]
+    part = _Part(
+        {
+            "kind": "section_prism",
+            "profile": profile,
+            "holes": holes,
+            "amount": _num(amount),
+            "both": bool(both),
+        }
+    )
+    if _T123D is not None:
+        _kernel_facts(
+            part._node(),
+            verb="extrude",
+            carrier="prism",
+            phase="admission",
+            via="extrude",
+        )
+    return part
+
+
 def extrude(shape, amount, both=False, mode=None, **kwargs):
     """build123d ``extrude(face, amount, both)``: the recording arm for a
     closed planar profile swept along its own plane normal.
@@ -3021,6 +3249,9 @@ def extrude(shape, amount, both=False, mode=None, **kwargs):
     """
     if not isinstance(shape, Face):
         _refuse("Face extrusion is not yet a kernel-engine row")
+    contours = getattr(shape, "contours", [shape.edges])
+    if len(contours) > 1:
+        return _extrude_multi_contour(contours, amount, both)
     profile = []
     lines = []
     spline_points = []
