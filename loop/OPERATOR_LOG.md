@@ -9198,3 +9198,55 @@ Escalation (step 7): MED - FHC-G6 warm build 0xc0000409 / RAM below floor
 
 Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by RAM / HEAD 94ba60b + this
 cycle's STATE/log commit.
+
+---
+
+[operator 2026-09-13T01:24Z] cycle 2 (this instance).
+
+Health (step 1): heartbeat 1 real (27872, LIVE; a naive `dispatch_heartbeat` match returns 2
+but the second hit is this operator's own powershell command line - the known landmine, not a
+double heartbeat). Watchdog 1 (29264), operator runner 1 (27876), cargoq UP (ping ok, queued
+0, running false). Disk 16.1 GB free (above the 8 GB floor AND the 15 GB janitor goal). RAM
+2.4 GB free (BELOW the 3 GB floor - carried HIGH; chrome+Dropbox+Discord+MsMpEng+2 opencode).
+No `%TEMP%/look-verify-baseline-*` leaks. Carried duplication: TWO supervisor.py, TWO
+cargoq/server.py (functional).
+
+Board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched.
+HEAD `fa89200` (integration/kernel-bg tip; parent is the 94ba60b FHC-B row-flip commit).
+
+Landing (step 2): nothing. Slots 3-7 FINISHED residue (e6553db/3c2109b/ee97499/713f205/
+5cf4811); re-derived with `git merge-base --is-ancestor <c> HEAD` = exit 0 for every one, so
+all are already landed. RESULT.json files live at `loop/slots/N/wt/RESULT.json` (worktree
+root), not `loop/slots/N/`. Slot 1 RUNNING (FHC-C, pid 29716, events ~1 min old, pre-commit).
+
+Unblock (step 3): nothing. Slot 0 IDLE (FHC-G6, dead dispatch, no work, base 94ba60b); slot 2
+IDLE (TTC-RECENSUS-F1-R3 row is DONE, no work, clean at f0ae3ab). No QUESTION, no
+no-RESULT-with-work worker.
+
+Registry (step 4): 361 lines = 265 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED (DONE
+262->265 since the last cycle). BLOCKED-with-all-needs-landed = 7 rows, but NONE mechanically
+flippable - every one is a semantic/owner block: BG-AUD-FIX-004 OWNER_BLOCKED,
+BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED (do not dispatch),
+DEF-SPINEFRAME-GRAZE has a live -R2 row, MONO-10 owner-challenge candidate, RDEF-M4/M5
+owner-decision inputs. Left all. READY rows failing gen_packet --check remain RG-23/RG-9
+(packet:'' - unauthored, cannot fix without authoring; carried). FHC-C/G6/G1 rows still read
+READY despite slot 1 RUNNING FHC-C (row-bookkeeping lag; slot truth wins).
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready.py --dry-run --max-workers=4` = "dispatched 0; workers ~1/4": FHC-G6 shown as
+DEAD dispatch (slot 0 holds no matching RESULT) that would reset+delete+redispatch, and the
+heartbeat's own 21:14 log shows G6 write-set-CLASHING with the RUNNING FHC-C on
+truck123d/src/bd_bridge.rs; FHC-G1 blocked on G6; RG-23/RG-9 clash with FHC-C on the same
+file. So the frontier is doubly held (FHC-C write-set clash + the warm-build RAM risk). Did
+NOT clean+re-warm slot 0 (RAM below floor under a live worker; ORCHESTRATOR: shrink, do not
+retry blindly). Carried escalation.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the machine, as left"
+status bullets, both labeled [operator 2026-09-13T01:24Z]; corrected HEAD to fa89200 and
+recorded the G6 write-set clash. Traps/history untouched.
+
+Escalation (step 7): MED carried - FHC-G6 frontier (warm-build 0xc0000409 + FHC-C write-set
+clash) / RAM below floor. No new escalation.
+
+Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by FHC-C write-set clash + RAM /
+HEAD fa89200 + this cycle's STATE/log commit.

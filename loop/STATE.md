@@ -75,36 +75,34 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T01:01Z]: 1 RUNNING / 0 landed-this-cycle /
-> 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `94ba60b` (integration/kernel-bg tip).
-> **FHC-B-MULTI-CONTOUR-SECTIONS LANDED** by the overnight driver (row-flip commit 94ba60b,
-> "FHC-B row LANDED (a43f7fc; scoped 6/6 at merged HEAD)"; a43f7fc is an ancestor of HEAD -
-> re-verified this cycle). **FHC-C-AUTHORING-FIDELITY is RUNNING in slot 1** (pid 29716,
-> forked 20:52:55 local from base 94ba60b, events fresh, pre-commit, 0 changed files) - do
-> not touch. **FHC-G6-CERT-COST-SCALE is the blocked frontier** (slot 0 IDLE): the heartbeat
-> tried it at 20:52:55 local and the warm build (`cargo check --workspace --all-targets`)
-> died exit 101 with `0xc0000409` STATUS_STACK_BUFFER_OVERRUN (the RAM-zone signature) while
-> building lzma-sys. RAM is 2.28 GB free (BELOW the 3 GB floor); a cold re-warm now would
-> spike RAM while FHC-C runs - the ORCHESTRATOR rule is shrink, do not retry blindly - so the
-> operator did NOT clean+re-warm slot 0; escalated this cycle. FHC-G1 waits on G6.
-> Slot 2 IDLE (TTC-RECENSUS-F1-R3, no work, clean at base f0ae3ab). Slots 3-7 FINISHED landed
-> residue (e6553db / 3c2109b / ee97499 / 713f205 / 5cf4811, all re-verified ancestors of HEAD
-> this cycle); slot 4 LANDED-WITH-FINDINGS. Nothing operator-landable.
-> Health: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight driver
-> 1 (24864), cargoq UP (ping ok, queued 0, running false). Disk 16.5 GB free (above the 8 GB
-> floor AND the 15 GB janitor goal). No `%TEMP%/look-verify-baseline-*` leaks. TWO
-> supervisor.py (19172 + 27828) and TWO cargoq/server.py (28544 + 34564) = carried
-> duplication, functional. Root worktree: human WIP untouched (untracked benchmarks/baselines,
-> M loop/cargoq/server.log).
-> Registry (last-wins): 361 lines = 262 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED.
-> BLOCKED-with-all-needs-landed = only BG-CK-SPLINE-CENSUS (owner-cancelled). READY without a
-> landed marker that is actually dispatchable = the FHC chain only (G6/G1/C). Nothing
-> mechanically flippable.
-> Carried: RG-23/RG-9 unauthored (anchor-check fail); F1-AUTHORING-ARMS LANDED-WITH-FINDINGS;
-> FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-1/2/4/7 wt RESULT residue;
-> duplicate registry lines; schedule.py 'needs' crash; warm-build RAM headroom.
-> Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by RAM / HEAD `94ba60b` + this
-> cycle's STATE/log commit.
+> LATEST GROUND TRUTH [operator 2026-09-13T01:24Z]: 1 RUNNING / 0 landed-this-cycle /
+> 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `fa89200` (integration/kernel-bg tip;
+> the 94ba60b "FHC-B row LANDED" commit is its parent). **FHC-C-AUTHORING-FIDELITY is RUNNING
+> in slot 1** (pid 29716, events fresh ~1 min, pre-commit) - do not touch. Slots 3-7 FINISHED
+> landed residue (e6553db / 3c2109b / ee97499 / 713f205 / 5cf4811); re-derived this cycle:
+> every worker commit is an ancestor of HEAD (`merge-base --is-ancestor` exit 0), so nothing
+> is operator-landable. **FHC-G6-CERT-COST-SCALE is the blocked frontier** (slot 0 IDLE, dead
+> dispatch, no work, base 94ba60b): the heartbeat's 20:52:55 warm build died exit 101
+> `0xc0000409` (RAM-zone) on lzma-sys. This cycle dispatch_ready also reports G6 write-set
+> CLASHING with the RUNNING FHC-C on `truck123d/src/bd_bridge.rs`, so it is doubly held; G1
+> waits on G6. RAM 2.4 GB free (BELOW the 3 GB floor, carried HIGH); operator did NOT
+> clean+re-warm slot 0 - shrink, do not retry blindly - escalated (carried). Slot 2 IDLE
+> (TTC-RECENSUS-F1-R3 is DONE, no work, clean at base f0ae3ab).
+> Health: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
+> (ping ok, queued 0, running false). Disk 16.1 GB free (above the 8 GB floor AND the 15 GB
+> janitor goal). No `%TEMP%/look-verify-baseline-*` leaks. Carried duplication: TWO
+> supervisor.py, TWO cargoq/server.py. Root worktree: human WIP untouched.
+> Registry (last-wins): 361 lines = 265 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED (DONE
+> 262->265 this cycle). BLOCKED-with-all-needs-landed = 7 rows but NONE mechanically
+> flippable: BG-AUD-FIX-004 (OWNER_BLOCKED), BG-CK-SPLINE-CENSUS (owner-cancelled),
+> SEM-PCURVE-MASTER-001-FIX (SUPERSEDED), DEF-SPINEFRAME-GRAZE (has live -R2 row),
+> MONO-10 (owner-challenge candidate), RDEF-M4/M5 (owner-decision inputs). FHC-C/G6/G1 rows
+> still say READY despite slot 1 RUNNING FHC-C (row-bookkeeping lag; slot truth wins).
+> Carried: RG-23/RG-9 unauthored (packet:''; clash FHC-C); F1-AUTHORING-ARMS
+> LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-3/4/5/6/7 wt
+> RESULT residue; schedule.py 'needs' crash; warm-build RAM headroom.
+> Leaving: 1 RUNNING (FHC-C, slot 1) / FHC-G6 frontier held by FHC-C write-set clash + RAM /
+> HEAD `fa89200` + this cycle's STATE/log commit.
 
 
 ## Pick up here
@@ -149,30 +147,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
-- 1 RUNNING worker [operator 2026-09-13T01:01Z]. FHC-C-AUTHORING-FIDELITY (slot 1, pid
-  29716) forked 20:52:55 local from base 94ba60b, events fresh, pre-commit. Do not touch.
-- FHC-B-MULTI-CONTOUR-SECTIONS LANDED by the overnight driver (row-flip commit 94ba60b);
-  a43f7fc is an ancestor of HEAD (re-verified this cycle). The 00:38Z driver-vs-operator
-  scoped-check discrepancy is resolved by the landing.
-- Slot 0 IDLE: FHC-G6-CERT-COST-SCALE frontier. The heartbeat's 20:52:55 local dispatch
-  failed on the warm build (cargo check --workspace --all-targets exit 101, 0xc0000409
-  STATUS_STACK_BUFFER_OVERRUN building lzma-sys). RAM 2.28 GB free (BELOW the 3 GB floor);
-  operator did NOT clean+re-warm (would spike RAM under FHC-C) - escalated. FHC-G1 waits.
-- Slot 2 IDLE: TTC-RECENSUS-F1-R3, no work (clean detached at f0ae3ab). Slots 3-7 FINISHED
-  landed residue (e6553db/3c2109b/ee97499/713f205/5cf4811, all ancestors of HEAD this
-  cycle); slot 4 LANDED-WITH-FINDINGS. Nothing landable.
+- 1 RUNNING worker [operator 2026-09-13T01:24Z]. FHC-C-AUTHORING-FIDELITY (slot 1, pid
+  29716) forked 20:52:55 local from base 94ba60b, events fresh (~1 min), pre-commit. Do not
+  touch.
+- Slots 3-7 FINISHED landed residue (e6553db/3c2109b/ee97499/713f205/5cf4811). Re-derived
+  this cycle: all are ancestors of HEAD (`merge-base --is-ancestor` exit 0). Nothing
+  landable.
+- Slot 0 IDLE: FHC-G6-CERT-COST-SCALE frontier. Dead dispatch (no work, base 94ba60b) from
+  the 20:52:55 warm-build failure (exit 101, 0xc0000409 STATUS_STACK_BUFFER_OVERRUN building
+  lzma-sys). This cycle dispatch_ready also shows G6 write-set-CLASHING with the RUNNING
+  FHC-C on truck123d/src/bd_bridge.rs. RAM 2.4 GB free (BELOW the 3 GB floor); operator did
+  NOT clean+re-warm (would spike RAM under FHC-C) - escalated (carried). FHC-G1 waits on G6.
+- Slot 2 IDLE: TTC-RECENSUS-F1-R3 row is DONE, no work (clean detached at f0ae3ab).
 - Do NOT run dispatch_ready live - the heartbeat (27872) owns dispatch and is LIVE.
-- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight
-  driver 1 (24864), cargoq UP (ping ok, queued 0, running false). TWO supervisor.py (19172
-  + 27828) and TWO cargoq/server.py (28544 + 34564) = carried duplication.
-- Disk 16.5 GB free (above the 8 GB floor AND the 15 GB janitor goal; no
-  `%TEMP%/look-verify-baseline-*` leaks). RAM 2.28 GB free (BELOW the 3 GB floor - carried
+- Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
+  (ping ok, queued 0, running false). Carried duplication: TWO supervisor.py and TWO
+  cargoq/server.py (functional).
+- Disk 16.1 GB free (above the 8 GB floor AND the 15 GB janitor goal; no
+  `%TEMP%/look-verify-baseline-*` leaks). RAM 2.4 GB free (BELOW the 3 GB floor - carried
   HIGH; heavy baseline chrome+Dropbox+Discord+MsMpEng+2 opencode).
-- Registry (last-wins): 361 lines = 262 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED.
-  BLOCKED-with-all-needs-landed = only BG-CK-SPLINE-CENSUS (owner-cancelled). READY
-  without a landed marker that is dispatchable = the FHC chain only. Nothing flippable.
-- [operator 2026-09-13T01:01Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
-  0 flipped / 0 operator-dispatched; HEAD 94ba60b.
+- Registry (last-wins): 361 lines = 265 DONE / 85 READY / 10 BLOCKED / 1 SUPERSEDED.
+  BLOCKED-with-all-needs-landed = 7 rows, none mechanically flippable (semantic/owner blocks:
+  BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE has live -R2,
+  MONO-10 owner candidate, RDEF-M4/M5 owner inputs). READY without a landed marker that is
+  dispatchable = the FHC chain only.
+- [operator 2026-09-13T01:24Z] board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked /
+  0 flipped / 0 operator-dispatched; HEAD fa89200.
 
 [operator 2026-09-09T02:2xZ - volatile refresh after the ADM-L4 operator
 landing. Board now: 0 running / 6 FINISHED residue (L1,L2,L3,F1,CL-005,

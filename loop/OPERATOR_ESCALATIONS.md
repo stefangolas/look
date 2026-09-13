@@ -2340,3 +2340,12 @@ uncommitted - left for the orchestrator, no dispatch impact.
   quiet machine, reduce max-workers and/or prewarm slot 0 once by hand.
 - Priority: medium. The FHC chain is stalled at G6 until a warm build succeeds; nothing else
   on the board is dispatchable.
+
+## 2026-09-13T01:24Z - operator carry (cycle 2): FHC-G6 frontier doubly held
+- Same G6 warm-build 0xc0000409 / RAM-below-floor item, re-observed and CARRIED; no new
+  action. New detail this cycle: `dispatch_ready --dry-run` also reports FHC-G6 write-set
+  CLASHING with the RUNNING FHC-C-AUTHORING-FIDELITY on `truck123d/src/bd_bridge.rs`, so even
+  with RAM restored G6 cannot dispatch until FHC-C frees its slot. The heartbeat (27872) owns
+  live dispatch and will retry G6 when the clash clears. Start from: let FHC-C finish; then
+  `python loop/dispatch_ready.py --max-workers=3` (or the heartbeat's next cycle) and watch
+  loop/dispatch_heartbeat.log for `0xc0000409`. Priority: medium (carried).
