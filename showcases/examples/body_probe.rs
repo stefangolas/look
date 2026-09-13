@@ -1,9 +1,9 @@
+use showcases::profile as _;
+use showcases::teapot::{TeapotTable, body_silhouette};
 use truck_base::cgmath64::Point3;
 use truck_geometry::arrange;
 use truck_geometry::canonical::Curve;
 use truck_modeling::{Line, revolve};
-use showcases::profile as _;
-use showcases::teapot::{TeapotTable, body_silhouette};
 
 fn main() {
     let t = TeapotTable::default();
@@ -14,7 +14,12 @@ fn main() {
     }
     let profile_curves: Vec<Curve> = silhouette
         .windows(2)
-        .map(|w| Curve::from(Line(Point3::new(w[0].x, 0.0, w[0].y), Point3::new(w[1].x, 0.0, w[1].y))))
+        .map(|w| {
+            Curve::from(Line(
+                Point3::new(w[0].x, 0.0, w[0].y),
+                Point3::new(w[1].x, 0.0, w[1].y),
+            ))
+        })
         .collect();
     let mut curves = profile_curves.clone();
     let first = silhouette[0];
@@ -26,7 +31,9 @@ fn main() {
     let working: Vec<Curve> = curves
         .iter()
         .map(|c| match c {
-            Curve::Line(Line(a, b)) => Curve::from(Line(Point3::new(a.x, a.z, 0.0), Point3::new(b.x, b.z, 0.0))),
+            Curve::Line(Line(a, b)) => {
+                Curve::from(Line(Point3::new(a.x, a.z, 0.0), Point3::new(b.x, b.z, 0.0)))
+            }
             _ => unreachable!(),
         })
         .collect();

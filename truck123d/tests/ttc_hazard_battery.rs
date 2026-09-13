@@ -37,43 +37,43 @@ fn python_command() -> std::process::Command {
 /// One battery row: the door entry name and its expected verdict class.
 const CASES: &[(&str, &str)] = &[
     // A. designed tangency & degeneracy
-    ("sphere_plane_kiss", "staged"),          // boolean gate
-    ("coaxial_equal_cylinders", "staged"),    // boolean gate
+    ("sphere_plane_kiss", "staged"),       // boolean gate
+    ("coaxial_equal_cylinders", "staged"), // boolean gate
     ("equal_cylinders_perpendicular", "staged"),
     ("near_tangency", "staged"),
     ("coplanar_face_fuse", "staged"),
     // B. periodicity, seams, decks
     ("cylinder_wrap", "staged"),
     ("seam_split", "staged"),
-    ("apex_revolve", "green"),                // revolve arm landed
+    ("apex_revolve", "green"), // revolve arm landed
     // C. trim & topology edges
     ("deep_cavity_cut", "staged"),
-    ("zero_thickness_residual", "typed"),     // correct permanent answer
+    ("zero_thickness_residual", "typed"), // correct permanent answer
     ("disjoint_fuse", "staged"),
     // D. chain depth & composition
-    ("boolean_of_boolean", "typed"),          // depth-2 cell: permanent
+    ("boolean_of_boolean", "typed"), // depth-2 cell: permanent
     ("long_chain", "staged"),
     ("fillet_then_cut", "staged"),
     // E. scale & tolerance regime
     ("small_feature_large_origin", "staged"),
     ("sliver_faces", "staged"),
-    ("scale_span_shock", "green"),            // compound arm landed
+    ("scale_span_shock", "green"), // compound arm landed
     // F. representation extremes
-    ("rational_heavy_spline", "green"),       // spline profile + loft row
-    ("twisted_loft_stations", "staged"),      // correspondence law
-    ("c0_knot_profile", "green"),             // polyline profile + extrude
+    ("rational_heavy_spline", "green"), // spline profile + loft row
+    ("twisted_loft_stations", "staged"), // correspondence law
+    ("c0_knot_profile", "green"),       // polyline profile + extrude
     // G. assembly identity & placement
-    ("prototype_reuse", "green"),             // placement landed
+    ("prototype_reuse", "green"), // placement landed
     ("mirror_twins", "green"),
     ("nested_compounds", "green"),
-    ("frame_composition_chain", "green"),     // frames landed
+    ("frame_composition_chain", "green"), // frames landed
     // H. shells, offsets, thickens
-    ("box_shell", "staged"),                  // CC strata landed, arm not
+    ("box_shell", "staged"), // CC strata landed, arm not
     ("cylinder_shell", "staged"),
     ("spline_loft_shell", "staged"),
     ("variable_thickness_offset", "staged"),
     ("thicken_sheet", "staged"),
-    ("offset_self_intersect", "typed"),       // singular regime: permanent
+    ("offset_self_intersect", "typed"), // singular regime: permanent
     // I. basic operations the corpus never touched
     ("drafted_extrude", "staged"),
     ("loft_intersection", "staged"),
@@ -149,7 +149,10 @@ fn hazard_battery_discipline() {
         }
     }
     if !drift.is_empty() {
-        println!("=== hazard battery: {} class drifts (staged vs landed) ===", drift.len());
+        println!(
+            "=== hazard battery: {} class drifts (staged vs landed) ===",
+            drift.len()
+        );
         for d in &drift {
             println!("  {d}");
         }

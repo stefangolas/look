@@ -1,8 +1,8 @@
-use truck_base::cgmath64::{Point3, Vector3};
-use truck_geometry::constructive::*;
 use showcases::profile::trapezoid_chute;
 use showcases::spine::{CompositeSpec, composite_path, shift_to_ground, spline_from_path};
+use truck_base::cgmath64::{Point3, Vector3};
 use truck_geometry::constructive::SpineCurve;
+use truck_geometry::constructive::*;
 
 fn main() {
     for samples in [48usize, 64, 96, 128, 160] {
@@ -30,11 +30,18 @@ fn sweep_for_samples(samples: usize) {
         spine,
         ProfileLaw::Scale {
             profile: chute,
-            scale: ScalarLaw::Linear { start: 1.0, end: 1.35 },
+            scale: ScalarLaw::Linear {
+                start: 1.0,
+                end: 1.35,
+            },
         },
-        FrameLaw::ParallelTransport { initial_normal: Vector3::new(a.sin(), 0.0, a.cos()) },
+        FrameLaw::ParallelTransport {
+            initial_normal: Vector3::new(a.sin(), 0.0, a.cos()),
+        },
     );
-    let stations = SamplingPolicy::UniformCount { spine: 120 }.resolve(0.0, 1.0).expect("stations");
+    let stations = SamplingPolicy::UniformCount { spine: 120 }
+        .resolve(0.0, 1.0)
+        .expect("stations");
     let result = match truck_modeling::facet_sweep::facet_sweep(&recipe, &stations, 4) {
         Ok(r) => r,
         Err(e) => {

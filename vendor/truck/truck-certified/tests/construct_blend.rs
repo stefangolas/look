@@ -55,16 +55,8 @@ fn chart(map: CertifiedSurfaceMap, side: f64) -> SupportChart {
 /// The certified box of a centre with the standard half-width.
 fn box_of(centre: [f64; 3]) -> IBox3 {
     IBox3::try_new(
-        [
-            centre[0] - 0.02,
-            centre[1] - 0.02,
-            centre[2] - 0.02,
-        ],
-        [
-            centre[0] + 0.02,
-            centre[1] + 0.02,
-            centre[2] + 0.02,
-        ],
+        [centre[0] - 0.02, centre[1] - 0.02, centre[2] - 0.02],
+        [centre[0] + 0.02, centre[1] + 0.02, centre[2] + 0.02],
     )
     .expect("the seed box is valid")
 }
@@ -119,7 +111,11 @@ fn two_plane_chain_walks_and_terminates_at_trim_events() {
     // `0 − 0.3`.
     let seed = groove_seed(0.3, 0.25, None);
     let mut budget = budget();
-    let trace = expect_trace(trace_blend_chain(&[seed], &RadiusLaw::Constant(0.25), &mut budget));
+    let trace = expect_trace(trace_blend_chain(
+        &[seed],
+        &RadiusLaw::Constant(0.25),
+        &mut budget,
+    ));
 
     let trims: Vec<_> = trace
         .events
@@ -207,7 +203,11 @@ fn clear_loss_stops_the_branch_as_collision_event() {
     };
     let seed = groove_seed(0.15, 0.25, Some(clearance));
     let mut budget = budget();
-    let trace = expect_trace(trace_blend_chain(&[seed], &RadiusLaw::Constant(0.25), &mut budget));
+    let trace = expect_trace(trace_blend_chain(
+        &[seed],
+        &RadiusLaw::Constant(0.25),
+        &mut budget,
+    ));
 
     let collisions: Vec<_> = trace
         .events
@@ -270,14 +270,8 @@ fn triple_node_joins_three_branches_exactly() {
     )
     .expect("the AC seed builds");
     // Wall/far-wall branch along `z`, seeded inside `(ρ, 1)`.
-    let bc = BranchSeed::try_new(
-        b,
-        c,
-        box_of([0.5, 0.5, 0.8]),
-        Some(a),
-        None,
-    )
-    .expect("the BC seed builds");
+    let bc = BranchSeed::try_new(b, c, box_of([0.5, 0.5, 0.8]), Some(a), None)
+        .expect("the BC seed builds");
 
     let mut budget = budget();
     let trace = expect_trace(trace_blend_chain(
@@ -319,7 +313,10 @@ fn triple_node_joins_three_branches_exactly() {
         reference.radius
     );
     for event in third_face.iter().skip(1) {
-        let node = event.node.as_ref().expect("a ThirdFace event carries its node");
+        let node = event
+            .node
+            .as_ref()
+            .expect("a ThirdFace event carries its node");
         assert_eq!(
             node, reference,
             "every incident branch references the SAME solved node (P6)"
@@ -338,10 +335,7 @@ fn topology_between_events_is_never_speculated() {
     let seed = groove_seed(0.3, 0.25, None);
     let mut budget = Budget::new(0, 3, 0);
     match trace_branch_steps(&seed, &RadiusLaw::Constant(0.25), &mut budget) {
-        Err(BranchRefusal {
-            refusal,
-            partial,
-        }) => {
+        Err(BranchRefusal { refusal, partial }) => {
             assert_eq!(refusal, ConstructRefusal::ConditioningBelowThreshold);
             assert_eq!(
                 partial.steps.len(),

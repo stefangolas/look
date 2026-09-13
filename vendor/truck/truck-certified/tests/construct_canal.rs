@@ -97,7 +97,10 @@ fn constant_radius_unit_circle_satisfies_pipe_condition() {
     // regular whenever the pipe condition holds on the whole loop.
     let closed = canal_regularity_closed_pipe(&map, &RadiusLaw::Constant(0.5))
         .expect("the constant-radius unit-circle closed pipe certifies regular");
-    assert!(closed.lo > 0.0, "the closed-pipe margin is positive: {closed:?}");
+    assert!(
+        closed.lo > 0.0,
+        "the closed-pipe margin is positive: {closed:?}"
+    );
 }
 
 #[test]
@@ -122,7 +125,10 @@ fn radius_law_slope_at_or_above_one_refuses_canal_singular() {
     );
     assert!(
         matches!(
-            radius_eval(&RadiusLaw::Linear { r0: 0.5, r1: 1.5 }, Interval { lo: 0.0, hi: 0.5 }),
+            radius_eval(
+                &RadiusLaw::Linear { r0: 0.5, r1: 1.5 },
+                Interval { lo: 0.0, hi: 0.5 }
+            ),
             Err(ConstructRefusal::CanalSingular)
         ),
         "the gate fires on any sub-interval where the constant slope reaches one"
@@ -147,14 +153,8 @@ fn radius_law_slope_at_or_above_one_refuses_canal_singular() {
 
     // A slope strictly inside (-1, 1) is admissible: the gate is at one, not
     // before it.
-    let ok = radius_eval(
-        &RadiusLaw::Linear {
-            r0: 0.25,
-            r1: 0.75,
-        },
-        unit,
-    )
-    .expect("a slope of 0.5 is admissible");
+    let ok = radius_eval(&RadiusLaw::Linear { r0: 0.25, r1: 0.75 }, unit)
+        .expect("a slope of 0.5 is admissible");
     assert!(ok.contains(0.5), "the radius stays positive and evaluated");
 
     // The seam refuses the degenerate slope through the same gate.
@@ -228,8 +228,8 @@ fn arc_restriction_is_strictly_more_permissive_than_all_theta() {
     let map = admitted_curve(&spine, 0.5);
     let law = RadiusLaw::Constant(0.5);
 
-    let arc_enclosure = canal_regularity(&map, &law, (0.0, 0.1))
-        .expect("the sub-arc near t = 0 certifies regular");
+    let arc_enclosure =
+        canal_regularity(&map, &law, (0.0, 0.1)).expect("the sub-arc near t = 0 certifies regular");
     assert!(
         arc_enclosure.lo > 0.0,
         "the arc-restricted margin is strictly positive: {arc_enclosure:?}"
@@ -251,26 +251,23 @@ fn arc_restriction_is_strictly_more_permissive_than_all_theta() {
 fn radius_law_evaluation_matches_declared_law() {
     // Constant(c) → (c, 0) over any sub-interval.
     let constant = RadiusLaw::Constant(0.75);
-    let r = radius_eval(&constant, Interval { lo: 0.0, hi: 1.0 })
-        .expect("the constant law evaluates");
+    let r =
+        radius_eval(&constant, Interval { lo: 0.0, hi: 1.0 }).expect("the constant law evaluates");
     assert!(r.contains(0.75), "constant radius evaluates to c");
-    let (rv, rp) = radius_derivs(&constant, Interval { lo: 0.0, hi: 1.0 })
-        .expect("the constant law derives");
+    let (rv, rp) =
+        radius_derivs(&constant, Interval { lo: 0.0, hi: 1.0 }).expect("the constant law derives");
     assert!(rv.contains(0.75), "constant radius value");
     assert!(rp.contains(0.0), "constant radius slope is zero");
 
     // Linear { r0, r1 } → r(u) = r0 + (r1 - r0)·u with constant slope
     // r1 - r0 over the declared arc; on [0.25, 0.5] the value spans [0.6, 0.7].
-    let linear = RadiusLaw::Linear {
-        r0: 0.5,
-        r1: 0.9,
-    };
-    let band = Interval {
-        lo: 0.25,
-        hi: 0.5,
-    };
+    let linear = RadiusLaw::Linear { r0: 0.5, r1: 0.9 };
+    let band = Interval { lo: 0.25, hi: 0.5 };
     let r = radius_eval(&linear, band).expect("the linear law evaluates");
-    assert!(r.contains(0.6) && r.contains(0.7), "linear interpolation band");
+    assert!(
+        r.contains(0.6) && r.contains(0.7),
+        "linear interpolation band"
+    );
     let (rv, rp) = radius_derivs(&linear, band).expect("the linear law derives");
     assert!(rv.contains(0.6) && rv.contains(0.7), "linear value band");
     assert!(rp.contains(0.4), "linear slope is r1 - r0 = 0.4");
@@ -301,7 +298,8 @@ fn radius_law_evaluation_matches_declared_law() {
     let mono = RadiusLaw::MonotoneCubic(vec![(0.0, 0.5), (0.5, 0.7), (1.0, 0.9)]);
     let vertex = RadiusLaw::VertexControl(vec![0.5, 0.7, 0.9]);
     for law in [&mono, &vertex] {
-        let (rv, rp) = radius_derivs(law, Interval::point(0.25)).expect("the monotone cubic derives");
+        let (rv, rp) =
+            radius_derivs(law, Interval::point(0.25)).expect("the monotone cubic derives");
         assert!(
             rv.lo <= 0.6 && 0.6 <= rv.hi, // H-3: collinear monotone cubic tracks the line
             "the monotone cubic value at u = 0.25 is 0.6: {rv:?}"

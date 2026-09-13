@@ -13,18 +13,36 @@ fn square(n: usize, r: f64) -> Profile2D {
 }
 
 fn stations(n: usize) -> Vec<f64> {
-    SamplingPolicy::UniformCount { spine: n }.resolve(0.0, 1.0).expect("stations")
+    SamplingPolicy::UniformCount { spine: n }
+        .resolve(0.0, 1.0)
+        .expect("stations")
 }
 
 fn main() {
     let line_recipe = SpineFrameRecipe::new(
-        LineSpine { start: Point3::new(0.0, 0.0, 0.0), end: Point3::new(0.0, 0.0, 2.0) },
-        ProfileLaw::Scale { profile: square(4, 0.2), scale: ScalarLaw::Linear { start: 1.0, end: -1.0 } },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        LineSpine {
+            start: Point3::new(0.0, 0.0, 0.0),
+            end: Point3::new(0.0, 0.0, 2.0),
+        },
+        ProfileLaw::Scale {
+            profile: square(4, 0.2),
+            scale: ScalarLaw::Linear {
+                start: 1.0,
+                end: -1.0,
+            },
+        },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     match facet_sweep::facet_sweep(&line_recipe, &stations(4), 4) {
-        Ok(r) => println!("scale-zero: Ok tri={} quad={} v={} winding={}",
-            r.audit.triangle_count, r.audit.quad_count, r.audit.signed_volume, r.audit.winding_violations),
+        Ok(r) => println!(
+            "scale-zero: Ok tri={} quad={} v={} winding={}",
+            r.audit.triangle_count,
+            r.audit.quad_count,
+            r.audit.signed_volume,
+            r.audit.winding_violations
+        ),
         Err(e) => println!("scale-zero: Err {e:?}"),
     }
 
@@ -32,25 +50,42 @@ fn main() {
         Point3::new(0.0, 0.0, 0.0),
         Point3::new(1.0, 0.0, 0.0),
         Point3::new(1.0, 1.0, 1.0),
-    ]).expect("polyline");
+    ])
+    .expect("polyline");
     println!("polyline domain: {:?}", SpineCurve::domain(&poly));
     let poly_recipe = SpineFrameRecipe::new(
         poly,
         ProfileLaw::Constant(square(4, 0.2)),
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     match facet_sweep::facet_sweep(&poly_recipe, &stations(8), 4) {
-        Ok(r) => println!("polyline: Ok v={} winding={}", r.audit.signed_volume, r.audit.winding_violations),
+        Ok(r) => println!(
+            "polyline: Ok v={} winding={}",
+            r.audit.signed_volume, r.audit.winding_violations
+        ),
         Err(e) => println!("polyline: Err {e:?}"),
     }
 
     let corr = SpineFrameRecipe::new(
-        LineSpine { start: Point3::new(0.0, 0.0, 0.0), end: Point3::new(0.0, 0.0, 2.0) },
-        ProfileLaw::LinearCorrespondence { start: square(4, 0.2), end: square(6, 0.1) },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        LineSpine {
+            start: Point3::new(0.0, 0.0, 0.0),
+            end: Point3::new(0.0, 0.0, 2.0),
+        },
+        ProfileLaw::LinearCorrespondence {
+            start: square(4, 0.2),
+            end: square(6, 0.1),
+        },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     match facet_sweep::facet_sweep(&corr, &stations(4), 4) {
-        Ok(r) => println!("correspondence: Ok v={} winding={}", r.audit.signed_volume, r.audit.winding_violations),
+        Ok(r) => println!(
+            "correspondence: Ok v={} winding={}",
+            r.audit.signed_volume, r.audit.winding_violations
+        ),
         Err(e) => println!("correspondence: Err {e:?}"),
     }
 }

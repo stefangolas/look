@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use showcases::cc_ports::LandedPorts;
 use showcases::amphora::{AmphoraTable, build};
+use showcases::cc_ports::LandedPorts;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -23,7 +23,10 @@ fn main() {
 
     match build(&table, &out_dir, &LandedPorts) {
         Ok(report) => {
-            println!("{}", serde_json::to_string_pretty(&report).expect("report json"));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&report).expect("report json")
+            );
         }
         Err(e) => {
             eprintln!("amphora build failed: {e}");

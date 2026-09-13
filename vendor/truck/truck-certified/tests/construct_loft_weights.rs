@@ -37,7 +37,8 @@ fn p4(w: f64) -> Vector4 {
 fn weight_surface(uknot: KnotVec, weights: &[f64]) -> BSplineSurface<Vector4> {
     let vknot = KnotVec::bezier_knot(0);
     let rows: Vec<Vec<Vector4>> = weights.iter().map(|&w| vec![p4(w)]).collect();
-    BSplineSurface::try_new((uknot, vknot), rows).expect("the weight-field fixture surface is valid")
+    BSplineSurface::try_new((uknot, vknot), rows)
+        .expect("the weight-field fixture surface is valid")
 }
 
 /// The minimum `w`-control value of a surface net, row-major.
@@ -73,7 +74,10 @@ fn all_positive_control_weights_admit_without_subdivision() {
     let cert = construct(certify_weight_field(&surface, &mut budget));
 
     assert!(!cert.refined, "an all-positive net admits on the fast path");
-    assert!(cert.refinements.is_empty(), "the fast path inserts no knots");
+    assert!(
+        cert.refinements.is_empty(),
+        "the fast path inserts no knots"
+    );
     assert_eq!(cert.min_control_weight, 0.5); // H-3: the net minimum, exact
     assert_eq!(budget.subdiv, 1024, "the free fast path spends no budget");
 }
@@ -90,7 +94,9 @@ fn straddling_weight_field_refuses_non_positive_weight_field() {
     match certify_weight_field(&surface, &mut budget) {
         Err(ConstructRefusal::NonPositiveWeightField) => {}
         Ok(_) => panic!("a weight field that reaches zero must refuse"),
-        Err(other) => panic!("a straddling weight field must refuse as NonPositiveWeightField, not {other:?}"),
+        Err(other) => {
+            panic!("a straddling weight field must refuse as NonPositiveWeightField, not {other:?}")
+        }
     }
 }
 
@@ -107,7 +113,9 @@ fn refinement_budget_exhaustion_refuses_non_positive_weight_field() {
     match certify_weight_field(&surface, &mut exhausted) {
         Err(ConstructRefusal::NonPositiveWeightField) => {}
         Ok(_) => panic!("an under-budgeted refinement must refuse as NonPositiveWeightField"),
-        Err(other) => panic!("budget exhaustion must refuse as NonPositiveWeightField, not {other:?}"),
+        Err(other) => {
+            panic!("budget exhaustion must refuse as NonPositiveWeightField, not {other:?}")
+        }
     }
 
     // With a sufficient budget the same surface certifies: the refusal above
@@ -156,6 +164,9 @@ fn certified_net_is_the_refined_net_never_the_coarse_one() {
     // exactly the refined net's positivity.
     let mut fresh = Budget::new(0, 0, 0);
     let again = construct(certify_weight_field(&refined, &mut fresh));
-    assert!(!again.refined, "the refined net admits without further subdivision");
+    assert!(
+        !again.refined,
+        "the refined net admits without further subdivision"
+    );
     assert_eq!(again.min_control_weight, refined_min); // H-3
 }

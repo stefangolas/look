@@ -1,8 +1,8 @@
+use showcases::spine::{CompositeSpec, composite_path, shift_to_ground};
 use truck_base::cgmath64::*;
 use truck_geometry::base::{BoundedCurve, ParametricCurve};
 use truck_geometry::canonical::Curve;
 use truck_geometry::nurbs::{BSplineCurve, KnotVec};
-use showcases::spine::{CompositeSpec, composite_path, shift_to_ground};
 
 fn main() {
     let spec = CompositeSpec {
@@ -27,11 +27,7 @@ fn main() {
     }
     knots.extend_from_slice(&[1.0; 4]);
     let knot_vec = KnotVec::from(knots);
-    let params: Vec<(f64, Point3)> = path
-        .samples
-        .iter()
-        .map(|(s, p)| (s / total, *p))
-        .collect();
+    let params: Vec<(f64, Point3)> = path.samples.iter().map(|(s, p)| (s / total, *p)).collect();
     let spline = BSplineCurve::try_interpole(knot_vec, params.clone()).expect("interpole");
     println!("knot range: {:?}", spline.range_tuple());
     for idx in [0usize, 1, n / 4, n / 2, 3 * n / 4, n - 1] {

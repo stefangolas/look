@@ -6,7 +6,9 @@ use truck_geometry::constructive::{
 use truck_modeling::{facet_sweep, spine_sweep};
 
 fn stations(n: usize) -> Vec<f64> {
-    SamplingPolicy::UniformCount { spine: n }.resolve(0.0, 1.0).expect("stations")
+    SamplingPolicy::UniformCount { spine: n }
+        .resolve(0.0, 1.0)
+        .expect("stations")
 }
 
 fn square(n: usize, r: f64) -> Profile2D {
@@ -19,7 +21,10 @@ fn square(n: usize, r: f64) -> Profile2D {
     Profile2D::try_closed(vertices).expect("profile")
 }
 
-fn vertical_line_recipe(profile_law: ProfileLaw, frame_law: FrameLaw) -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
+fn vertical_line_recipe(
+    profile_law: ProfileLaw,
+    frame_law: FrameLaw,
+) -> SpineFrameRecipe<LineSpine, ProfileLaw, FrameLaw> {
     SpineFrameRecipe::new(
         LineSpine {
             start: Point3::new(0.0, 0.0, 0.0),
@@ -41,7 +46,9 @@ fn polyline_corner_refuses_c1() {
     let recipe = SpineFrameRecipe::new(
         spine,
         ProfileLaw::Constant(square(4, 0.2)),
-        FrameLaw::FixedPlane { normal: Vector3::unit_y() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_y(),
+        },
     );
     let facet = facet_sweep::facet_sweep(&recipe, &stations(8), 4);
     assert!(facet.is_err(), "facet path must refuse a non-C1 spine");
@@ -55,7 +62,9 @@ fn polyline_corner_refuses_c1() {
 fn architectural_up_parallel_to_tangent_refuses() {
     let recipe = vertical_line_recipe(
         ProfileLaw::Constant(square(4, 0.2)),
-        FrameLaw::ArchitecturalUp { up: Vector3::unit_z() },
+        FrameLaw::ArchitecturalUp {
+            up: Vector3::unit_z(),
+        },
     );
     let facet = facet_sweep::facet_sweep(&recipe, &stations(4), 4);
     assert!(facet.is_err(), "up parallel to tangent must refuse");
@@ -67,12 +76,20 @@ fn through_zero_scale_spine_sweep_refuses() {
     let recipe = vertical_line_recipe(
         ProfileLaw::Scale {
             profile: square(4, 0.2),
-            scale: ScalarLaw::Linear { start: 1.0, end: -1.0 },
+            scale: ScalarLaw::Linear {
+                start: 1.0,
+                end: -1.0,
+            },
         },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     let brep = spine_sweep::spine_sweep(&recipe, &stations(4));
-    assert!(brep.is_err(), "through-zero scale must refuse at the BREP entry");
+    assert!(
+        brep.is_err(),
+        "through-zero scale must refuse at the BREP entry"
+    );
 }
 
 #[test]
@@ -80,9 +97,14 @@ fn through_zero_scale_facet_path_behavior() {
     let recipe = vertical_line_recipe(
         ProfileLaw::Scale {
             profile: square(4, 0.2),
-            scale: ScalarLaw::Linear { start: 1.0, end: -1.0 },
+            scale: ScalarLaw::Linear {
+                start: 1.0,
+                end: -1.0,
+            },
         },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     let facet = facet_sweep::facet_sweep(&recipe, &stations(4), 4);
     match facet {
@@ -107,10 +129,15 @@ fn correspondence_mismatch_spine_sweep_refuses() {
     let end = square(6, 0.1);
     let recipe = vertical_line_recipe(
         ProfileLaw::LinearCorrespondence { start, end },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     let brep = spine_sweep::spine_sweep(&recipe, &stations(4));
-    assert!(brep.is_err(), "mismatched correspondence must refuse at the BREP entry");
+    assert!(
+        brep.is_err(),
+        "mismatched correspondence must refuse at the BREP entry"
+    );
 }
 
 #[test]
@@ -119,7 +146,9 @@ fn correspondence_mismatch_facet_path_behavior() {
     let end = square(6, 0.1);
     let recipe = vertical_line_recipe(
         ProfileLaw::LinearCorrespondence { start, end },
-        FrameLaw::FixedPlane { normal: Vector3::unit_x() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_x(),
+        },
     );
     let facet = facet_sweep::facet_sweep(&recipe, &stations(4), 4);
     match facet {

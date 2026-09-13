@@ -14,17 +14,17 @@ use std::path::Path;
 
 use truck_base::cgmath64::{Point2, Point3, Vector3};
 use truck_base::evidence::{Certified, Outcome};
+use truck_geometry::canonical::Curve;
 use truck_geometry::constructive::{
     FrameLaw, LineSpine, Profile2D, ProfileLaw, SamplingPolicy, SpineCurve, SpineFrameRecipe,
 };
-use truck_geometry::canonical::Curve;
-use truck_modeling::spine_sweep;
 use truck_modeling::Solid;
+use truck_modeling::spine_sweep;
 
 use crate::cc_ports::{CanalCert, CcPorts, RadiusLaw, RibWire, ThicknessCert};
 use crate::harness::{
     BrepReport, CcPortReport, FacetReport, ShowcaseReport, brep_volume, census_summary,
-    record_export, write_report, write_step, write_stl, write_solid_stl,
+    record_export, write_report, write_solid_stl, write_step, write_stl,
 };
 use crate::profile::regular_polygon;
 use crate::spine::spline_through_points;
@@ -110,10 +110,7 @@ fn handle_spine(points: &[(f64, f64, f64)], azimuth_deg: f64) -> Result<Curve, S
     spline_through_points(&pts).map_err(|e| e.to_string())
 }
 
-fn handle_recipe(
-    spine: &Curve,
-    t: &AmphoraTable,
-) -> SpineFrameRecipe<Curve, ProfileLaw, FrameLaw> {
+fn handle_recipe(spine: &Curve, t: &AmphoraTable) -> SpineFrameRecipe<Curve, ProfileLaw, FrameLaw> {
     SpineFrameRecipe::new(
         spine.clone(),
         ProfileLaw::Constant(
@@ -144,22 +141,21 @@ fn realize(
     breps: &mut Vec<BrepReport>,
 ) -> Option<Solid> {
     let (s0, s1) = recipe.spine.domain();
-    let station_list =
-        match (SamplingPolicy::UniformCount { spine: stations }).resolve(s0, s1) {
-            Ok(list) => list,
-            Err(e) => {
-                facets.push(FacetReport {
-                    law: name.to_string(),
-                    triangle_count: 0,
-                    quad_count: 0,
-                    signed_volume: f64::NAN,
-                    winding_violations: 0,
-                    verdict: "NotRealized".to_string(),
-                    refusal: Some(format!("{e:?}")),
-                });
-                return None;
-            }
-        };
+    let station_list = match (SamplingPolicy::UniformCount { spine: stations }).resolve(s0, s1) {
+        Ok(list) => list,
+        Err(e) => {
+            facets.push(FacetReport {
+                law: name.to_string(),
+                triangle_count: 0,
+                quad_count: 0,
+                signed_volume: f64::NAN,
+                winding_violations: 0,
+                verdict: "NotRealized".to_string(),
+                refusal: Some(format!("{e:?}")),
+            });
+            return None;
+        }
+    };
     match truck_modeling::facet_sweep::facet_sweep(recipe, &station_list, ring) {
         Ok(result) => facets.push(FacetReport {
             law: name.to_string(),
@@ -211,7 +207,11 @@ fn realize(
 
 /// Builds the amphora into `out_dir`: the landed parts (two handles, foot
 /// prism) plus the full CC-port probe battery for the gated body.
-pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<ShowcaseReport, String> {
+pub fn build(
+    t: &AmphoraTable,
+    out_dir: &Path,
+    ports: &dyn CcPorts,
+) -> Result<ShowcaseReport, String> {
     std::fs::create_dir_all(out_dir).map_err(|e| e.to_string())?;
 
     let mut report = ShowcaseReport {
@@ -263,9 +263,7 @@ pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sh
             start: Point3::new(0.0, 0.0, t.foot.1),
             end: Point3::new(0.0, 0.0, t.foot.2),
         },
-        ProfileLaw::Constant(
-            regular_polygon(t.foot.0, 8, PI / 8.0).map_err(|e| format!("{e:?}"))?,
-        ),
+        ProfileLaw::Constant(regular_polygon(t.foot.0, 8, PI / 8.0).map_err(|e| format!("{e:?}"))?),
         FrameLaw::FixedPlane {
             normal: Vector3::unit_x(),
         },
@@ -317,7 +315,12 @@ pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sh
     let loft = ports.loft_ribs(&ribs);
     report.cc_ports.push(CcPortReport {
         port: "loft_body".to_string(),
-        status: if loft.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if loft.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &loft {
             Ok(_) => "loft realized".to_string(),
             Err(e) => format!("{e:?}"),
@@ -326,7 +329,12 @@ pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sh
     let gordon = ports.gordon_ribs(&ribs);
     report.cc_ports.push(CcPortReport {
         port: "gordon_body".to_string(),
-        status: if gordon.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if gordon.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &gordon {
             Ok(_) => "gordon realized".to_string(),
             Err(e) => format!("{e:?}"),
@@ -339,16 +347,29 @@ pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sh
         ports.canal_cert(&t.handle_points, t.handle_azimuth_deg, t.handle_radius);
     report.cc_ports.push(CcPortReport {
         port: "canal_regularity_handle_spine".to_string(),
-        status: if canal.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if canal.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &canal {
-            Ok(c) => format!("regular={} min_r={}", c.value.regular, c.value.min_curvature_radius),
+            Ok(c) => format!(
+                "regular={} min_r={}",
+                c.value.regular, c.value.min_curvature_radius
+            ),
             Err(e) => format!("{e:?}"),
         }),
     });
     let thickness: Outcome<ThicknessCert> = ports.shell_thickness(&ribs);
     report.cc_ports.push(CcPortReport {
         port: "certified_shell_wall".to_string(),
-        status: if thickness.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if thickness.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &thickness {
             Ok(c) => format!(
                 "t_safe={} t_focal={} d_min/2={}",
@@ -357,14 +378,18 @@ pub fn build(t: &AmphoraTable, out_dir: &Path, ports: &dyn CcPorts) -> Result<Sh
             Err(e) => format!("{e:?}"),
         }),
     });
-    let blend = ports.blend_handle_root(&ribs, &RadiusLaw::MonotoneCubic(vec![
-        (0.0, 0.05),
-        (0.5, 0.08),
-        (1.0, 0.10),
-    ]));
+    let blend = ports.blend_handle_root(
+        &ribs,
+        &RadiusLaw::MonotoneCubic(vec![(0.0, 0.05), (0.5, 0.08), (1.0, 0.10)]),
+    );
     report.cc_ports.push(CcPortReport {
         port: "blend_handle_root_var_radius".to_string(),
-        status: if blend.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if blend.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &blend {
             Ok(_) => "blend realized".to_string(),
             Err(e) => format!("{e:?}"),

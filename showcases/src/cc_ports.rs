@@ -156,27 +156,35 @@ pub trait CcPorts {
     /// correspondence into a closed solid.
     fn loft(&self, stations: &[Wire], _tol: &DirectTolerance) -> Outcome<Solid> {
         let _ = stations;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-010..014, amphora-facing: loft the rib set (height-ordered rings)
     /// into the closed vessel body.
     fn loft_ribs(&self, ribs: &[RibWire]) -> Outcome<Solid> {
         let _ = ribs;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-015: Gordon boolean-sum blend over the same rib set (A/B against
     /// [`CcPorts::loft`]).
     fn gordon(&self, stations: &[Wire]) -> Outcome<Solid> {
         let _ = stations;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-015, amphora-facing: Gordon blend over the rib set.
     fn gordon_ribs(&self, ribs: &[RibWire]) -> Outcome<Solid> {
         let _ = ribs;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-030/031: variable-radius blend along one named edge.
@@ -187,26 +195,34 @@ pub trait CcPorts {
         _law: &RadiusLaw,
     ) -> Outcome<Solid> {
         let _ = solid;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-030/031, amphora-facing: the handle-root blend where each handle
     /// meets the body, radius growing with height per the law.
     fn blend_handle_root(&self, ribs: &[RibWire], _law: &RadiusLaw) -> Outcome<Solid> {
         let _ = ribs;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-004: certified minimum distance (Clear) between two solids.
     fn clear(&self, a: &Solid, b: &Solid, required: f64) -> Outcome<ClearCert> {
         let _ = (a, b, required);
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-025: canal regularity certificate for one spine.
     fn canal_regularity(&self, spine: &Curve, tube_radius: f64) -> Outcome<CanalCert> {
         let _ = (spine, tube_radius);
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-025, amphora-facing: canal regularity of the handle spine by table
@@ -218,20 +234,26 @@ pub trait CcPorts {
         tube_radius: f64,
     ) -> Outcome<CanalCert> {
         let _ = (handle_points, azimuth_deg, tube_radius);
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-023/026: the thinnest certified shell wall of `solid`.
     fn certify_shell(&self, solid: &Solid) -> Outcome<ThicknessCert> {
         let _ = solid;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 
     /// CC-023/026, amphora-facing: the thinnest certified wall of the lofted
     /// body over the rib set.
     fn shell_thickness(&self, ribs: &[RibWire]) -> Outcome<ThicknessCert> {
         let _ = ribs;
-        Err(Refusal::UnsupportedEnvelope(EnvelopeCase::ContactReductionDeferred))
+        Err(Refusal::UnsupportedEnvelope(
+            EnvelopeCase::ContactReductionDeferred,
+        ))
     }
 }
 

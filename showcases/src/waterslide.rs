@@ -25,7 +25,10 @@ use truck_modeling::{Curve, Solid, facet_sweep};
 use truck_shapeops::facade::{Mode, boolean_op};
 
 use crate::cc_ports::{CanalCert, CcPorts};
-use crate::harness::{BrepReport, CcPortReport, FacetReport, ShowcaseReport, brep_volume, census_summary, record_export, write_report, write_step, write_stl};
+use crate::harness::{
+    BrepReport, CcPortReport, FacetReport, ShowcaseReport, brep_volume, census_summary,
+    record_export, write_report, write_step, write_stl,
+};
 use crate::profile::{regular_polygon, trapezoid_chute};
 use crate::spine::{CompositeSpec, composite_path, shift_to_ground, spline_from_path};
 
@@ -387,9 +390,17 @@ pub fn build(
     let canal: Outcome<CanalCert> = ports.canal_regularity(&spine, t.chute_floor_thickness);
     report.cc_ports.push(CcPortReport {
         port: "canal_regularity_chute_spine".to_string(),
-        status: if canal.is_ok() { "certified" } else { "deferred" }.to_string(),
+        status: if canal.is_ok() {
+            "certified"
+        } else {
+            "deferred"
+        }
+        .to_string(),
         detail: Some(match &canal {
-            Ok(c) => format!("regular={} min_r={}", c.value.regular, c.value.min_curvature_radius),
+            Ok(c) => format!(
+                "regular={} min_r={}",
+                c.value.regular, c.value.min_curvature_radius
+            ),
             Err(e) => format!("{e:?}"),
         }),
     });
@@ -398,7 +409,12 @@ pub fn build(
         let clearance = ports.clear(chute, tower, t.helix_radius - t.tower_radius);
         report.cc_ports.push(CcPortReport {
             port: "clear_chute_tower".to_string(),
-            status: if clearance.is_ok() { "certified" } else { "deferred" }.to_string(),
+            status: if clearance.is_ok() {
+                "certified"
+            } else {
+                "deferred"
+            }
+            .to_string(),
             detail: Some(match &clearance {
                 Ok(c) => format!("distance={} margin={}", c.value.distance, c.value.margin),
                 Err(e) => format!("{e:?}"),

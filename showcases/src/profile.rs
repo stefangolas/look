@@ -46,7 +46,11 @@ pub fn u_chute(
 /// narrowing to `width * top_fraction` at the wall top (up = `wall_height`).
 /// Convex, so both realization backends accept it — this is the showcase's
 /// working cross-section.
-pub fn trapezoid_chute(width: f64, wall_height: f64, top_fraction: f64) -> Result<Profile2D, ConstructError> {
+pub fn trapezoid_chute(
+    width: f64,
+    wall_height: f64,
+    top_fraction: f64,
+) -> Result<Profile2D, ConstructError> {
     if !(0.0..=1.0).contains(&top_fraction) || width <= 0.0 || wall_height <= 0.0 {
         return Err(ConstructError::InvalidInput);
     }

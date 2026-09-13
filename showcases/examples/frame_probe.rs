@@ -3,10 +3,10 @@
 //! convention (mod.rs): unit lengths, pairwise orthogonality, and
 //! right-handedness `tangent x normal == binormal`.
 
-use truck_base::cgmath64::*;
-use truck_geometry::constructive::{FrameLaw, Profile2D, ProfileLaw, SpineCurve, SpineFrameRecipe};
 use showcases::profile::trapezoid_chute;
 use showcases::spine::{CompositeSpec, composite_path, shift_to_ground, spline_from_path};
+use truck_base::cgmath64::*;
+use truck_geometry::constructive::{FrameLaw, Profile2D, ProfileLaw, SpineCurve, SpineFrameRecipe};
 
 fn frame_report(name: &str, law: FrameLaw, spine: &truck_modeling::Curve, chute: &Profile2D) {
     let recipe = SpineFrameRecipe::new(spine.clone(), ProfileLaw::Constant(chute.clone()), law);
@@ -33,9 +33,7 @@ fn frame_report(name: &str, law: FrameLaw, spine: &truck_modeling::Curve, chute:
             if orth > 1e-9 {
                 orth_bad += 1;
             }
-            println!(
-                "  s={s:.4} t x n - b = {rh:.3e}, max |dot| = {orth:.3e}"
-            );
+            println!("  s={s:.4} t x n - b = {rh:.3e}, max |dot| = {orth:.3e}");
         }
     }
     println!("  handedness violations: {rh_bad}, non-orthogonal: {orth_bad}");
@@ -60,25 +58,34 @@ fn main() {
 
     frame_report(
         "parallel",
-        FrameLaw::ParallelTransport { initial_normal: Vector3::new(a.sin(), 0.0, a.cos()) },
+        FrameLaw::ParallelTransport {
+            initial_normal: Vector3::new(a.sin(), 0.0, a.cos()),
+        },
         &spine,
         &chute,
     );
     frame_report(
         "architectural",
-        FrameLaw::ArchitecturalUp { up: Vector3::unit_z() },
+        FrameLaw::ArchitecturalUp {
+            up: Vector3::unit_z(),
+        },
         &spine,
         &chute,
     );
     frame_report(
         "radial",
-        FrameLaw::RadialAboutAxis { origin: Point3::new(0.0, 0.0, 0.0), axis: Vector3::unit_z() },
+        FrameLaw::RadialAboutAxis {
+            origin: Point3::new(0.0, 0.0, 0.0),
+            axis: Vector3::unit_z(),
+        },
         &spine,
         &chute,
     );
     frame_report(
         "fixed",
-        FrameLaw::FixedPlane { normal: Vector3::unit_y() },
+        FrameLaw::FixedPlane {
+            normal: Vector3::unit_y(),
+        },
         &spine,
         &chute,
     );
