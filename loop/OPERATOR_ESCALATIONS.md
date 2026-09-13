@@ -2356,3 +2356,16 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - What the operator did: removed loop/slots/0/target (documented step-5 clean). Did NOT re-warm: RAM 1.5 GB free (BELOW the 3 GB floor; janitor `ram` killed 1 opencode-parented rust-analyzer and RAM stayed ~1.5 GB); a cold `cargo check --workspace --all-targets` is a 4-8 GB spike and would 0xc0000409 again.
 - Why escalate: the re-warm is a RAM-bound action the operator cannot make safe; per the charter's cost asymmetry, shrink rather than retry blindly. The live heartbeat (27872, --max-workers=3) will retry G6 each 10-min cycle and may re-corrupt the target on another crash.
 - Exact command a human should start from: free RAM (close chrome/Dropbox/Discord and/or the second opencode, ~2-3 GB), then let heartbeat 27872's next cycle retry, or run `python loop/dispatch_ready.py --max-workers=3`; watch loop/dispatch_heartbeat.log for `0xc0000409`. Slot 0's target is now clean, so the first retry after RAM is freed should be a genuine cold build. Priority: medium (frontier; FHC-G1/FHC-D/FHC-E all queue behind G6).
+
+## 2026-09-13T03:51Z - operator carry (cycle 4): FHC-G6 frontier RESOLVED
+
+- The 03:33Z item is RESOLVED; no human action needed. The heartbeat (27872) dispatched
+  FHC-G6-CERT-COST-SCALE to slot 0 at ~03:47Z after last cycle's `loop/slots/0/target` clean;
+  the cold warm build succeeded (`dispatch_heartbeat.log`: "FHC-G6-CERT-COST-SCALE -> slot 0
+  ... dispatched 1; workers now ~1/3") and the worker is live and progressing (cmd pid 2324,
+  session `ses_f671f0eb4ffer7zIT6yKdcOe6R`, events 822 KB / 0.0 min fresh). RAM recovered to
+  3.81 GB (above the 3 GB floor); disk 16.1 GB free. No operator action taken.
+- Carried non-G6 items remain: RG-23/RG-9 unauthored (packet:''); duplicate supervisors
+  (19172 + 27828) + duplicate cargoq/server.py (28544 + 34564); F1-AUTHORING-ARMS
+  LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/7 wt
+  RESULT residue. Priority: none (informational closure).

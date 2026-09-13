@@ -9268,3 +9268,25 @@ STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the mach
 Escalation (step 7): MED - FHC-G6 frontier held by RAM below floor + the newly-diagnosed slot-0 target corruption (now cleaned). Human action: free RAM (close chrome/Dropbox/Discord or the second opencode), then let heartbeat 27872 retry G6 and watch loop/dispatch_heartbeat.log for 0xc0000409.
 
 Leaving: 0 RUNNING / FHC-G6 frontier held by RAM (slot-0 target cleaned) / HEAD c896d2b + this cycle's STATE/log commit.
+
+## 2026-09-13T03:51Z (operator cycle 4) - 1 RUNNING; FHC-G6 frontier UNBLOCKED and RUNNING in slot 0
+
+Health sweep (step 1): `slot_status.py` -> slot 0 RUNNING FHC-G6-CERT-COST-SCALE (cmd pid 2324, session `ses_f671f0eb4ffer7zIT6yKdcOe6R`, branch packet/FHC-G6-CERT-COST-SCALE@58f0c2b =base pre-commit, events 822578 bytes 0.0 min fresh, changed=1); slot 1 FINISHED (FHC-C, RESULT DONE, eb66295); slot 2 IDLE (TTC-RECENSUS-F1-R3, HEAD@f0ae3ab); slots 3-7 FINISHED landed residue. Heartbeat exactly 1 (27872, `-File ...dispatch_heartbeat.ps1`; the second broad-regex hit was my own probing shell), watchdog 1 (29264), operator runner 1 (27876), overnight driver 1 (24864), cargoq UP (ping ok, queued 0, running false). Disk 16.13 GB free (above the 8 GB floor AND the 15 GB janitor goal). RAM 3.81 GB free (ABOVE the 3 GB floor - recovered from the prior cycle's 1.5 GB). No `%TEMP%/look-verify-baseline-*` leaks. Carried duplication: TWO supervisor.py (19172 + 27828) and TWO cargoq/server.py (28544 + 34564) - functional.
+
+Board: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched. HEAD `58f0c2b`.
+
+Land (step 2): nothing landable. `git merge-base --is-ancestor <c> integration/kernel-bg` = exit 0 for every slot tip checked (eb66295, e6553db, 3c2109b, ee97499, 713f205, 5cf4811, 58f0c2b) - all already landed. Slot RESULT statuses: slot 1 DONE, slot 3 DONE, slot 4 LANDED-WITH-FINDINGS, slot 5 DONE, slot 6 DONE, slot 7 LANDED - none operator-landable (slot 4/7 correctly not DONE; the rest are ancestors).
+
+Unblock (step 3): slot 0 is ALIVE and making progress (do not touch); no other IDLE/DEAD slot holds unlanded work; no QUESTION, no 402.
+
+Registry hygiene (step 4): last-wins, case-folded `dispatch_ready.landed()` re-derive = 360 unique = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker = exactly the 6 slot-assigned packets: RG-23/RG-9 (packet:'' unauthored + anchor check FAILED), FHC-G6 (RUNNING), FHC-G1/FHC-D/FHC-E (correctly chained). BLOCKED-with-all-needs-landed = 7 rows, NONE mechanically flippable (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, MONO-10 owner candidate, RDEF-M4/M5 owner inputs). Nothing to flip; no anchor/lint-fixable READY packet surfaced.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE. `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 6; RG-23/RG-9 write-set clash with the RUNNING row on truck123d/src/bd_bridge.rs; FHC-G1 blocked on FHC-G6; FHC-D on G1; FHC-E on D; dispatched 0; workers now ~1/4" - REAL idle beyond the running G6.
+
+**FRONTIER RESOLVED:** the heartbeat's 03:47Z cycle dispatched FHC-G6-CERT-COST-SCALE to slot 0 (`dispatch_heartbeat.log`: "FHC-G6-CERT-COST-SCALE -> slot 0 ... dispatched 1; workers now ~1/3"). The cold warm build SUCCEEDED after last cycle's `loop/slots/0/target` clean, so the prior CORRUPTION/RAM blocker is RESOLVED. G6 is the frontier; G1/D/E queue behind it.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of the machine, as left" status bullets, both labeled [operator 2026-09-13T03:51Z]; corrected HEAD to 58f0c2b and recorded G6 RUNNING. Traps/history untouched.
+
+Escalation (step 7): NO new item. The prior MED escalation (FHC-G6 frontier held by RAM/corruption) is RESOLVED - G6 dispatched and is running; closure noted in OPERATOR_ESCALATIONS.md.
+
+Leaving: 1 RUNNING (FHC-G6, slot 0) / HEAD 58f0c2b + this cycle's STATE/log commit.
