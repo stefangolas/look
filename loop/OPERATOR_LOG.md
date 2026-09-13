@@ -10364,3 +10364,89 @@ STATE/log commit.
 - Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + a live agent
   re-running its scoped checks + slots 1/2 idle residue + slots 3-7 landed residue / HEAD `f2e5868`
   + this cycle's STATE/log commit.
+
+## [operator 2026-09-13T23:06Z] cycle
+
+- Health (step 1): heartbeat exactly 1 (27872), operator runner exactly 1 (27876) - a naive
+  `CommandLine -match` shows 2 only because the operator's own query shell matches itself. cargoq UP
+  (ping `{"ok":true,"queued":0,"running":false}`; last job `cargo test -p truck123d --test
+  cert_cost_scale --locked` exit 0 at 18:42:14 local). Watchdog/supervisor/overnight 0 (carried dead,
+  NOT restarted). Disk 20.0 GB free (above 15 GB goal); RAM 4.94 GB free (above the 3 GB floor -
+  recovered after the FHC-G6 measurement children exited). No `%TEMP%/look-verify-baseline-*` leaks;
+  no root `RESULT.json` poison; `fallback.log` quiet.
+- Board (measured): slot 0 RUNNING FHC-G10-PLACEMENT-COVARIANCE-CACHE (heartbeat-dispatched 19:02:03
+  local, registered worker pid 19308; `events.jsonl` grew 0.18 -> 0.65 MB during this cycle =
+  progressing). slot 1 IDLE dead duplicate FHC-G6 (pid=-, changed=0, no RESULT). slot 2 IDLE residue
+  TTC-RECENSUS-F1-R3 (row DONE). slots 3-7 FINISHED landed residue. 0 landed / 0 unblocked / 0
+  flipped / 0 dispatched by the operator.
+- Land (step 2): nothing. HEAD `e6519b8` (the 22:40Z operator STATE/log commit, loop/ only; no packet
+  code). Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE). FHC-G6 `19cfd68` NOT an ancestor + top-level `spec_gap` ->
+  do NOT land; escalation carried. No root `RESULT.json` poison.
+- **NEW finding: FHC-G6 RESULT.json is LOST.** The heartbeat's 19:02:03 re-fork of slot 0 (to dispatch
+  FHC-G10) deleted `loop/slots/0/wt/RESULT.json`, the sole copy; a repo-wide search finds no other.
+  Commit `19cfd68` survives on `packet/FHC-G6-CERT-COST-SCALE`; the disposition is preserved in prose.
+  Escalated (the "preserve before re-fork" instruction could not survive the automated reset).
+- Unblock (step 3): no slot with resumable work. Slot 1 = clean IDLE dead duplicate of FHC-G6; did
+  NOT reset/redispatch (same packet, known SPEC_GAP; the heartbeat owns dispatch). Slot 2 = IDLE
+  residue, row DONE. No active `QUESTION.md` (slot 5's is a stale 2026-09-05 CC-013 artifact). No
+  APIError 402 in any recent events.
+- Registry hygiene (step 4): re-derived inline (363 rows, last-wins): 265 DONE / 87 READY / 10
+  BLOCKED / 1 SUPERSEDED (3 new READY rows registered 9/13: FHC-G8/G9/G10). All 10 BLOCKED
+  owner/semantic parked, none mechanically flippable. CL-005/CL-006 remain READY but their notes say
+  "LANDED <hex>" so the dispatcher skips them (not re-dispatched); left untouched.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5"; RG-23/RG-9 write-set
+  clash with the RUNNING G10; FHC-G6 DEAD dispatch (slot 1, would reset+delete+redispatch); FHC-G1/D/E
+  and FHC-G8/G9 chained on G6; `dispatched 0`.
+- Observation: leftover opencode agent `37844` (`-s ses_f672d94d2ffe2kEMYEJYJogHmk`) is STILL ALIVE
+  but idle (children = pyright + yaml-language-server only; no cargo/rustc). Its slot-0 FHC-G6
+  worktree was re-forked at 19:02:03 for FHC-G10. Not a registered worker; did NOT disturb.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T23:06Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): NEW entry for the FHC-G6 RESULT loss; carried the FHC-G6 adjudication, substrate
+  stack down, RG-23/RG-9 authoring, slot-4/7 wt RESULT residue, FRAME-REVOLVE F1 pin, TOR-C.
+- Leaving: slot 0 FHC-G10 RUNNING + slots 1/2 idle residue + slots 3-7 landed residue / HEAD `e6519b8`
+  + this cycle's STATE/log/escalation commit.
+
+## 2026-09-13T23:37Z - operator cycle: FHC-G6 RESULT loss REPAIRED by heartbeat re-run; SPEC_GAP carried
+
+Board at start (re-derived by `python loop/slot_status.py`): slot 0 FINISHED FHC-G6-CERT-COST-SCALE
+(RESULT.json present, commit `f4088c7`); slot 1 RUNNING FHC-G10-PLACEMENT-COVARIANCE-CACHE (pid 38112,
+events 0.3 min old, changed=2); slot 2 IDLE residue TTC-RECENSUS-F1-R3 (row DONE); slots 3-7 FINISHED
+landed residue. HEAD `cfaa924` (rustfmt drift commit; parent `e6519b8`).
+
+- Health sweep (step 1): heartbeat exactly 1 (27872). A `-match 'dispatch_heartbeat'` also matches the
+  operator's own opencode/cmd shell (charter text in its command line) - not a second heartbeat.
+  watchdog/supervisor/overnight 0 (carried dead; a `-match 'watchdog'` false-positives on ms-teams
+  `msedgewebview2 --gpu-watchdog-timeout-seconds`, pids 6324/6432). cargoq UP (`/ping` ok; `/stats`
+  queued 1, running `test -p truck123d --test placement_cache` = slot-1 G10). Disk 18.68 GB free (>
+  15); RAM 4.05 GB free (> 3). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
+  2026-09-11.
+- Land (step 2): slot 0 FHC-G6 has a FRESH `RESULT.json` (the 23:06Z loss is repaired - the heartbeat
+  re-ran the packet) but status DONE + top-level `spec_gap` stop condition (dominant phase = per-patch
+  interval certification in binding-layer `volume_facts`, outside `write_allow`; no whitelisted
+  bd_bridge fix applies). Per charter (anything but a clean DONE) and prior cycles -> do NOT land;
+  escalated. Commit `f4088c7` is NOT an ancestor of HEAD. Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
+  (re-verified via `git merge-base --is-ancestor`). Nothing else landable.
+- Unblock (step 3): slot 1 RUNNING healthy (events 0.3 min old; cargoq job live) - do NOT disturb. No
+  slot with resumable work; no `QUESTION.md`; no APIError 402 in recent events. Slot 2 is landed-row
+  residue (TTC-RECENSUS-F1-R3 DONE), so reset/redispatch is inappropriate; left untouched.
+- Registry hygiene (step 4): re-derived by script (363 rows, last-wins): 265 DONE / 87 READY / 10
+  BLOCKED / 1 SUPERSEDED. All 10 BLOCKED owner/semantic parked, none mechanically flippable.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 6"; RG-23/RG-9 write-set
+  clash with the RUNNING G10 on `truck123d/src/bd_bridge.rs`; FHC-G1/D/E and FHC-G8/G9 chained on G6;
+  `dispatched 0` = REAL idle.
+- New observation: main worktree carries an uncommitted `vendor/truck/truck-certified/src/lib.rs`
+  clippy-1.97 `#![allow(...)]` block (+13) and a modified `loop/packets/FHC-G1-RATIONAL-FLUX.md` -
+  orchestrator in-progress, outside operator scope; flagged, not touched. Leftover opencode `37844`
+  (`-s ses_f672d94d2ffe2kEMYEJYJogHmk`) still alive/idle (pyright + yaml servers only; no cargo) - not
+  a registered worker; did NOT disturb.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T23:37Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): NEW entry recording the RESULT-loss repair + carried FHC-G6 adjudication;
+  carried substrate stack down, RG-23/RG-9 authoring, dirty vendor file, TOR-C.
+- Leaving: slot 1 FHC-G10 RUNNING + slot 0 FHC-G6 FINISHED-UNLANDED + slots 2 residue + slots 3-7
+  landed residue / HEAD `cfaa924` + this cycle's STATE/log/escalation commit.

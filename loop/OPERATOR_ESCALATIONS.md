@@ -2705,3 +2705,40 @@ uncommitted - left for the orchestrator, no dispatch impact.
   FHC-D -> FHC-E chained behind this. RESULT only copy is `loop/slots/0/wt/RESULT.json` (still
   preserve before any re-fork). Also carried: RG-23/RG-9 authoring; substrate stack
   (watchdog/supervisor/overnight) down; TOR-C flip-or-pin.
+
+## 2026-09-13T23:06Z - operator cycle: FHC-G6 RESULT.json LOST (sole copy); adjudication carried
+
+- What/why: at 19:02:03 local the heartbeat re-forked slot 0 to dispatch FHC-G10, deleting
+  `loop/slots/0/wt/RESULT.json` - the ONLY copy of the FHC-G6-CERT-COST-SCALE RESULT. The prior
+  carry's "preserve before any re-fork" instruction was not honoured (the reset is automated). The
+  worker commit `19cfd68` survives on branch `packet/FHC-G6-CERT-COST-SCALE` (NOT an ancestor of
+  HEAD `e6519b8`), and the SPEC_GAP disposition is preserved in prose in this file and STATE.md.
+- Start from: `git show 19cfd68 --stat` (the instrumentation-only change); adjudicate (a) land it and
+  route the `spec_gap` to `docs/F1_HYPERCAR_GAP_REGISTER.md`, or (b) hold/re-fork. If a re-run is
+  wanted, note slot 0 now writes `bd_bridge.rs` for FHC-G10, so FHC-G6 cannot run concurrently.
+- Carried unchanged: substrate stack (watchdog/supervisor/overnight) down; RG-23/RG-9 authoring
+  (packet files absent, anchor check fails); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis
+  pin; TOR-C flip-or-pin. New: leftover idle opencode agent `37844` still alive after its slot-0
+  worktree was re-forked (do NOT disturb).
+
+## 2026-09-13T23:37Z - operator cycle: FHC-G6 RESULT loss repaired; SPEC_GAP adjudication still human-owned
+
+- What/why: the 23:06Z "sole RESULT.json copy LOST" is now REPAIRED - the heartbeat re-ran
+  FHC-G6-CERT-COST-SCALE on slot 0 and a fresh `loop/slots/0/wt/RESULT.json` exists, with a NEW worker
+  commit `f4088c7` (branch `packet/FHC-G6-CERT-COST-SCALE`; NOT an ancestor of HEAD `cfaa924`). Status
+  is DONE but the RESULT carries a top-level `spec_gap` (packet stop condition: dominant phase =
+  per-patch interval certification in the binding-layer `volume_facts`, outside `write_allow`; no
+  whitelisted bd_bridge-only fix applies). Operator did NOT land (anything but a clean DONE).
+- Start from: `git show f4088c7 --stat` and `loop/slots/0/wt/RESULT.json`; adjudicate (a) land the
+  instrumentation-only change and route the `spec_gap` to `docs/F1_HYPERCAR_GAP_REGISTER.md` section 5,
+  or (b) hold/re-fork. FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 stay chained behind FHC-G6 either way.
+- NEW (operator-observed, outside operator scope): the MAIN worktree has an uncommitted
+  `vendor/truck/truck-certified/src/lib.rs` clippy-1.97 `#![allow(...)]` block (+13 lines) and a
+  modified `loop/packets/FHC-G1-RATIONAL-FLUX.md`. Looks like in-progress orchestrator hygiene
+  (`loop/STATE.md` traps reference it). Operator may not edit `vendor/**`; flagging so the orchestrator
+  commits or reverts it deliberately rather than leaving it to be swept into an unrelated commit.
+  Start from: `git -C C:\Users\stefa\look diff -- vendor/truck/truck-certified/src/lib.rs`.
+- Carried unchanged: substrate stack (watchdog/supervisor/overnight) down; RG-23/RG-9 authoring
+  (packet files absent, anchor check fails; new untracked FHC-G8/G9/G10/G11/G12/G13/G14 +
+  ROUTING-REACH packet files exist, G11-G14/ROUTING-REACH unregistered); slot-4/7 wt RESULT residue;
+  FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844` (do NOT disturb).
