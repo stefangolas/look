@@ -10165,3 +10165,43 @@ STATE/log commit.
   Carried: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED (cross-test startup hang) + slots 1/2 idle residue +
   slots 3-7 landed residue / HEAD `f8bad98` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-13T21:06Z - operator cycle 24: slot 0 FHC-G6 worker RECOVERED and FINISHED with a SPEC_GAP RESULT; nothing landable (escalated); nothing flippable; real idle
+
+- Board (re-derived by command): 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier) + 2 IDLE residue
+  (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed
+  residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD `1773b46`.
+- Health (step 1): heartbeat exactly 1 (27872), operator runner exactly 1 (27876). A naive
+  `CommandLine -match` count reports 2 for each because the operator's own query shell matches its
+  own command line - no double heartbeat, no double runner. cargoq UP (`/ping` ok, queued 0, running
+  false). Watchdog 0, supervisor 0, overnight 0 (carried dead, not restarted). Disk 17.64 GB free
+  (above 15 GB goal); RAM 5.30 GB free (above 3 GB floor); no `%TEMP%/look-verify-baseline-*`
+  leaks; `fallback.log` quiet since 2026-09-11.
+- Land (step 2): nothing. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 are all
+  ancestors of HEAD `1773b46` (`git merge-base --is-ancestor` True); nothing landable. **Slot 0
+  FHC-G6 is now FINISHED** (the 20:44Z cross-test startup hang cleared on its own; worker pid=-,
+  events 12.1 min old). Worker commit `19cfd68` (bd_bridge.rs +78/-5, new tests/cert_cost_scale.rs
+  +584); wt-root RESULT.json status **DONE** but carries a top-level `spec_gap` and its notes say
+  "this is a SPEC_GAP". Tests 3/3 green; `pre_existing_drift` reports fmt/clippy fail on
+  files/lints OUTSIDE write_allow. **Did NOT land** (SPEC_GAP outcome + done-when fmt/clippy fail)
+  -> ESCALATED per charter step 2.
+- Unblock (step 3): slot 0 is FINISHED, not IDLE/DEAD. slot 1 CLEAN IDLE dead duplicate (same
+  packet, pid=-, changed=0, detached `fd40760`): reset-only NO-OP, and redispatch is inappropriate
+  (same packet, SPEC_GAP outcome). slot 2 IDLE residue (row DONE). No stuck workers with work to
+  resume; no QUESTION.md anywhere.
+- Registry hygiene (step 4): re-derived by script (360 rows, last-wins): 265 DONE / 84 READY / 10
+  BLOCKED / 1 SUPERSEDED. No BLOCKED row flippable - `BG-CK-SPLINE-CENSUS` is CANCELLED BY OWNER
+  (session 49) despite its `needs` being DONE; DEF-VENDOR-FIXTURES/DEF-SEEDRAY-A/ADM-001/ADM-002
+  read READY but carry `LANDED <hex>` markers so `landed()` skips them; the rest owner/semantic
+  parked. RG-23/RG-9 packet FILES are absent from `loop/packets/` so their anchors cannot be
+  re-measured (authoring item, not anchor drift). Nothing flipped/edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR
+  CHECK FAILED (files absent); FHC-G1/D/E chained on G6; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T21:06Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): slot 0 FHC-G6's SPEC_GAP disposition (land instrumentation + route the gap,
+  or hold/re-fork) is orchestrator judgment; also carried substrate stack down, RG-23/RG-9
+  authoring, slot-4/7 wt RESULT residue, FRAME-REVOLVE F1 pin, TOR-C.
+- Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + slots 1/2 idle
+  residue + slots 3-7 landed residue / HEAD `1773b46` + this cycle's STATE/log/escalation commit.

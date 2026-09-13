@@ -2638,3 +2638,29 @@ uncommitted - left for the orchestrator, no dispatch impact.
   intend to re-fork slot 0. Priority: high (frontier; FHC-G1/D/E all chained behind it).
 - Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
   slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T21:06Z - operator cycle 24: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (status DONE); NOT landed; orchestrator adjudication needed
+
+- What: slot 0 FHC-G6-CERT-COST-SCALE is FINISHED. Worker commit `19cfd68` on
+  `packet/FHC-G6-CERT-COST-SCALE` (2 files: `truck123d/src/bd_bridge.rs` +78/-5, new
+  `truck123d/tests/cert_cost_scale.rs` +584). wt-root `RESULT.json` status **DONE**, tests 3/3 green,
+  byte-identity verified. BUT it carries a top-level `spec_gap` field and its notes say "Per the
+  packet stop condition this is a SPEC_GAP".
+- Why not landed: the packet's stop condition fired - the dominant phase is the per-patch interval
+  certification (99.4-99.8% of facts_ms) and no whitelisted bd_bridge-only fix applies; the bracket
+  decomposition needs a smarter form (theory-adjacent, back to the gap register). Additionally the
+  packet's done-when (`cargo fmt --check -p truck123d`, `cargo clippy -p truck123d --all-targets --
+  -D warnings`) does not pass: RESULT's `pre_existing_drift` reports both fail on files/lints
+  OUTSIDE `write_allow` (ttc_hazard_battery.rs; vendor/truck/truck-certified clone_on_copy; lib/test
+  lints). Charter step 2: RESULT status is DONE but the outcome is a SPEC_GAP and a done-when check
+  fails -> do NOT land; escalate.
+- Decision needed (orchestrator): (a) land the byte-identical, instrumentation-only commit +
+  route the `spec_gap` to `docs/F1_HYPERCAR_GAP_REGISTER.md` (treat fmt/clippy as pre-existing
+  baseline noise), or (b) hold and re-fork with a sharpened packet / theory fix. Note the FHC
+  frontier (FHC-G1 -> FHC-D -> FHC-E) is chained behind G6's disposition.
+- Exact command to start from: `git -C C:\Users\stefa\look show 19cfd68 --stat` and
+  `git -C C:\Users\stefa\look show packet/FHC-G6-CERT-COST-SCALE:...`; the RESULT is the untracked
+  `C:\Users\stefa\look\loop\slots\0\wt\RESULT.json` (only copy - preserve before any re-fork).
+- Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring
+  (packet files absent from `loop/packets/`); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
+  non_z_axis pin; TOR-C flip-or-pin.
