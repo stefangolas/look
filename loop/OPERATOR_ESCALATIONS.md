@@ -2679,3 +2679,9 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: substrate stack down; RG-23/RG-9 authoring; slot-4/7 wt RESULT residue;
   FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin. New note: `loop/slots/5/wt/QUESTION.md` is a
   stale 2026-09-05 CC-013 artifact in a landed slot (not an active question).
+- [operator 2026-09-13T21:52Z] carry (unchanged disposition): slot 0 FHC-G6-CERT-COST-SCALE remains
+  FINISHED-UNLANDED (`19cfd68` NOT an ancestor of HEAD `9783cad`; RESULT status DONE + top-level
+  `spec_gap` = packet stop condition; done-when fmt/clippy fail on pre-existing drift outside
+  `write_allow`). Adjudicate: (a) land instrumentation-only `19cfd68` + route the gap, or (b)
+  hold/re-fork. FHC-G1 -> FHC-D -> FHC-E chained behind this. Also carried: RG-23/RG-9 authoring;
+  substrate stack (watchdog/supervisor/overnight) down; TOR-C.

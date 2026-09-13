@@ -75,41 +75,42 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T21:29Z]: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier) +
+> LATEST GROUND TRUTH [operator 2026-09-13T21:52Z]: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier) +
 > 2 IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
 > FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `b63f472` (the 21:06Z operator commit, loop/ only; no new packet code).
-> **NO CHANGE from the 21:06Z cycle** - all re-derived by command this cycle.
+> HEAD `9783cad` (the 21:29Z operator commit, loop/ only; no new packet code).
+> **NO CHANGE from the 21:29Z cycle** - all re-derived by command this cycle.
 > **slot 0 FHC-G6** still FINISHED-UNLANDED: commit `19cfd68` on `packet/FHC-G6-CERT-COST-SCALE`
 > (bd_bridge.rs +78/-5, new tests/cert_cost_scale.rs +584); wt-root `RESULT.json` status DONE with a
-> top-level `spec_gap` (dominant phase = per-patch interval certification; no whitelisted
-> bd_bridge-only fix; needs a smarter bracket decomposition), tests 3/3 green, `pre_existing_drift`
-> fmt/clippy fail outside `write_allow`. Packet done-when does not pass -> **NOT landed; orchestrator
-> adjudication still open** (land instrumentation + route the gap, or hold/re-fork). `19cfd68` is
-> NOT an ancestor of HEAD (unlanded).
+> top-level `spec_gap` (packet stop condition: dominant phase = per-patch interval certification; no
+> whitelisted bd_bridge-only fix; needs a smarter bracket decomposition), tests 3/3 green,
+> `pre_existing_drift` fmt/clippy fail outside `write_allow`. Packet done-when does not pass ->
+> **NOT landed; orchestrator adjudication still open** (land instrumentation + route the gap, or
+> hold/re-fork). `19cfd68` is NOT an ancestor of HEAD (unlanded).
 > **slot 1** CLEAN IDLE dead duplicate (same packet, pid=-, changed=0, detached `fd40760`);
 > reset-only NO-OP, redispatch inappropriate (same packet, SPEC_GAP). **slot 2** IDLE residue
 > (TTC-RECENSUS-F1-R3 row DONE, landed de6bfc6). Neither blocking.
 > Frontier: FHC-G6 returns SPEC_GAP; FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet
 > files MISSING (`loop/packets/`) -> authoring item. Slots 3-7 landed residue; worker commits
-> e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `b63f472` (`merge-base --is-ancestor`
+> e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `9783cad` (`merge-base --is-ancestor`
 > TRUE). Nothing landable.
 > Registry re-derived by script (360 rows, last-wins): 265 DONE / 84 READY / 10 BLOCKED / 1
-> SUPERSEDED. No BLOCKED row flippable: `BG-CK-SPLINE-CENSUS` is CANCELLED BY OWNER (session 49);
-> the DEF-*/ADM-* rows read READY but are already landed by `LANDED <hex>` marker (so `landed()`
-> skips them); the rest are owner/semantic parked.
+> SUPERSEDED. No BLOCKED row flippable: all 10 are owner/semantic parked (`BG-CK-SPLINE-CENSUS`
+> CANCELLED BY OWNER, `SEM-PCURVE-MASTER-001-FIX` SUPERSEDED, `BG-AUD-FIX-004` OWNER_BLOCKED,
+> `DEF-SEEDRAY-B` human-gated, `TOR-C` orchestrator-held, `MONO-10` owner candidate, `RDEF-M4/M5`
+> owner inputs, `DEF-SPINEFRAME-GRAZE` SPEC_GAP, `DEF-TESS-ANALYTIC-SEAM` superseded->R2).
 > `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 8 free); slot-assigned packets:
 > 5"; RG-23/RG-9 **ANCHOR CHECK FAILED** (packet files absent); FHC-G1/D/E chained on G6;
 > `dispatched 0` = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT run it live).
 > **SUBSTRATE: supervisor, watchdog, and overnight driver remain ALL DEAD (carried, escalated).**
-> Heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last written 21:20Z), operator runner exactly
+> Heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last written 21:50Z), operator runner exactly
 > 1 (27876) - a naive process match shows "2" only because the operator's own query shell matches
-> its own command line. cargoq UP (ping ok, queued 0, running false). Disk 17.61 GB free (above 15
-> GB goal); RAM 5.24 GB free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*` leaks;
-> `fallback.log` quiet. Slot 5 wt holds a STALE `QUESTION.md` (CC-013-CORRESPONDENCE, 2026-09-05) -
-> landed-slot residue, not an active question.
+> its own command line. cargoq UP (ping ok, queued 0, running false). Disk 17.58 GB free (above 15
+> GB goal); RAM 5.12 GB free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*` leaks;
+> `fallback.log` quiet (last entry 2026-09-11). Slot 5 wt holds a STALE `QUESTION.md`
+> (CC-013-CORRESPONDENCE, 2026-09-05) - landed-slot residue, not an active question.
 > Leaving: slot 0 FHC-G6 FINISHED with a SPEC_GAP RESULT (unlanded, escalated) + slots 1/2 idle
-> residue + slots 3-7 landed residue / HEAD `b63f472` + this cycle's STATE/log commit.
+> residue + slots 3-7 landed residue / HEAD `9783cad` + this cycle's STATE/log commit.
 
 
 ## Pick up here
@@ -154,6 +155,26 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T21:52Z] board: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier, SPEC_GAP) + 2
+  IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
+  FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched;
+  HEAD `9783cad`. Board re-derived by command; NO CHANGE from 21:29Z.
+- [operator 2026-09-13T21:52Z] health: heartbeat exactly 1 (27872; `dispatch_heartbeat.log` written
+  21:50Z), operator runner exactly 1 (27876); a naive `CommandLine -match` reports 2 only because
+  the operator's own query shell matches its own command line. cargoq UP (ping ok, queued 0, running
+  false). Watchdog/supervisor/overnight 0 (carried dead, not restarted). Disk 17.58 GB free; RAM
+  5.12 GB free; no `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last 2026-09-11).
+- [operator 2026-09-13T21:52Z] slot 0 FHC-G6: `19cfd68` NOT an ancestor of HEAD (unlanded);
+  RESULT status DONE but carries a top-level `spec_gap` (packet stop condition) and done-when
+  fmt/clippy fail on pre-existing drift outside `write_allow` -> did NOT land, escalation carried.
+  Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE); `fd40760`/`f0ae3ab` (slots 1/2) ancestors too. No root
+  `RESULT.json` poison. Nothing landable.
+- [operator 2026-09-13T21:52Z] Registry re-derived by script (360 rows, last-wins): 265 DONE / 84
+  READY / 10 BLOCKED / 1 SUPERSEDED; all 10 BLOCKED owner/semantic parked, none mechanically
+  flippable. Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it); `--dry-run
+  --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR
+  CHECK FAILED (packet files absent); FHC-G1/D/E chained on G6; `dispatched 0` = REAL idle.
 - [operator 2026-09-13T21:29Z] board: 1 FINISHED-UNLANDED (slot 0 FHC-G6, frontier, SPEC_GAP) + 2
   IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
   FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched;
