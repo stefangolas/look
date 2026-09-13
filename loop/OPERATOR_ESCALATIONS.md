@@ -2369,3 +2369,26 @@ uncommitted - left for the orchestrator, no dispatch impact.
   (19172 + 27828) + duplicate cargoq/server.py (28544 + 34564); F1-AUTHORING-ARMS
   LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; slot-4/7 wt
   RESULT residue. Priority: none (informational closure).
+
+## 2026-09-13T14:49Z - operator cycle 8: DUPLICATE FHC-G6 dispatch (slot 0 active + slot 1 stalled-alive)
+
+- What: the heartbeat (27872) re-forked FHC-G6-CERT-COST-SCALE into slot 0 at ~10:30 local while
+  the original G6 worker in slot 1 was still live. NOW TWO live workers on the same packet:
+  - slot 0 RUNNING/ACTIVE: cmd pid 35812 -> opencode 14252 (session
+    `ses_f64d2e588ffeYAPndGa9CJ43Gw`), worktree on `packet/FHC-G6-CERT-COST-SCALE`@45575f6;
+    cargoq is running `cargo test --profile quick -p truck123d --lib tmp_microbench_patch_cert`
+    with cwd=`loop/slots/0/wt` (server.log 10:44:11), events mtime 10:44:10 local - progressing.
+  - slot 1 STALLED-but-ALIVE: cmd pid 25232 -> opencode 26668 (session
+    `ses_f650755e6ffeXNsMpdBvyxH7IM`), detached at `fd40760`; NO RESULT/commit/QUESTION, last
+    cargo job DONE 10:32:14, events frozen 10:32:22 local (~17 min quiet at scan).
+- What the operator did: NOTHING destructive. Did NOT kill or reset either worker: both opencode
+  processes are alive, and the charter forbids killing a live worker / resetting the shared
+  packet branch. slot 0 covers the frontier, so no unblock is missed.
+- Why escalate: two live workers on one packet can each write a RESULT/commit and diverge; the
+  duplicate is a dispatch/heartbeat judgment call, not a control-flow action. Also the heartbeat
+  has now re-forked G6 repeatedly (09:38Z, 14:03Z, this cycle) without cleaning the prior slot.
+- Exact command a human/orchestrator should start from: decide which worker is authoritative
+  (slot 0 is active; slot 1 is hung). To reclaim slot 1 safely, kill opencode pid 26668 + cmd
+  pid 25232, then `python loop/run_packet.py --slot 1 --reset-only`; or leave it and let it be
+  reaped. Watch `loop/slots/0/events.jsonl` for slot 0's RESULT/commit. Priority: medium-high
+  (frontier; G1/D/E queue behind G6).

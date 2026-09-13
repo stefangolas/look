@@ -9438,3 +9438,55 @@ supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT residue; F1 non_z_a
 flip-or-pin.
 
 Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD 45575f6 + this cycle's STATE/log commit.
+
+---
+
+## operator 2026-09-13T14:49Z - cycle 8
+
+Health sweep (step 1): `slot_status.py` = slot 0 RUNNING (FHC-G6), slot 1 STALLED (FHC-G6),
+slot 2 IDLE, slots 3-7 FINISHED. Heartbeat exactly 1 (27872, `-File ...dispatch_heartbeat.ps1`;
+the second `-match` hit was this probing shell self-matching the pattern). Watchdog 1 (29264).
+cargoq UP (`/ping` = queued 0, running **true** = the slot-0 G6 test). Disk **16.2 GB free**
+(above the 8 GB floor AND the 15 GB goal); no `%TEMP%/look-verify-baseline-*` leaks. RAM
+**3.77 GB free** (above the 3 GB floor). Carried duplication: TWO supervisor.py (19172 + 27828)
+and multiple cargoq/server.py - functional.
+
+Land (step 2): nothing landable. HEAD is `1ce49bd` (orchestrator's post-14:26Z "boolean
+machinery gap" docs commit; `fd40760` = new_slot warm-build JOBS=2 cap). `git merge-base
+--is-ancestor <c> HEAD` = True for e6553db, 3c2109b, ee97499, 713f205. Slot 3-7 wt RESULT
+statuses: 3=DONE, 4=LANDED-WITH-FINDINGS, 5=DONE, 6=DONE, 7=LANDED (redundant, no commit).
+Nothing merged, nothing filed.
+
+Unblock (step 3): **NEW - DUPLICATE FHC-G6.** slot 0 is RUNNING/ACTIVE (cmd 35812 -> opencode
+14252, session `ses_f64d2e588ffeYAPndGa9CJ43Gw`, worktree on `packet/FHC-G6-CERT-COST-SCALE`;
+cargoq `cargo test --profile quick -p truck123d --lib tmp_microbench_patch_cert` cwd=`slots/0/wt`
+since 10:44:11; events mtime 10:44:10 local). slot 1 is STALLED-but-ALIVE (cmd 25232 -> opencode
+26668, session `ses_f650755e6ffeXNsMpdBvyxH7IM`, detached `fd40760`; NO RESULT/commit/QUESTION,
+last cargo DONE 10:32:14, events frozen 10:32:22 local ~17 min). The heartbeat re-forked G6 to
+slot 0 at ~10:30 local while slot 1 was live. Took NO destructive action: both opencode processes
+alive, and resetting slot 1 would touch the live packet branch (forbidden). slot 0 covers the
+frontier, so no unblock is missed. **ESCALATED** to OPERATOR_ESCALATIONS 14:49Z.
+
+Registry hygiene (step 4): re-derived programmatically (last-wins dedup + `landed <hex>` match):
+360 rows = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. BLOCKED-with-all-deps-landed = 6
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, MONO-10 owner candidate, RDEF-M4 owner inputs) -
+all owner/semantic, none mechanically flippable. RG-23/RG-9 packet files are MISSING (unauthored),
+so their anchor-check FAIL is an authoring item, not a re-measure fix - carried, not fixed.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 6 free); slot-assigned
+packets: 5; dispatched 0" (RG-23/RG-9 anchor FAIL; FHC-G1 blocked on G6, FHC-D on G1, FHC-E on
+D) = REAL idle beyond the running G6.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and added the labeled
+`[operator 2026-09-13T14:49Z]` block to "State of the machine, as left" - corrected HEAD to
+`1ce49bd`, recorded the duplicate G6 (slot 0 ACTIVE + slot 1 STALLED), disk 16.2 GB, RAM 3.77 GB.
+Traps/history untouched.
+
+Escalation (step 7): NEW - duplicate FHC-G6 dispatch (slot 0 active + slot 1 stalled-alive).
+Carried human items unchanged: RG-23/RG-9 unauthored; duplicate supervisors + duplicate
+cargoq/server.py; slot-4/7 wt RESULT residue; F1 non_z_axis pin; TOR-C flip-or-pin.
+
+Leaving: slot 0 ACTIVE G6 + slot 1 STALLED G6 (duplicate, escalated) / HEAD `1ce49bd` + this
+cycle's STATE/log/escalation commit.
