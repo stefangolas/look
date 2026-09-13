@@ -9058,3 +9058,57 @@ flip-or-pin; slot-1/2/4/7 wt RESULT residue; duplicate registry lines; schedule.
 
 Leaving: 1 RUNNING (FHC-B, slot 1, progressing) / HEAD eb7bada + this cycle's STATE/log
 commit; heartbeat 1 (27872, LIVE); disk 17.67 GB; RAM ~2.0 GB.
+
+## 2026-09-13 00:04 UTC (operator, next instance)
+
+Board at start: 1 RUNNING / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
+operator-dispatched. HEAD `a383405` (the 23:42Z operator cycle's STATE/log commit).
+Program: the FHC chain (G5 landed; G6 frontier held; B running; G1/C chained behind).
+
+Health sweep:
+- slot_status: slot 1 RUNNING (FHC-B, cmd pid 38624, events 7.5 min old, 3 changed
+  files); slot 0 IDLE (G6, no work, clean at base); slot 2 IDLE (TTC-RECENSUS-F1-R3, no
+  work); slots 3-7 FINISHED residue.
+- cargoq ping OK (queued 0, running true = the FHC-B `multi_contour_sections` test).
+- Heartbeat exactly 1 (27872, command-line anchored; last cycle 20:00:42 local = 00:00Z).
+  Watchdog 1 (29264). Operator runner 1 (27876). Overnight driver 1 (24864).
+- Disk 16.9 GB free (above the 8 GB floor and the 15 GB janitor goal). RAM 1.85 GB free
+  (BELOW the 3 GB floor - carried HIGH; FHC-B's test is the resident consumer).
+- No `%TEMP%/look-verify-baseline-*` leaks. fallback.log quiet since 2026-09-11 13:42.
+  Janitor slot targets: slot 0 outer 0.98 GB, slot 1 outer 0.98 GB + inner wt 1.85 GB.
+- TWO supervisor.py (19172 + 27828) = carried duplication; only ONE overnight.py child,
+  no double-merge risk.
+
+Land (step 2): nothing landable. Slots 3-7 FINISHED residue are all landed -
+`git merge-base --is-ancestor` exit 0 for e6553db/3c2109b/ee97499/713f205/5cf4811 against
+integration/kernel-bg. Slot 4 RESULT status LANDED-WITH-FINDINGS (escalated); slot 7
+RESULT LANDED (redundant, no commit). Slot 1's live worker is not a landing.
+
+Unblock (step 3): nothing to unblock. Slot 0 IDLE (G6 frontier, no work, clean at base)
+and slot 2 IDLE (TTC-RECENSUS-F1-R3, no work) hold no in-progress work, no QUESTION, no
+dead process. FHC-B (slot 1) is alive and progressing - not touched.
+
+Registry hygiene (step 4): nothing mechanically flippable. READY without a landed marker
+= exactly 6: RG-23/RG-9 (`"packet": ""`, unauthored - carried LOW) and the FHC chain
+G6/G1/B/C. BLOCKED-with-all-needs-landed = BG-CK-SPLINE-CENSUS (needs
+BG-CK-P0-PREVALENCE, landed, but owner-cancelled) plus MONO-10 / RDEF-M4 / RDEF-M5 (null
+needs; owner/adjudication-gated) and the carried set. Left BLOCKED.
+
+Dispatch (step 5): did NOT run live (heartbeat owns dispatch). The heartbeat's 20:00:42
+cycle logged the same five holds (RG-23/RG-9/G6 clash on `bd_bridge.rs`; G1 blocked on
+G6; C on FHC-B; "dispatched 0; workers ~1/3"). No action.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and the "State of the machine, as
+left" status lines to [operator 2026-09-13T00:04Z].
+
+Report (step 7): this entry.
+
+Escalations: none NEW. Carried unchanged - HIGH: warm builds/workers need RAM headroom
+(RAM below the 3 GB floor; heavy baseline chrome+Dropbox+Discord+MsMpEng+2 opencode);
+LOW: RG-23/RG-9 unauthored; duplicate supervisors + lagging cargoq restart guard;
+F1-AUTHORING-ARMS LANDED-WITH-FINDINGS; FRAME-REVOLVE F1 non_z_axis pin; TOR-C
+flip-or-pin; slot-1/2/4/7 wt RESULT residue; duplicate registry lines; schedule.py
+'needs' crash.
+
+Leaving: 1 RUNNING (FHC-B, slot 1, progressing) / HEAD a383405 + this cycle's STATE/log
+commit; heartbeat 1 (27872, LIVE); disk 16.9 GB; RAM ~1.85 GB.
