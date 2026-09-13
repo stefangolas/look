@@ -2432,3 +2432,20 @@ uncommitted - left for the orchestrator, no dispatch impact.
   RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in loop/packets); duplicate supervisors (19172 + 27828)
   + duplicate cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt RESULT residue; FRAME-REVOLVE
   F1 non_z_axis pin (ttc_lathe_spline.rs:255); TOR-C flip-or-pin (orchestrator-held).
+
+## 2026-09-13T16:02Z - operator cycle 11: duplicate FHC-G6 CARRY (slot 1 now clean; blocker unchanged)
+
+- Update to the 15:37Z item: slot 1's processes are now GONE. opencode 26668 and cmd 25232 no
+  longer exist; slot 1's worktree is clean (changed=0, detached `fd40760`), no
+  RESULT/commit/QUESTION. So the 15:37Z kill step is moot and `python loop/run_packet.py
+  --slot 1 --reset-only` is now a NO-OP ("slot 1 is clean; nothing to reset") - do not bother.
+- The remaining blocker is UNCHANGED and is the only thing holding the frontier: branch
+  `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty worktree (slot 0 is the legitimate
+  in-progress G6 worker; do NOT touch it). The heartbeat's redispatch of the dead slot-1 G6
+  cannot complete until slot 0 commits/finishes and frees the branch. Nothing for the operator to
+  do beyond carrying this.
+- Exact command a human/orchestrator should start from: none needed now; wait for slot 0 to
+  commit, then the branch frees and the heartbeat dispatches FHC-G1. Priority: medium (frontier;
+  FHC-G1/D/E queue behind G6). All other carried items unchanged (RG-23/RG-9 unauthored;
+  duplicate supervisors + cargoq/server.py; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin;
+  TOR-C).

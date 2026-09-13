@@ -75,48 +75,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T15:37Z]: 1 WORKING (slot 0 FHC-G6) + 1 DEAD
-> duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `bd09376` (predecessor 15:11Z commit; no packet code moved this cycle).
-> **slot 0 FHC-G6 is CONFIRMED WORKING, not stalled.** events.jsonl mtime is 33.9 min old, but a
-> live child is the progress: cmd pid 35812 -> opencode 14252 (session
-> `ses_f64d2e588ffeYAPndGa9CJ43Gw`) -> powershell 16492 -> **python 24408 running
-> `Measure-Command { python measure_row.py ... build_suspension_rear }` at ~1 core** (CPU
-> 1634.9 -> 1640.8 s over 6 s, WS 237 MB). Branch `packet/FHC-G6-CERT-COST-SCALE`@45575f6,
-> dirty `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. Do NOT touch (the packet is an
-> expensive-measurement task; the worker said the rows are extremely expensive).
-> **slot 1 is now a DEAD duplicate** (not merely stalled): cmd 25232 -> opencode 26668 (session
-> `ses_f650755e6ffeXNsMpdBvyxH7IM`), detached `fd40760`, changed=0, **no child process**, no
-> cargo/rustc, no RESULT/commit/QUESTION, events frozen 37.3 min. `dispatch_ready --dry-run`
-> now flags it: "FHC-G6-CERT-COST-SCALE: DEAD dispatch (slot 1 holds no matching RESULT) - would
-> reset + delete + redispatch". But that redispatch CANNOT complete: branch
-> `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty worktree (heartbeat 11:30:58 local:
-> `new_slot FAILED: branch ... held by slots/0/wt (dirty=True, at_tip=True); release it
-> manually`). The frontier is deadlocked on slot 0's own (legitimate) in-progress work. Operator
-> did NOT kill 26668 (hard limit: may not kill a worker) and did NOT reset its worktree (the
-> MONO-2 live-reset hazard) - ESCALATED with the kill+reset recipe (see OPERATOR_ESCALATIONS
-> 15:37Z).
+> LATEST GROUND TRUTH [operator 2026-09-13T16:02Z]: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE
+> dead duplicate (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
+> HEAD `2fdf11a` (orchestrator commit: warm-build cap + G6 duplicate saga + LOOK_SHARED_TARGET
+> switched on; advanced from `bd09376`, no packet code).
+> **slot 0 FHC-G6 still WORKING.** opencode 14252 (session `ses_f64d2e588ffeYAPndGa9CJ43Gw`)
+> alive at CPU 502.6 s / WS 505 MB; events.jsonl 9.7 min old; its prior measurement child
+> (python 24408 `measure_row.py ... build_suspension_rear`) has EXITED and no child is live now
+> (worker between calls). Dirty `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. Do NOT
+> touch - the packet is an expensive-measurement task.
+> **slot 1 is now a CLEAN IDLE dead duplicate** (corrects the 15:37Z "dead, needs kill+reset"):
+> opencode 26668 / cmd 25232 are GONE, worktree clean (changed=0, detached `fd40760`), no
+> RESULT/commit/QUESTION. `run_packet --reset-only` would be a NO-OP ("slot 1 is clean"). The
+> redispatch still cannot complete: branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's
+> dirty worktree. No operator action (nothing to kill, nothing to reset).
 > Frontier: FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files are MISSING
-> (unauthored -> anchor-check FAIL, an authoring item). Slots 3-7 FINISHED landed residue, all
-> commits ancestors of HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811); RESULT statuses 3=DONE
-> 4=LANDED-WITH-FINDINGS 5=DONE 6=DONE 7=LANDED - none operator-landable. Slot 2 IDLE.
-> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 6 free); slot-assigned
-> packets: 4; dispatched 0" (only candidate = the dead slot-1 G6 reset, which the held branch
-> blocks) = REAL idle (heartbeat 27872 owns dispatch and is LIVE; do not run it live manually).
-> Registry re-derived by script (last-wins dedup + `landed <hex>` match): 360 rows = 265 DONE /
-> 84 READY / 10 BLOCKED / 1 SUPERSEDED; READY-without-landed-marker = exactly the 6
-> slot-assigned packets; BLOCKED-with-all-needs-landed = 9, all owner/semantic parked, none
-> mechanically flippable (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
-> SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM
-> superseded by -R2, DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner candidate,
-> RDEF-M4-NUMERIC-TIER owner input).
-> Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), cargoq UP
-> (ping ok, queued 0, running false). Carried: TWO supervisor.py (19172 + 27828) + THREE
-> cargoq/server.py (28544 + 34564 + 31804) - functional. Disk 16.3 GB free (above the 8 GB floor
-> and the 15 GB goal; no `%TEMP%/look-verify-baseline-*` leaks). RAM 3.56 GB free (above the 3 GB
-> floor). fallback.log quiet.
-> Leaving: slot 0 WORKING G6 + slot 1 DEAD duplicate G6 (escalated) / HEAD `bd09376` + this
-> cycle's STATE/log commit.
+> (gen_packet --check = FileNotFoundError; only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in
+> loop/packets) -> authoring item. Slots 2-7 FINISHED/IDLE landed residue; all worker commits
+> ancestors of HEAD (e6553db/3c2109b/ee97499/713f205/5cf4811; slot 4 status
+> LANDED-WITH-FINDINGS, slot 7 LANDED - neither landable, both already merged). Nothing landable.
+> Registry (script): 360 rows = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
+> BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none mechanically flippable
+> (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+> SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, MONO-10 owner candidate, RDEF-M4/M5 owner inputs).
+> `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned
+> packets: 5; dispatched 0" = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did NOT
+> run it live).
+> Health: heartbeat exactly 1 (27872), watchdog 1 (29264), operator runner 1 (27876), overnight
+> 1 (24864), cargoq UP (ping ok, queued 0, running false). Carried: TWO supervisor.py (19172 +
+> 27828) + THREE cargoq/server.py (28544 + 34564 + 31804). Disk 14.8 GB free (above 8 GB floor,
+> below 15 GB goal); RAM 3.0 GB free (at floor); no `%TEMP%/look-verify-baseline-*` leaks.
+> Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE duplicate / HEAD `2fdf11a` + this cycle's
+> STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -161,6 +151,34 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T16:02Z] board: 1 WORKING (slot 0 FHC-G6) + 1 CLEAN IDLE dead duplicate
+  (slot 1 FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD
+  `2fdf11a` (orchestrator warm-build/G6/LOOK_SHARED_TARGET commit; advanced from `bd09376`).
+- [operator 2026-09-13T16:02Z] **slot 0 FHC-G6 WORKING** (re-derived): opencode 14252
+  (`ses_f64d2e588ffeYAPndGa9CJ43Gw`) alive CPU 502.6 s / WS 505 MB; events.jsonl 9.7 min old;
+  measurement child python 24408 has exited, no child live now (worker between calls); dirty
+  `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Do NOT kill/reset.
+- [operator 2026-09-13T16:02Z] **slot 1 now CLEAN IDLE dead duplicate**: opencode 26668 / cmd
+  25232 GONE; worktree clean (changed=0, detached `fd40760`); no RESULT/commit/QUESTION.
+  `run_packet --reset-only` = NO-OP ("slot 1 is clean"). Redispatch blocked by slot 0's held
+  branch `packet/FHC-G6-CERT-COST-SCALE`; no operator action available.
+- [operator 2026-09-13T16:02Z] Slots 2-7 FINISHED/IDLE landed residue; all worker commits
+  ancestors of HEAD (`e6553db`/`3c2109b`/`ee97499`/`713f205`/`5cf4811`; slot 4
+  LANDED-WITH-FINDINGS, slot 7 LANDED - neither landable, both already merged). Nothing landable.
+- [operator 2026-09-13T16:02Z] Registry (script, last-wins): 360 rows = 265 DONE / 84 READY /
+  10 BLOCKED / 1 SUPERSEDED; BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none
+  flippable (BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled,
+  SEM-PCURVE-MASTER-001-FIX SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, MONO-10 owner candidate,
+  RDEF-M4/M5 owner inputs).
+- [operator 2026-09-13T16:02Z] Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it).
+  `--dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5;
+  dispatched 0" (RG-23/RG-9 packet files MISSING -> gen_packet FileNotFoundError, authoring item;
+  FHC-G1/D/E chained) = REAL idle.
+- [operator 2026-09-13T16:02Z] Substrate: heartbeat 1 (27872), watchdog 1 (29264), operator
+  runner 1 (27876), overnight 1 (24864), cargoq UP (ping ok, queued 0, running false); carried
+  TWO supervisor.py (19172 + 27828) + THREE cargoq/server.py (28544 + 34564 + 31804). Disk
+  14.8 GB free (above 8 GB floor, below 15 GB goal); RAM 3.0 GB free (at floor); no
+  `%TEMP%/look-verify-baseline-*` leaks.
 - [operator 2026-09-13T15:37Z] board: 1 WORKING (slot 0 FHC-G6) + 1 DEAD duplicate (slot 1
   FHC-G6) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 operator-dispatched; HEAD
   `bd09376`.

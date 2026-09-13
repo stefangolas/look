@@ -9609,3 +9609,56 @@ non_z_axis pin; TOR-C flip-or-pin.
 
 Leaving: slot 0 WORKING G6 + slot 1 DEAD duplicate G6 (escalated) / HEAD `bd09376` + this cycle's
 STATE/log/escalation commit.
+
+## [operator 2026-09-13T16:02Z] cycle 11 - quiet carry; slot 1 dead duplicate now CLEAN, HEAD moved to 2fdf11a
+
+Health sweep (step 1): `slot_status.py` = slot 0 RUNNING FHC-G6 (pid 35812, events 7.9 min old,
+changed=1, =base no commit); slot 1 IDLE FHC-G6 (pid=-, events 61.5 min old, changed=0, detached
+fd40760); slot 2 IDLE TTC-RECENSUS-F1-R3 (row DONE); slots 3-7 FINISHED landed residue.
+`curl 127.0.0.1:8231/ping` = {ok, queued 0, running false}. Heartbeat exactly 1 (27872
+dispatch_heartbeat.ps1); watchdog 1 (29264 watchdog.py); operator runner 1 (27876); overnight 1
+(24864 overnight.py). Disk 14.80 GB free (>8 floor, <15 goal); RAM 3.00 GB free (at floor); no
+`%TEMP%/look-verify-baseline-*` leaks. HEAD is now `2fdf11a` (orchestrator commit "warm-build
+cap, G6 duplicate saga, LOOK_SHARED_TARGET switched on") - advanced from the STATE-recorded
+`bd09376`; no packet code moved.
+
+Land (step 2): NOTHING LANDABLE. All five FINISHED slot branch tips are ancestors of HEAD
+(`git merge-base --is-ancestor`: e6553db/3c2109b/ee97499/713f205/5cf4811 all True). Slot 4
+RESULT status LANDED-WITH-FINDINGS and slot 7 LANDED - not DONE, and already merged regardless.
+Slot 3/5/6 DONE and already merged. Re-derived by command, matches prior cycle.
+
+Unblock (step 3): slot 0 is RUNNING and making progress - opencode 14252 alive (CPU 502.6 s, WS
+505 MB), events 9.7 min old; its prior measurement child python 24408 (`measure_row.py ...
+build_suspension_rear`) has EXITED and no child is live at scan (worker between calls). Dirty
+`truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION. NOT touched (hard limit: alive worker).
+slot 1 is now a CLEAN IDLE dead duplicate: opencode 26668 / cmd 25232 GONE, worktree clean
+(changed=0, detached fd40760), no RESULT/commit/QUESTION. `run_packet --reset-only` would be a
+NO-OP ("slot 1 is clean; nothing to reset"), so I did not run it. Redispatch of the same packet
+still cannot complete (branch `packet/FHC-G6-CERT-COST-SCALE` held by slot 0's dirty worktree) -
+no action; carried/escalated.
+
+Registry hygiene (step 4): re-derived by script: 360 rows = 265 DONE / 84 READY / 10 BLOCKED / 1
+SUPERSEDED. BLOCKED-all-needs-DONE = 7, all owner/semantic parked, none mechanically flippable
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP, MONO-10 owner candidate, RDEF-M4/M5 owner inputs).
+RG-23/RG-9 "ANCHOR CHECK FAILED" is really FileNotFoundError: the packet FILES are MISSING
+(only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in loop/packets) - authoring item, carried, not
+fixable mechanically.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned
+packets: 5; dispatched 0" (RG-23/RG-9 missing packet files; FHC-G1/D/E chained on G6) = REAL
+idle beyond slot 0's work.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and prepended the labeled
+`[operator 2026-09-13T16:02Z]` block to "State of the machine, as left" - HEAD `2fdf11a`,
+slot 0 WORKING (opencode 14252, measure child exited), slot 1 CLEAN IDLE dead duplicate, disk
+14.8 GB, RAM 3.0 GB. Traps/history untouched.
+
+Escalation (step 7): UPDATED the duplicate-FHC-G6 item (cycle 11) - slot 1 processes gone and
+reset-only now a no-op; the only remaining blocker is slot 0's held branch. Carried human items
+unchanged: RG-23/RG-9 unauthored; duplicate supervisors + duplicate cargoq/server.py; slot-4/7 wt
+RESULT residue; F1 non_z_axis pin; TOR-C flip-or-pin.
+
+Leaving: slot 0 WORKING G6 + slot 1 CLEAN IDLE dead duplicate / HEAD `2fdf11a` + this cycle's
+STATE/log/escalation commit.
