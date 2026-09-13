@@ -9397,3 +9397,44 @@ supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT residue; F1 non_z_a
 flip-or-pin.
 
 Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD bc1c3f3 + this cycle's STATE/log commit.
+
+---
+
+## operator 2026-09-13T14:26Z - cycle 7
+
+Health sweep (step 1): `slot_status.py` = slot 0 IDLE (dead residue), slot 1 RUNNING, slot 2 IDLE,
+slots 3-7 FINISHED. Heartbeat exactly 1 (27872, `-File ...dispatch_heartbeat.ps1` anchored),
+watchdog 1 (29264), operator runner 1 (27876), cargoq UP (`/ping` = queued 0, running false). Disk
+**19.07 GB free** (above the 8 GB floor AND the 15 GB goal); no `%TEMP%/look-verify-baseline-*`
+leaks. **RAM 2.27 GB free - still BELOW the 3 GB floor**, transient: the RUNNING G6 build is the
+single queued spike; did NOT stack workers or start any build. Carried duplication: TWO
+supervisor.py (19172 + 27828) and multiple cargoq/server.py - functional (port 8231 answers).
+
+Land (step 2): nothing landable. HEAD is `45575f6` (the 14:03Z operator STATE commit - no code
+moved this cycle). `git merge-base --is-ancestor <c> HEAD` = True for e6553db, 3c2109b, ee97499,
+713f205, 5cf4811; nothing merged.
+
+Unblock (step 3): slot 0 IDLE dead residue of the SAME packet (events 44.9 min old, worktree on
+`packet/FHC-G6-CERT-COST-SCALE`@45575f6 = base, no work, no RESULT/commit/QUESTION) - its packet
+runs LIVE in slot 1, so NO reset/re-dispatch (a reset must not touch the shared live
+`packet/FHC-G6-CERT-COST-SCALE` branch). Slot 2 IDLE (row TTC-RECENSUS-F1-R3 DONE) holds no work;
+no new QUESTION; no 402.
+
+Registry hygiene (step 4): dispatch_ready output unchanged from 14:03Z; nothing to flip; no
+anchor/lint-fixable READY packet surfaced.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); dispatched 0"
+(RG-23/RG-9 unauthored + write-set clash with the RUNNING G6 on `truck123d/src/bd_bridge.rs`;
+FHC-G1 blocked on G6, FHC-D on G1, FHC-E on D) = REAL idle beyond the running G6.
+
+STATE (step 6): rewrote the volatile LATEST GROUND TRUTH block and the "State of the machine, as
+left" bullets, both labeled [operator 2026-09-13T14:26Z]; corrected HEAD to 45575f6, recorded G6
+RUNNING in slot 1 (slot 0 dead residue), disk 19.07 GB, the transient RAM-below-floor. Traps/
+history untouched.
+
+Escalation (step 7): NO new item. Carried human items unchanged: RG-23/RG-9 unauthored; duplicate
+supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT residue; F1 non_z_axis pin; TOR-C
+flip-or-pin.
+
+Leaving: 1 RUNNING (FHC-G6, slot 1) / HEAD 45575f6 + this cycle's STATE/log commit.
