@@ -2404,3 +2404,31 @@ uncommitted - left for the orchestrator, no dispatch impact.
   threshold with zero cargo/rustc activity, so it is the natural reclaim candidate.
 - Start from the 14:49Z item above (same kill+`--reset-only` recipe). Priority: medium-high
   (carried; G1/D/E queue behind G6).
+
+## 2026-09-13T15:37Z - operator cycle 10: duplicate FHC-G6 now DEAD (slot 1) + frontier deadlocked on slot 0's held branch
+
+- What: the 14:49Z/15:11Z duplicate item is now SHARPENED. slot 0 is CONFIRMED WORKING - its
+  events are 33.9 min old, but a live child chain runs the packet's expensive measurement:
+  cmd 35812 -> opencode 14252 (session `ses_f64d2e588ffeYAPndGa9CJ43Gw`) -> powershell 16492 ->
+  `python 24408` executing `Measure-Command { python measure_row.py ... build_suspension_rear }`
+  at ~1 core (CPU 1634.9 -> 1640.8 s over 6 s, WS 237 MB). Do NOT kill or reset slot 0.
+- slot 1 is now a DEAD duplicate: opencode 26668 (session `ses_f650755e6ffeXNsMpdBvyxH7IM`) /
+  cmd 25232 are alive but have NO child process, no cargo/rustc, no RESULT/commit/QUESTION, and
+  events frozen 37.3 min. `dispatch_ready --dry-run` flags it: "FHC-G6-CERT-COST-SCALE: DEAD
+  dispatch (slot 1 holds no matching RESULT) - would reset + delete + redispatch".
+- Why the operator did not just do it: (a) the hard limit forbids killing a worker (only own
+  timed-out predecessor's leftovers); (b) resetting slot 1's worktree while its opencode is alive
+  is the MONO-2 2026-09-10 live-reset hazard. And the redispatch would fail anyway: branch
+  `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty worktree, so the heartbeat's own
+  cycle logs `new_slot FAILED: branch ... held by loop/slots/0/wt (dirty=True, at_tip=True);
+  release it manually` (dispatch_heartbeat.log 11:30:58 local). The frontier is deadlocked on
+  slot 0's legitimate in-progress work.
+- Exact command a human/orchestrator should start from: kill opencode pid 26668 + cmd pid 25232,
+  then `python loop/run_packet.py --slot 1 --reset-only` (archive-and-reset, no spawn). Leave
+  slot 0 alone; it is the frontier and is actively measuring. When slot 0 finishes/commits, the
+  branch frees and the heartbeat can dispatch the next FHC link. Priority: medium-high (frontier;
+  FHC-G1/D/E queue behind G6).
+- Carried human items unchanged: RG-23/RG-9 unauthored (empty `packet`, only
+  RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists in loop/packets); duplicate supervisors (19172 + 27828)
+  + duplicate cargoq/server.py (28544 + 34564 + 31804); slot-4/7 wt RESULT residue; FRAME-REVOLVE
+  F1 non_z_axis pin (ttc_lathe_spline.rs:255); TOR-C flip-or-pin (orchestrator-held).

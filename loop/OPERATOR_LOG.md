@@ -9551,3 +9551,61 @@ still alive and slowly advancing, uncommitted `bd_bridge.rs`, no RESULT/commit/Q
 cargo/rustc, cargoq running=false. Neither is dead (events growing), so no reset. STATE.md
 corrected to "2 STALLED-but-ALIVE" and HEAD `fbba6ab` (this cycle's commit). Final re-check:
 HEAD `fbba6ab`, heartbeat 1 (27872), cargoq ping ok queued 0 running false.
+
+---
+
+## operator 2026-09-13T15:37Z - cycle 10
+
+Health sweep (step 1): `slot_status.py` = slot 0 STALLED (FHC-G6), slot 1 STALLED (FHC-G6),
+slot 2 IDLE, slots 3-7 FINISHED. Heartbeat exactly 1 (27872; the extra `-like` hits were this
+probing shell self-matching). Watchdog 1 (29264). Operator runner 1 (27876). cargoq UP
+(`/ping` = queued 0, running false). Disk **16.3 GB free** (above the 8 GB floor AND the 15 GB
+goal); no `%TEMP%/look-verify-baseline-*` leaks. RAM **3.56 GB free** (above the 3 GB floor).
+Carried duplication: TWO supervisor.py (19172 + 27828) and THREE cargoq/server.py
+(28544 + 34564 + 31804) - functional.
+
+Land (step 2): nothing landable. HEAD `bd09376` (predecessor 15:11Z commit). `git merge-base
+--is-ancestor` = True for e6553db/3c2109b/ee97499/713f205/5cf4811 against integration/kernel-bg.
+Slot wt RESULT statuses: 3=DONE, 4=LANDED-WITH-FINDINGS, 5=DONE, 6=DONE, 7=LANDED (redundant, no
+commit) - none status DONE with an unlanded commit. Nothing merged, nothing filed.
+
+Unblock (step 3): **the 15:11Z "both stalled-but-alive" read is CORRECTED.** slot 0 is WORKING:
+events.jsonl mtime is 33.9 min old but a live child chain cmd 35812 -> opencode 14252 ->
+powershell 16492 -> **python 24408 running `Measure-Command { python measure_row.py ...
+build_suspension_rear }` at ~1 core** (CPU +5.9 s over 6 s, WS 237 MB). The long event gap is
+the expensive measurement, not a hang - do NOT kill/reset. slot 1 is now a DEAD duplicate:
+opencode 26668 / cmd 25232 alive but no child, no cargo/rustc, no RESULT/commit/QUESTION, events
+frozen 37.3 min. `dispatch_ready --dry-run` flags "FHC-G6-CERT-COST-SCALE: DEAD dispatch (slot 1
+holds no matching RESULT) - would reset + delete + redispatch", but that redispatch is blocked:
+branch `packet/FHC-G6-CERT-COST-SCALE` is held by slot 0's dirty worktree (heartbeat 11:30:58
+local `new_slot FAILED: branch ... held by slots/0/wt (dirty=True, at_tip=True); release it
+manually`). Did NOT kill 26668 (hard limit) and did NOT reset its worktree (MONO-2 live-reset
+hazard); ESCALATED 15:37Z with the kill+reset recipe.
+
+Registry hygiene (step 4): re-derived by script (last-wins dedup + `landed <hex>` match): 360
+rows = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED. READY-without-landed-marker = exactly the
+6 slot-assigned packets (RG-23/RG-9 unauthored, FHC-G6, FHC-G1/D/E chained).
+BLOCKED-with-all-needs-landed = 9, all owner/semantic parked, none mechanically flippable
+(BG-AUD-FIX-004 OWNER_BLOCKED, BG-CK-SPLINE-CENSUS owner-cancelled, SEM-PCURVE-MASTER-001-FIX
+SUPERSEDED, DEF-SPINEFRAME-GRAZE SPEC_GAP->-R2, DEF-TESS-ANALYTIC-SEAM superseded by -R2,
+DEF-SEEDRAY-B human-gated, TOR-C orchestrator-held, MONO-10 owner candidate, RDEF-M4-NUMERIC-TIER
+owner input). RG-23/RG-9 packet files are MISSING (only RG-4-CANONICAL-BOOLEAN-PRODUCT.md exists
+in loop/packets) - authoring item, carried, not fixed.
+
+Dispatch (step 5): did NOT run live - heartbeat 27872 owns dispatch and is LIVE.
+`dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 6 free); slot-assigned
+packets: 4; dispatched 0" (only candidate = the dead slot-1 G6 reset, blocked by the held
+branch) = REAL idle beyond slot 0's work.
+
+STATE (step 6): rewrote the LATEST GROUND TRUTH block and added the labeled
+`[operator 2026-09-13T15:37Z]` block to "State of the machine, as left" - HEAD `bd09376`,
+slot 0 WORKING (live python measurement child), slot 1 DEAD duplicate, disk 16.3 GB, RAM 3.56 GB.
+Traps/history untouched.
+
+Escalation (step 7): UPDATED - slot 1 is now a DEAD duplicate and the frontier is deadlocked on
+slot 0's held branch; kill+reset recipe given. Carried human items unchanged: RG-23/RG-9
+unauthored; duplicate supervisors + duplicate cargoq/server.py; slot-4/7 wt RESULT residue; F1
+non_z_axis pin; TOR-C flip-or-pin.
+
+Leaving: slot 0 WORKING G6 + slot 1 DEAD duplicate G6 (escalated) / HEAD `bd09376` + this cycle's
+STATE/log/escalation commit.
