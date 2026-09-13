@@ -998,8 +998,8 @@ class Edge:
         options = {}
         if args:
             options["positional"] = True
-        for key in kwargs:
-            options[key] = True
+        for key, value in kwargs.items():
+            options[key] = value
         return cls("spline", pts, options=options)
 
     @classmethod
@@ -1085,7 +1085,8 @@ class Edge:
                 self.p0.z + t * (self.p1.z - self.p0.z),
             )
         if self.kind == "spline":
-            return Vector(*_path_point(_path_points(self), t))
+            points, tangents = _spline_interpolation(self)
+            return Vector(*_path_point(points, t, tangents))
         _refuse("this path carrier has no recorded interpolation")
         return self.p0
 
@@ -1104,7 +1105,8 @@ class Edge:
                 self.p1.z - self.p0.z,
             )
         if self.kind == "spline":
-            return Vector(*_path_derivative(_path_points(self), t))
+            points, tangents = _spline_interpolation(self)
+            return Vector(*_path_derivative(points, t, tangents))
         _refuse("this path carrier has no recorded derivative")
         return Vector(0.0, 0.0, 0.0)
 
@@ -1285,14 +1287,133 @@ def Helix(*args, **kwargs):
     _refuse("Helix: a helical path carrier is not a kernel-engine row")
 
 
-def FilletPolyline(*args, **kwargs):
-    """build123d ``FilletPolyline(points, radius=...)`` -- a filleted polyline
-    profile carrier.
+def _fillet_arc(prev, cur, nxt, radius):
+    """The exact tangent fillet of one polyline corner (build123d
+    ``fillet_2d`` semantics).
 
-    TIER B: the carrier needs the fillet-arm composition the landed executor
-    does not carry, so the name refuses TYPED naming the open carrier.
+    The two recorded straight edges ``prev -> cur`` and ``cur -> nxt`` are
+    trimmed to the tangent points of a radius-``radius`` circular arc. The
+    tangent length is ``radius * tan(turn / 2)`` for the signed turn angle
+    ``turn`` (the exterior angle of the corner), the centre lies on the
+    interior bisector at ``radius / cos(turn / 2)`` and the arc sweeps by
+    ``turn``. All arithmetic is exact in the recorded ``z = 0`` plane; the
+    returned tangent points and the exact ``Arc`` edge are the landed carrier
+    decomposition, never a flattening.
     """
-    _refuse("FilletPolyline: a fillet-arm polyline carrier is not a kernel-engine row")
+    ax, ay = cur[0] - prev[0], cur[1] - prev[1]
+    bx, by = nxt[0] - cur[0], nxt[1] - cur[1]
+    la = math.hypot(ax, ay)
+    lb = math.hypot(bx, by)
+    if la == 0.0 or lb == 0.0:
+        raise ValueError("FilletPolyline: a corner repeats an adjacent point")
+    ux, uy = ax / la, ay / la
+    wx, wy = bx / lb, by / lb
+    turn = math.atan2(ux * wy - uy * wx, ux * wx + uy * wy)
+    if turn == 0.0:
+        # A straight (collinear) corner has no arc: the sharp vertex stays.
+        return None
+    half = abs(turn) * 0.5
+    tangent = radius * math.tan(half)
+    if tangent > 0.5 * la or tangent > 0.5 * lb:
+        raise ValueError(
+            "FilletPolyline: the radius exceeds the recorded corner span"
+        )
+    t_in = (cur[0] - ux * tangent, cur[1] - uy * tangent, 0.0)
+    t_out = (cur[0] + wx * tangent, cur[1] + wy * tangent, 0.0)
+    bxn, byn = wx - ux, wy - uy
+    bl = math.hypot(bxn, byn)
+    if bl == 0.0:
+        raise ValueError("FilletPolyline: a corner has no interior bisector")
+    bxn, byn = bxn / bl, byn / bl
+    distance = radius / math.cos(half)
+    center = (cur[0] + bxn * distance, cur[1] + byn * distance, 0.0)
+    # `Edge.make_arc` sweeps CCW about `+normal`; a positive turn is CCW and a
+    # negative turn is the same arc swept CCW about `-normal`.
+    if turn > 0.0:
+        normal = (0.0, 0.0, 1.0)
+        start = math.degrees(math.atan2(t_in[1] - center[1], t_in[0] - center[0]))
+        end = start + math.degrees(turn)
+    else:
+        normal = (0.0, 0.0, -1.0)
+        start = math.degrees(
+            math.atan2(-(t_in[1] - center[1]), t_in[0] - center[0])
+        )
+        end = start + math.degrees(-turn)
+    arc = Edge.make_arc(center, radius, normal, (1.0, 0.0, 0.0), start, end)
+    return {"in": t_in, "out": t_out, "arc": arc}
+
+
+def FilletPolyline(*points, radius, close=False, **kwargs):
+    """build123d ``FilletPolyline(points, radius=..., close=...)`` -- a
+    polyline whose corners are replaced by exact tangent arcs.
+
+    A polyline with arc-filleted corners decomposes EXACTLY into line-arc-line
+    chains: every piece is a landed carrier (``Line`` and the exact ``Arc``
+    conic). The radius semantics are the build123d ``fillet_2d`` call-site
+    convention -- each corner is trimmed to the tangent points of a radius
+    ``radius`` arc, and ``radius == 0`` keeps a sharp vertex. The recorded
+    ``Wire`` is the exact decomposition; the consuming arm either answers it
+    (the landed line+arc ``profile_loop``) or refuses typed, never flattened.
+    """
+    if kwargs:
+        option = sorted(kwargs)[0]
+        _refuse(
+            "a FilletPolyline option is not answered exactly by a "
+            "kernel-engine row: " + option,
+            code="E_UNSUPPORTED_ENVELOPE",
+            verb="FilletPolyline",
+            carrier="fillet_polyline",
+            phase="authoring",
+        )
+    pts = [_point3(point) for point in points]
+    if len(pts) < 2:
+        raise ValueError("FilletPolyline requires two or more points")
+    if close and pts[-1] == pts[0]:
+        pts.pop()
+    n = len(pts)
+    if n < 2:
+        raise ValueError("FilletPolyline requires two or more points")
+    if isinstance(radius, (int, float)):
+        radii = [float(radius)] * n
+    else:
+        radii = [float(value) for value in radius]
+    if any(value < 0.0 for value in radii):
+        raise ValueError("FilletPolyline radius must be non-negative")
+
+    fillets = {}
+    for i in range(n):
+        if not close and (i == 0 or i == n - 1):
+            continue
+        prev = pts[i - 1]
+        nxt = pts[(i + 1) % n] if close else pts[i + 1]
+        r = radii[i] if close else radii[i - 1]
+        if r == 0.0:
+            fillets[i] = None
+            continue
+        fillets[i] = _fillet_arc(prev, pts[i], nxt, r)
+
+    edges = []
+    if close:
+        for i in range(n):
+            previous = fillets.get((i - 1) % n)
+            current = fillets.get(i)
+            start = previous["out"] if previous else pts[(i - 1) % n]
+            end = current["in"] if current else pts[i]
+            edges.append(Edge.make_line(start, end))
+            if current:
+                edges.append(current["arc"])
+    else:
+        first = fillets.get(1)
+        edges.append(Edge.make_line(pts[0], first["in"] if first else pts[1]))
+        for i in range(1, n - 1):
+            current = fillets.get(i)
+            if current:
+                edges.append(current["arc"])
+            following = fillets.get(i + 1)
+            start = current["out"] if current else pts[i]
+            end = following["in"] if following else pts[n - 1]
+            edges.append(Edge.make_line(start, end))
+    return Wire(edges)
 
 
 def make_hull(*args, **kwargs):
@@ -2824,13 +2945,19 @@ def _lagrange_end_slope(pts, params, first):
     return out
 
 
-def _clamped_slopes(pts, params):
+def _clamped_slopes(pts, params, end_tangents=None):
     """The clamped cubic slopes at every station: the interior slopes solve
-    the C2 tridiagonal system, the end slopes are the Lagrange end slopes."""
+    the C2 tridiagonal system, the end slopes are the Lagrange end slopes (the
+    landed Lagrange interpolant) or the recorded end tangents (the landed
+    Hermite interpolant)."""
     n = len(pts)
     slopes = [[0.0, 0.0, 0.0] for _ in range(n)]
-    slopes[0] = _lagrange_end_slope(pts[0:4], params[0:4], True)
-    slopes[n - 1] = _lagrange_end_slope(pts[n - 4:n], params[n - 4:n], False)
+    if end_tangents is None:
+        slopes[0] = _lagrange_end_slope(pts[0:4], params[0:4], True)
+        slopes[n - 1] = _lagrange_end_slope(pts[n - 4:n], params[n - 4:n], False)
+    else:
+        slopes[0] = list(end_tangents[0])
+        slopes[n - 1] = list(end_tangents[1])
     nk = n - 2
     h = [params[i + 1] - params[i] for i in range(n - 1)]
     delta = [
@@ -2881,9 +3008,14 @@ def _clamped_slopes(pts, params):
     return slopes
 
 
-def _path_spans(pts):
+def _path_spans(pts, end_tangents=None):
     """The reconstructed spans of the recorded station interpolant plus the
-    chord parameters; one span per consecutive station pair."""
+    chord parameters; one span per consecutive station pair.
+
+    With no recorded end tangents the landed Lagrange interpolant is used (the
+    fixed-order clamped cubic whose end slopes are the degree-3 Lagrange
+    slopes); with recorded end tangents the landed Hermite interpolant is used
+    (the same clamped cubic with the recorded end derivatives)."""
     n = len(pts)
     if n < 2:
         _refuse("DegenerateSweepPath: a path needs at least two recorded stations")
@@ -2892,8 +3024,18 @@ def _path_spans(pts):
         if not (params[i] > params[i - 1]):
             _refuse("DegenerateSweepPath: a repeated path station has no direction")
     if n == 2:
+        if end_tangents is not None:
+            h = params[1] - params[0]
+            span = [
+                _hermite_power(
+                    pts[0][c], pts[1][c],
+                    h * end_tangents[0][c], h * end_tangents[1][c],
+                )
+                for c in range(3)
+            ]
+            return [span], params
         return [[[pts[0][c], pts[1][c] - pts[0][c], 0.0, 0.0] for c in range(3)]], params
-    if n == 3:
+    if n == 3 and end_tangents is None:
         u1 = (params[1] - params[0]) / (params[2] - params[0])
         denom = 2.0 * u1 * (1.0 - u1)
         if denom == 0.0:
@@ -2904,7 +3046,7 @@ def _path_spans(pts):
             q1 = (p1 - (1.0 - u1) * (1.0 - u1) * p0 - u1 * u1 * p2) / denom
             span.append([p0, 2.0 * (q1 - p0), p0 - 2.0 * q1 + p2, 0.0])
         return [span], params
-    slopes = _clamped_slopes(pts, params)
+    slopes = _clamped_slopes(pts, params, end_tangents)
     spans = []
     for i in range(n - 1):
         h = params[i + 1] - params[i]
@@ -2932,10 +3074,10 @@ def _span_slope(span, u):
     ]
 
 
-def _path_span_at(pts, t):
+def _path_span_at(pts, t, end_tangents=None):
     """The span index and span parameter of the normalized parameter ``t``,
     plus the spans and chord parameters."""
-    spans, params = _path_spans(pts)
+    spans, params = _path_spans(pts, end_tangents)
     total = params[-1]
     if t <= 0.0:
         return spans, params, 0, 0.0, total
@@ -2949,9 +3091,9 @@ def _path_span_at(pts, t):
     return spans, params, j, (s - params[j]) / h, total
 
 
-def _path_point(pts, t):
+def _path_point(pts, t, end_tangents=None):
     """The exact interpolated point at the normalized parameter ``t``."""
-    spans, _params, j, u, _total = _path_span_at(pts, t)
+    spans, _params, j, u, _total = _path_span_at(pts, t, end_tangents)
     if t <= 0.0:
         return list(pts[0])
     if t >= 1.0:
@@ -2959,34 +3101,82 @@ def _path_point(pts, t):
     return _span_value(spans[j], u)
 
 
-def _path_derivative(pts, t):
+def _path_derivative(pts, t, end_tangents=None):
     """The exact interpolated derivative (with respect to the normalized
     parameter) at ``t``."""
-    spans, params, j, u, total = _path_span_at(pts, t)
+    spans, params, j, u, total = _path_span_at(pts, t, end_tangents)
     h = params[j + 1] - params[j]
     slope = _span_slope(spans[j], u)
     return [slope[c] * total / h for c in range(3)]
 
 
-def _path_directions(pts):
+def _path_directions(pts, end_tangents=None):
     """The exact interpolated derivative at every recorded station."""
     n = len(pts)
-    spans, params = _path_spans(pts)
+    spans, params = _path_spans(pts, end_tangents)
     total = params[-1]
     if n == 2:
         return [_span_slope(spans[0], 0.0)] * 2
-    if n == 3:
+    if n == 3 and end_tangents is None:
         return [_span_slope(spans[0], params[i] / total) for i in range(n)]
-    slopes = _clamped_slopes(pts, params)
+    slopes = _clamped_slopes(pts, params, end_tangents)
     return [[slopes[i][c] * total for c in range(3)] for i in range(n)]
 
 
+def _spline_interpolation(edge):
+    """The recorded samples of a path spline edge plus its landed
+    interpolation choice.
+
+    The default (`make_spline(points)`) is the landed Lagrange interpolant
+    (clamped cubic with degree-3 Lagrange end slopes). A recorded
+    ``tangents=(t0, t1)`` pair selects the landed Hermite interpolant (the
+    same clamped cubic with the recorded end derivatives). Any other
+    interpolation option -- a parameter list, a per-point tangent list, a
+    periodic path -- is a semantics no landed interpolant reproduces exactly,
+    so it refuses TYPED naming the option; the corpus convention is never
+    approximated.
+    """
+    options = dict(edge.options or {})
+    tangents = None
+    for key in sorted(options):
+        value = options[key]
+        if key == "tangents":
+            if value is None:
+                continue
+            if (
+                not isinstance(value, (tuple, list))
+                or len(value) != 2
+                or value[0] is None
+                or value[1] is None
+            ):
+                _refuse(
+                    "a spline interpolation option is not answered exactly by "
+                    "a landed interpolant: tangents",
+                    code="E_UNSUPPORTED_ENVELOPE",
+                    verb="spline",
+                    carrier="path_spline",
+                    phase="authoring",
+                )
+            tangents = (_point3(value[0]), _point3(value[1]))
+            continue
+        if key == "periodic" and not value:
+            continue
+        _refuse(
+            "a spline interpolation option is not answered exactly by a "
+            "landed interpolant: " + key,
+            code="E_UNSUPPORTED_ENVELOPE",
+            verb="spline",
+            carrier="path_spline",
+            phase="authoring",
+        )
+    return [point.to_tuple() for point in edge.points], tangents
+
+
 def _path_points(edge):
-    """The recorded samples of a recoverable spline path edge; an
-    interpolation option the recorded data cannot recover refuses typed."""
-    if edge.options:
-        _refuse("a path spline with interpolation options is not a kernel-engine row")
-    return [point.to_tuple() for point in edge.points]
+    """The recorded samples of a recoverable spline path edge (the landed
+    interpolation is validated and dispatched by the callers)."""
+    points, _tangents = _spline_interpolation(edge)
+    return points
 
 
 def _path_edge(path):
@@ -3028,8 +3218,8 @@ def _station_data(edge):
             _refuse("DegenerateSweepPath: a station direction is zero")
         return pts, [direction, list(direction)]
     if edge.kind == "spline":
-        pts = _path_points(edge)
-        directions = _path_directions(pts)
+        pts, tangents = _spline_interpolation(edge)
+        directions = _path_directions(pts, tangents)
         for direction in directions:
             if _vlen(direction) == 0.0:
                 _refuse("DegenerateSweepPath: a station direction is zero")
@@ -3661,6 +3851,42 @@ def _build_truck_module():
             _refuse("Shape.cast is not a kernel-engine row")
 
     class _SolidMixin:
+        @classmethod
+        def make_loft(cls, sections, ruled=False, **kwargs):
+            """build123d ``Solid.make_loft(wires, ruled=...)`` -- the landed
+            N-station loft (MONO-2-NSTATION-LOFT).
+
+            The corpus's structural members (`_strut`, `_hull_plate`,
+            `_upright_shell`) build a loft from placed section Wires. Each
+            recorded Wire is wrapped as its planar Face and routed to the same
+            ``loft`` arm the ``bd.loft`` name answers: a line section stack
+            certifies through the exact ruled carrier, a periodic spline
+            section stack through the certified canonical N-station arm. A
+            section outside the recorded wire/face carrier refuses typed naming
+            the open carrier.
+            """
+            if kwargs:
+                option = sorted(kwargs)[0]
+                _refuse(
+                    "a make_loft option is not a kernel-engine row: " + option
+                )
+            faces = []
+            for section in sections:
+                if isinstance(section, Face):
+                    faces.append(section)
+                elif isinstance(section, Wire):
+                    faces.append(make_face(section))
+                else:
+                    _refuse(
+                        "a make_loft section outside the recorded wire/face "
+                        "carrier is not a kernel-engine row",
+                        code="E_UNSUPPORTED_ENVELOPE",
+                        verb="make_loft",
+                        carrier="loft_section",
+                        phase="authoring",
+                    )
+            return loft(*faces, ruled=ruled)
+
         @classmethod
         def make_cylinder(cls, radius, height, plane=None, **kwargs):
             if plane is not None and isinstance(plane, Plane):
