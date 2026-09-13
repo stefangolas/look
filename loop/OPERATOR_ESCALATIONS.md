@@ -2584,3 +2584,30 @@ uncommitted - left for the orchestrator, no dispatch impact.
   NOT kill opencode `18632` unless you also intend to re-fork slot 0. Priority: high (frontier).
 - Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
   slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T20:19Z - operator cycle 22: slot 0 FHC-G6 startup hang is REPRODUCIBLE (timeout -> self-kill -> retry -> hang again); operator still did NOT kill
+
+- Update to the 19:57Z item (same packet, same symptom, now confirmed reproducible). The 19:57Z hung
+  job `cargo test --profile quick -p truck123d --lib tmp_microbench_patch_cert_scaling` (cargoq
+  START 15:37:30 local) TIMED OUT at 16:07:37 local (exit 4294967295 = -1, 1807 s) with no test
+  output. The worker then self-diagnosed (20:07:34Z `Get-CimInstance`), killed the hung
+  `33784`/`29484`/`31524` itself (20:07:40Z), edited, and retried. The retry (cargoq START 16:07:47
+  local) spawned exe `31336` (`truck123d-01311bf50ba025c6.exe tmp_microbench_patch_cert_scaling
+  --nocapture`, created 16:07:50 local) that has now burned **0.00 s CPU / 3 threads / 4 MB for ~12
+  min** - the identical startup-hang signature. opencode `18632` (cmd `15276`) is idle (CPU delta
+  0.000 s / 4 s); last event 20:07:45Z (step_start). So a plain retry does NOT clear it: the test
+  binary wedges at startup deterministically on this slot.
+- Why the operator did NOT kill/reset: worker process ALIVE, frontier packet, branch
+  `packet/FHC-G6-CERT-COST-SCALE` held by slot 0's dirty worktree (reset/redispatch unavailable),
+  and killing a live worker's child is a judgment call. The worker already killed its own hung exe
+  once, so it is aware; a human/orchestrator should decide whether to keep killing the exe (the
+  worker will keep retrying) or investigate why the binary wedges at 0 CPU on this slot.
+- Exact command a human/orchestrator should start from: inspect
+  `C:\Users\stefa\look\loop\cargoq\server.log` tail (last line: `16:07:47 START ... -p truck123d
+  ...`) and the process tree under pid `15276`; minimal unblock is `Stop-Process -Id 31336` (the
+  hung test exe) and `Stop-Process -Id 38104` (its cargoq client). If the wedge recurs, the slot's
+  `target/quick` for truck123d may need clearing (a corrupt/locked test binary is the prime
+  suspect), or the packet should be re-forked. Do NOT kill opencode `18632` unless you intend to
+  re-fork slot 0. Priority: high (frontier; FHC-G1/D/E all chained behind it).
+- Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
+  slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.

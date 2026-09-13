@@ -10079,3 +10079,45 @@ STATE/log commit.
   RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED + slots 1/2 idle residue + slots 3-7 landed residue /
   HEAD `368ea26` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-13T20:19Z - operator cycle 22: slot 0 FHC-G6 hang is REPRODUCIBLE (timed out + retried + hung again); substrate still down (carried); nothing to land/flip; real idle
+
+- Health sweep (step 1): `slot_status.py` = slot 0 RUNNING (events 11.4 min old, changed=1), slot 1
+  IDLE, slot 2 IDLE, slots 3-7 FINISHED. cargoq `ping` = `{"ok": true, "queued": 0, "running":
+  true}`. Heartbeat = exactly 1 (powershell 27872; my 2nd match was my own query shell); last cycle
+  20:19:39Z "workers now ~1/3", dispatched 0. Watchdog = 0 real processes (only my query) - carried
+  dead. Operator runner 1 (27876). cargoq server `31804` UP. Disk 18.83 GB free (> 15 goal); RAM
+  4.93 GB free (> 3 floor). No `%TEMP%/look-verify-baseline-*` leaks.
+- Landing (step 2): NOTHING landable. Slots 3-7 branch tips e6553db/3c2109b/ee97499/713f205/
+  5cf4811 all reachable from HEAD `30ad7f8` (`git merge-base --is-ancestor` True) and
+  `loop/results/<ID>.json` filed. RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE
+  / 7 LANDED.
+- Unblock (step 3): slot 0 is RUNNING, not IDLE/DEAD, so the reset/redispatch branch does not
+  apply. **New evidence this cycle:** the 19:57Z hung cargoq job (`cargo test --profile quick -p
+  truck123d --lib tmp_microbench_patch_cert_scaling`, START 15:37:30 local) TIMED OUT at 16:07:37
+  local (exit 4294967295 = -1, 1807 s) with no output. The worker then self-diagnosed (20:07:34Z
+  `Get-CimInstance`), killed the hung `33784`/`29484`/`31524` itself (20:07:40Z), edited a file,
+  and retried: the retry (cargoq START 16:07:47 local) spawned exe `31336` (created 16:07:50 local)
+  that is hung at **0.00 s CPU / 3 threads / 4 MB for ~12 min** - same startup-hang signature.
+  opencode `18632` idle (CPU delta 0.000 s / 4 s; total 575.4 s / WS 486 MB); last event 20:07:45Z
+  (step_start). Dirty `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Did NOT kill (worker
+  alive, frontier, branch `packet/FHC-G6-CERT-COST-SCALE` held) -> ESCALATED, strengthened. Slot 1
+  CLEAN IDLE dead duplicate: reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2
+  IDLE residue (row DONE). No other stuck workers.
+- Registry hygiene (step 4): census over 360 unique ids = 265 DONE / 84 READY / 10 BLOCKED / 1
+  SUPERSEDED. All 10 BLOCKED rows are owner/semantic parked (OWNER_BLOCKED, owner-cancelled,
+  SUPERSEDED, SPEC_GAP->R2, human-gated, orchestrator-held TOR-C, owner inputs M4/M5) - none
+  flippable. RG-23/RG-9 packet files confirmed ABSENT from `loop/packets/` (only RG-4 present) ->
+  authoring item. Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (0 running, 7 free); slot-assigned packets: 4"; RG-23/RG-9 ANCHOR
+  CHECK FAILED; FHC-G6 "DEAD dispatch (slot 1 holds no matching RESULT) - would reset + delete +
+  redispatch" (blocked: branch held by slot 0); FHC-G1/D/E chained; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T20:19Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): (a) slot 0 FHC-G6 hang now REPRODUCIBLE (timeout + self-kill + retry +
+  hang again); operator did not kill; needs a human/orchestrator decision to kill `31336`/`38104`
+  or let the next cargoq timeout ride. (b) substrate stack still down - carried unchanged.
+  Carried: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED (reproducible hang) + slots 1/2 idle residue + slots
+  3-7 landed residue / HEAD `30ad7f8` + this cycle's STATE/log/escalation commit.
