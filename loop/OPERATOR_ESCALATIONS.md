@@ -2392,3 +2392,15 @@ uncommitted - left for the orchestrator, no dispatch impact.
   pid 25232, then `python loop/run_packet.py --slot 1 --reset-only`; or leave it and let it be
   reaped. Watch `loop/slots/0/events.jsonl` for slot 0's RESULT/commit. Priority: medium-high
   (frontier; G1/D/E queue behind G6).
+
+## 2026-09-13T15:11Z - operator cycle 9: duplicate FHC-G6 CARRY (still open, no change)
+
+- The 14:49Z duplicate-FHC-G6 item remains OPEN and unchanged; no new decision needed beyond it.
+  Re-derived this cycle: slot 0 still ACTIVE (cmd 35812 -> opencode 14252, events 10.9 min old,
+  uncommitted `truck123d/src/bd_bridge.rs`, no RESULT/commit/QUESTION, cargoq running=false) and
+  slot 1 still STALLED-but-ALIVE (cmd 25232 -> opencode 26668, events 14.3 min old, uncommitted
+  `bd_bridge.rs`, no RESULT/commit/QUESTION). Both opencode processes alive; operator took no
+  destructive action (slot 0 covers the frontier). Slot 1 is approaching the 15-min dead-worker
+  threshold with zero cargo/rustc activity, so it is the natural reclaim candidate.
+- Start from the 14:49Z item above (same kill+`--reset-only` recipe). Priority: medium-high
+  (carried; G1/D/E queue behind G6).
