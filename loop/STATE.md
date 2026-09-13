@@ -75,49 +75,46 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-13T20:19Z]: 1 RUNNING-BUT-BLOCKED (slot 0 FHC-G6, frontier)
+> LATEST GROUND TRUTH [operator 2026-09-13T20:43Z]: 1 RUNNING-BUT-BLOCKED (slot 0 FHC-G6, frontier)
 > + 2 IDLE residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5
 > FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched.
-> HEAD `30ad7f8` (the 19:57Z operator commit, loop/ only; no new packet code).
-> **slot 0 FHC-G6 worker ALIVE but BLOCKED again on the SAME test - now REPRODUCIBLE.** Since the
-> 19:57Z cycle: the first hung job (`cargo test --profile quick -p truck123d --lib
-> tmp_microbench_patch_cert_scaling`, cargoq START 15:37:30 local) TIMED OUT at 16:07:37 local
-> (exit 4294967295 = -1, 1807 s) with no test output. The worker then self-diagnosed at 20:07:40Z
-> and killed `33784`/`29484`/`31524` itself, edited a file, and retried; the retry (cargoq START
-> 16:07:47 local) spawned test exe `31336` (`truck123d-...exe tmp_microbench_patch_cert_scaling
-> --nocapture`, created 16:07:50 local) that has burned **0.00 s CPU / 3 threads / 4 MB for ~12 min**
-> = hung at startup, same signature. opencode `18632` (cmd `15276`) idle (CPU delta 0.000 s / 4 s,
-> total 575.4 s / WS 486 MB); last event 20:07:45Z (step_start), 12 min old. Dirty
-> `truck123d/src/bd_bridge.rs`; no RESULT/commit/QUESTION. Operator did NOT kill (worker alive,
-> frontier, branch `packet/FHC-G6-CERT-COST-SCALE` held) -> ESCALATED, strengthened (see 20:19Z).
+> HEAD `f8bad98` (the 20:19Z operator commit, loop/ only; no new packet code).
+> **slot 0 FHC-G6 worker ALIVE but its test binary is HUNG AT STARTUP AGAIN - now REPRODUCIBLE
+> ACROSS TWO DIFFERENT TESTS (slot/environment-level, NOT test-specific).** The `tmp_microbench`
+> hang (20:19Z) was abandoned by the worker; it moved to `truck123d/tests/cert_cost_scale.rs` (new
+> untracked file), `cargo check -p truck123d --test cert_cost_scale` went exit 101 -> 0, then
+> `cargo test -p truck123d --test cert_cost_scale --locked -- --nocapture --test-threads=1` (cargoq
+> START 16:32:03 local) ran 331 s and exited 101, and the retry (START 16:37:45 local) spawned exe
+> `cert_cost_scale-c3919afee52a961b.exe` (pid 14584, created 16:37:49 local) that has burned
+> **0.00 s CPU / 4 threads / 12.2 MB for ~6 min** (8 s CPU delta = 0.000 s) = the identical
+> startup-hang signature on a DIFFERENT binary. opencode `18632` (cmd `15276`, session
+> `ses_f63ef5656ffeAO3dDpZZeUvoXr`) idle (CPU delta 0.016 s / 3 s); last event 20:37:44Z. Dirty
+> `truck123d/src/bd_bridge.rs` + new `truck123d/tests/cert_cost_scale.rs`; no RESULT/commit/QUESTION.
+> Operator did NOT kill (worker alive, frontier, branch `packet/FHC-G6-CERT-COST-SCALE` held) ->
+> ESCALATED, strengthened with the cross-test evidence (see 20:43Z).
 > **slot 1 CLEAN IDLE dead duplicate**: pid=-, changed=0, detached `fd40760`; reset-only NO-OP;
 > redispatch blocked by slot 0's held branch `packet/FHC-G6-CERT-COST-SCALE`.
 > **slot 2** IDLE residue, TTC-RECENSUS-F1-R3 row DONE (landed de6bfc6); no work. Neither blocking.
 > Frontier: FHC-G6 blocked; FHC-G1 waits on G6, FHC-D on G1, FHC-E on D; RG-23/RG-9 packet files
-> MISSING (`loop/packets/` has only RG-4-CANONICAL-BOOLEAN-PRODUCT.md; RG-23/RG-9 absent ->
-> gen_packet FileNotFoundError) -> authoring item. Slots 3-7 landed residue; worker commits
-> e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `30ad7f8` (re-verified via
-> merge-base --is-ancestor); RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE /
-> 7 LANDED; `loop/results/` copies present. Nothing landable.
-> Registry (census, last-wins over 360 unique ids): 265 DONE / 84 READY / 10 BLOCKED / 1
-> SUPERSEDED. All 10 BLOCKED rows are owner/semantic parked (OWNER_BLOCKED, owner-cancelled,
-> SUPERSEDED, SPEC_GAP->R2, human-gated, orchestrator-held TOR-C, owner inputs M4/M5) - none
-> mechanically flippable. `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (0 running, 7 free);
-> slot-assigned packets: 4"; RG-23/RG-9 **ANCHOR CHECK FAILED**; FHC-G6 "DEAD dispatch (slot 1
-> holds no matching RESULT) - would reset + delete + redispatch" (blocked: branch held by slot 0);
-> FHC-G1/D/E chained; `dispatched 0` = REAL idle (heartbeat 27872 LIVE owns dispatch; operator did
-> NOT run it live). Heartbeat last cycle 20:19:39Z, "workers now ~1/3", dispatched 0.
+> MISSING (`loop/packets/`) -> authoring item. Slots 3-7 landed residue; worker commits
+> e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `f8bad98` (re-verified via
+> merge-base --is-ancestor). Nothing landable.
+> Registry carried from 20:19Z (265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED); all BLOCKED
+> owner/semantic parked, none mechanically flippable - dry-run confirms no flippable candidates.
+> `dispatch_ready --dry-run --max-workers=4`: "slots: 8 (1 running, 7 free); slot-assigned packets:
+> 5"; RG-23/RG-9 **ANCHOR CHECK FAILED**; FHC-G1/D/E chained; `dispatched 0` = REAL idle (heartbeat
+> 27872 LIVE owns dispatch; operator did NOT run it live). Heartbeat last cycle 20:39:50Z,
+> "workers now ~1/4", dispatched 0.
 > **SUBSTRATE: supervisor, watchdog, and overnight driver remain ALL DEAD (carried, escalated).**
-> Only python procs = cargoq server `31804` + slot-0's hung cargoq client `38104`. `watchdog.lock`
-> stale pid `29264`; `watchdog.log` silent since 2026-09-10T22:30Z; `supervisor.log` last action
-> 09-13 09:38:57; `overnight.log` last 09-13 14:16:31. Operator did NOT restart (supervisor would
-> also restart the overnight driver; may be an intentional orchestrator-session stop). Escalated.
-> Health otherwise: heartbeat exactly 1 (27872), operator runner 1 (27876), cargoq UP (ping ok,
-> queued 0, running true = slot-0's hung job). Disk 18.83 GB free (above 15 GB goal); RAM 4.93 GB
-> free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
-> 2026-09-11.
-> Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED on a REPRODUCIBLE hung cargoq test + slots 1/2 idle
-> residue + slots 3-7 landed residue / HEAD `30ad7f8` + this cycle's STATE/log/escalation commit.
+> `watchdog.lock` stale; `supervisor.log` last action 09-13 09:38:57; `overnight.log` last 09-13
+> 14:16:31. Operator did NOT restart (supervisor would also restart the overnight driver; may be an
+> intentional orchestrator-session stop). Heartbeat exactly 1 (27872), operator runner exactly 1
+> (27876) - a naive process match shows "2" only because the operator's own query shell matches its
+> own command line. cargoq UP (ping ok, queued 0, running true = slot-0's hung test). Disk 19.12 GB
+> free (above 15 GB goal); RAM 4.47 GB free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*`
+> leaks; `fallback.log` quiet since 2026-09-11.
+> Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED on a REPRODUCIBLE cross-test startup hang + slots 1/2
+> idle residue + slots 3-7 landed residue / HEAD `f8bad98` + this cycle's STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -162,6 +159,40 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-13T20:43Z] board: 1 RUNNING-BUT-BLOCKED (slot 0 FHC-G6, frontier) + 2 IDLE
+  residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED
+  landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD
+  `f8bad98` (the 20:19Z operator commit, loop/ only). Board re-derived by command.
+- [operator 2026-09-13T20:43Z] **slot 0 FHC-G6 worker ALIVE; its test binary is HUNG AT STARTUP
+  AGAIN, now across TWO different tests -> the wedge is slot/environment-level, not test-specific.**
+  The worker abandoned `tmp_microbench_patch_cert_scaling` and switched to a new integration test
+  `truck123d/tests/cert_cost_scale.rs`: `cargo check -p truck123d --test cert_cost_scale` went
+  exit 101 -> 0 (compile fixed), then `cargo test -p truck123d --test cert_cost_scale --locked --
+  --nocapture --test-threads=1` (cargoq START 16:32:03 local) ran 331 s and exited 101, and the
+  retry (START 16:37:45 local) spawned `cert_cost_scale-c3919afee52a961b.exe` (pid 14584, created
+  16:37:49 local) burning **0.00 s CPU / 4 threads / 12.2 MB for ~6 min** (8 s delta = 0.000 s).
+  opencode `18632` (cmd `15276`, session `ses_f63ef5656ffeAO3dDpZZeUvoXr`) idle (delta 0.016 s /
+  3 s); last event 20:37:44Z. Dirty `truck123d/src/bd_bridge.rs` + new `truck123d/tests/
+  cert_cost_scale.rs`; no RESULT/commit/QUESTION. Operator did NOT kill (worker alive, frontier,
+  branch `packet/FHC-G6-CERT-COST-SCALE` held) -> ESCALATED, strengthened (cross-test evidence).
+- [operator 2026-09-13T20:43Z] slot 1 CLEAN IDLE dead duplicate (pid=-, changed=0, detached
+  `fd40760`); reset-only NO-OP; redispatch blocked by slot 0's held branch
+  `packet/FHC-G6-CERT-COST-SCALE`. slot 2 IDLE residue (TTC-RECENSUS-F1-R3 row DONE). Neither
+  blocking; no operator action.
+- [operator 2026-09-13T20:43Z] Slots 3-7 FINISHED landed residue; worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `f8bad98` (re-verified via
+  `git merge-base --is-ancestor`). Nothing landable. Registry carried from 20:19Z; all BLOCKED
+  owner/semantic parked, none flippable.
+- [operator 2026-09-13T20:43Z] Do NOT run dispatch_ready live (heartbeat 27872 LIVE owns it; last
+  cycle 20:39:50Z, "workers now ~1/4"). `--dry-run --max-workers=4` = "slots: 8 (1 running, 7
+  free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent);
+  FHC-G1/D/E chained; `dispatched 0` = REAL idle.
+- [operator 2026-09-13T20:43Z] **SUBSTRATE: supervisor + watchdog + overnight driver DEAD
+  (carried).** heartbeat exactly 1 (27872), operator runner exactly 1 (27876) - a naive process
+  match reports 2 only because the operator's own query shell matches its own command line.
+  cargoq UP (ping ok, queued 0, running true = slot-0's hung test). Disk 19.12 GB free (above
+  15 GB goal); RAM 4.47 GB free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet since 2026-09-11.
 - [operator 2026-09-13T20:19Z] board: 1 RUNNING-BUT-BLOCKED (slot 0 FHC-G6, frontier) + 2 IDLE
   residue (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED
   landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD

@@ -10121,3 +10121,47 @@ STATE/log commit.
   Carried: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED (reproducible hang) + slots 1/2 idle residue + slots
   3-7 landed residue / HEAD `30ad7f8` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-13T20:44Z - operator cycle 23: slot 0 FHC-G6 startup hang is now CROSS-TEST (slot/environment-level); worker alive, not killed; nothing landable/flippable; real idle
+
+- Board (re-derived by command): 1 RUNNING-BUT-BLOCKED (slot 0 FHC-G6, frontier) + 2 IDLE residue
+  (slot 1 FHC-G6 clean dead duplicate, slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed
+  residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD `f8bad98`.
+- Health (step 1): heartbeat exactly 1 (27872, created 09-09 21:55), operator runner exactly 1
+  (27876). NOTE: a naive `CommandLine -match` count reports 2 for each because the operator's own
+  query shell matches its own command line - no double heartbeat, no double runner. cargoq UP
+  (`/ping` ok, queued 0, running true = slot-0's test). Watchdog 0 and supervisor 0 (carried dead,
+  not restarted). Disk 19.12 GB free (above 15 GB goal); RAM 4.47 GB free (above 3 GB floor); no
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- Land (step 2): nothing. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 are all
+  ancestors of HEAD `f8bad98` (`git merge-base --is-ancestor` True); slot 4 is LANDED-WITH-FINDINGS
+  and slot 7 LANDED - none landable. (slot-root `RESULT.json` reads as absent at
+  `loop/slots/N/RESULT.json`; slot_status reports it present - it lives in the worktree. Not acted
+  on since every commit is already an ancestor.)
+- Unblock (step 3): slot 0 is RUNNING (not IDLE/DEAD), so the reset/redispatch branch does not
+  apply. **New evidence this cycle:** the worker recovered from the `tmp_microbench` hang, wrote a
+  NEW test `truck123d/tests/cert_cost_scale.rs`, got `cargo check -p truck123d --test
+  cert_cost_scale` from exit 101 to exit 0, ran the test (START 16:32:03 local) which exited 101
+  after 331 s, then retried (START 16:37:45 local). The retry's test exe
+  `cert_cost_scale-c3919afee52a961b.exe` (pid 14584) has burned **0.00 s CPU / 4 threads / 12.2 MB
+  for ~6 min** (8 s sample delta = 0.000 s) = the SAME startup-hang signature, now on a DIFFERENT
+  test binary. So the wedge is not test-specific; it is slot/environment-level. opencode `18632`
+  (cmd `15276`, session `ses_f63ef5656ffeAO3dDpZZeUvoXr`) is idle (delta 0.016 s / 3 s), last event
+  20:37:44Z; dirty `bd_bridge.rs` + new `tests/cert_cost_scale.rs`; no RESULT/commit/QUESTION. Did
+  NOT kill (worker alive, frontier, branch `packet/FHC-G6-CERT-COST-SCALE` held) -> ESCALATED,
+  strengthened. Slot 1 CLEAN IDLE dead duplicate: reset-only NO-OP, redispatch blocked by slot 0's
+  held branch. Slot 2 IDLE residue (row DONE). No other stuck workers.
+- Registry hygiene (step 4): carried from 20:19Z (265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED);
+  dry-run flagged no flippable BLOCKED row. Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR
+  CHECK FAILED (packet files absent from `loop/packets/`); FHC-G1/D/E chained on G6; `dispatched 0`
+  = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T20:43Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): slot 0's startup hang now reproduced on TWO distinct test binaries ->
+  likely a slot-level cause (corrupt/locked `target/quick` test binary, or a loader/AV wedge), not
+  the test itself. Operator did not kill. (b) substrate stack still down - carried unchanged.
+  Carried: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 RUNNING-BUT-BLOCKED (cross-test startup hang) + slots 1/2 idle residue +
+  slots 3-7 landed residue / HEAD `f8bad98` + this cycle's STATE/log/escalation commit.

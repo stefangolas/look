@@ -2611,3 +2611,30 @@ uncommitted - left for the orchestrator, no dispatch impact.
   re-fork slot 0. Priority: high (frontier; FHC-G1/D/E all chained behind it).
 - Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
   slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T20:44Z - operator cycle 23: slot 0 FHC-G6 startup hang is now CROSS-TEST -> slot/environment-level; operator still did NOT kill
+
+- Update to the 20:19Z item. The worker abandoned `tmp_microbench_patch_cert_scaling` and switched
+  to a new integration test `truck123d/tests/cert_cost_scale.rs`. `cargo check -p truck123d --test
+  cert_cost_scale` now exits 0 (compile fixed). `cargo test -p truck123d --test cert_cost_scale
+  --locked -- --nocapture --test-threads=1` (cargoq START 16:32:03 local) ran 331 s and exited 101,
+  and the retry (cargoq START 16:37:45 local) spawned `cert_cost_scale-c3919afee52a961b.exe`
+  (pid 14584, created 16:37:49 local) that has burned **0.00 s CPU / 4 threads / 12.2 MB for ~6
+  min** (8 s CPU delta = 0.000 s). This is the IDENTICAL startup-hang signature seen on
+  `tmp_microbench` at 19:57Z/20:19Z, now on a DIFFERENT test binary.
+- Why this matters: the wedge is NOT specific to one test. Two distinct test binaries have now hung
+  at ~0 CPU / ~12 MB on slot 0. Prime suspects are slot-level: a corrupt or locked `target/quick`
+  test binary for truck123d, or a loader/AV wedge on freshly-linked exes in that target dir. A plain
+  retry does not clear it (the worker already tried twice).
+- Why the operator did NOT kill/reset: worker process ALIVE, frontier packet, branch
+  `packet/FHC-G6-CERT-COST-SCALE` held by slot 0's dirty worktree (reset/redispatch unavailable),
+  and killing a live worker's child is a judgment call. The worker is aware and self-kills its hung
+  exe, but keeps landing on the same wall.
+- Exact command a human/orchestrator should start from: inspect the process tree under pid `15276`
+  and `C:\Users\stefa\look\loop\cargoq\server.log` tail (last line: `16:37:45 START ... --test
+  cert_cost_scale`). Minimal unblock is `Stop-Process -Id 14584` (the hung test exe) and its cargoq
+  client. Given the cross-test recurrence, the stronger fix is to clear the slot's truck123d
+  `target/quick` (and/or re-fork slot 0) rather than retry. Do NOT kill opencode `18632` unless you
+  intend to re-fork slot 0. Priority: high (frontier; FHC-G1/D/E all chained behind it).
+- Carried unchanged: substrate stack down (supervisor/watchdog/overnight); RG-23/RG-9 authoring;
+  slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
