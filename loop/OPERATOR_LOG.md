@@ -9884,3 +9884,46 @@ STATE/log commit.
 - Escalation (step 7): carried the slot-0/orphan and RG-23/RG-9 items unchanged; no new item.
 - Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slot 1 CLEAN IDLE duplicate / HEAD `9838486` + this
   cycle's STATE/log/escalation commit.
+
+## 2026-09-13T18:28Z - operator cycle 17: substrate stack down (supervisor+watchdog+overnight); slot 0 G6 progressing; nothing to land/unblock/flip; real idle
+
+- Board: 1 RUNNING-HEALTHY (slot 0 FHC-G6, frontier) + 1 CLEAN IDLE dead duplicate (slot 1) + 1
+  dead residue (slot 2, row DONE) / 0 landed / 0 unblocked / 0 flipped / 0 dispatched; HEAD
+  `669cc47` (the 17:58Z operator commit; no packet code).
+- Health sweep (step 1): heartbeat exactly 1 (27872; the 2nd `dispatch_heartbeat` regex hit 31696
+  was this operator's own query shell); operator runner 1 (27876; pid file 27876); cargoq UP (ping
+  ok, queued 0, running false). Disk 17.2 GB free (above 8 GB floor AND 15 GB goal); RAM 3.8 GB
+  free (above 3 GB floor). **watchdog DEAD** - `watchdog.lock` holds stale pid `29264` (gone),
+  `watchdog.log` has no entries since 2026-09-10T22:30Z, and `python.exe` command-line scan for
+  `watchdog` = 0. **supervisor DEAD** - last action 09-13 09:38:57 (it started cargoq 31804, whose
+  parent 27828 is now gone); no supervisor.py process. **overnight driver DEAD** - overnight.log
+  last 09-13 14:16:31. Full python process list = cargoq server 31804 + slot-0 measure child 10028
+  only. The 17:35Z/17:58Z STATE "watchdog 1 (29264)" reads were STALE. Orphan 35748 (escalated last
+  cycle) is now GONE on its own.
+- Land (step 2): NOTHING. Slots 3/5/6 RESULT DONE, slot 4 LANDED-WITH-FINDINGS, slot 7 LANDED;
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `669cc47`
+  (re-verified via git merge-base --is-ancestor). loop/results/ already holds all five; PACKETS
+  rows for CL-006/CL-005 read READY but carry the uppercase LANDED marker (one-verify amendment),
+  so `landed()` is true and the dispatcher skips them. Nothing landable.
+- Unblock (step 3): slot 0 CORRECT - FHC-G6 worker HEALTHY: opencode 26336 (cmd 35764) alive, live
+  measurement child 10028 (`measure_row.py ... lib.suspension build_suspension_rear` ->
+  `sr_rel.stl`; parent 19920 -> 26336), events growing (221129 B, 3.5 min old). Dirty
+  truck123d/src/bd_bridge.rs; no RESULT/commit/QUESTION. Did NOT touch. Slot 1 IDLE clean dead
+  duplicate: reset-only NO-OP, redispatch blocked by slot 0's held branch. Slot 2 IDLE residue
+  (packet TTC-RECENSUS-F1-R3 row DONE, landed de6bfc6): no work, not blocking. No other stuck
+  workers.
+- Registry hygiene (step 4): 360 unique ids = 265 DONE / 84 READY / 10 BLOCKED / 1 SUPERSEDED.
+  READY-without-landed-marker = 6 {RG-23, RG-9, FHC-G6, FHC-G1, FHC-D, FHC-E}. BLOCKED = 10, all
+  owner/semantic parked, none flippable. RG-23/RG-9 packet files MISSING -> authoring item
+  (escalated). Nothing flipped.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5; dispatched 0" = REAL
+  idle (G6 held by slot 0; G1/D/E chained on G6; RG-23/RG-9 unauthored).
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-13T18:28Z] bullets to "State of the machine, as left". Traps/history
+  untouched.
+- Escalation (step 7): NEW item - supervisor/watchdog/overnight stack down (do not blindly
+  restart; sequence given). Carried: RG-23/RG-9 authoring; duplicate supervisors/cargoq (now
+  moot - the duplicates are gone); slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 0 FHC-G6 RUNNING-HEALTHY + slots 1/2 dead residue / HEAD `669cc47` + this cycle's
+  STATE/log/escalation commit.

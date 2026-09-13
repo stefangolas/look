@@ -2512,3 +2512,31 @@ uncommitted - left for the orchestrator, no dispatch impact.
   Needs authoring (orchestrator). Priority: medium (frontier filler while FHC-G6 runs).
 - All other carried human items unchanged: duplicate supervisors + duplicate cargoq/server.py;
   slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin.
+
+## 2026-09-13T18:28Z - operator cycle 17: NEW - supervisor + watchdog + overnight driver all DEAD (substrate); do NOT blindly restart
+
+- What: the whole substrate stack is down. Only two python processes exist: cargoq server `31804`
+  (parent `27828`, now dead) and slot-0's measure child `10028`. `watchdog` = 0 processes,
+  `watchdog.lock` holds stale pid `29264` (gone), `watchdog.log` silent since 2026-09-10T22:30Z.
+  `supervisor.py` = 0 processes; supervisor.log's last action was 09-13 09:38:57 ("cargoq server
+  not running - restarting", which started 31804), then it died. `overnight.py` = 0 processes;
+  overnight.log last 09-13 14:16:31 (it was leaving slot 4 F1-AUTHORING-ARMS for morning). The
+  17:35Z/17:58Z operator STATE entries that read "watchdog 1 (29264)" were STALE.
+- Why it matters: no disk guard, no wedge/hard-death auto-recovery, and no overnight driver to
+  land/adjudicate when humans are away. The heartbeat (27872) and this operator still run, so the
+  loop is not stopped, but nothing self-heals.
+- Why the operator did NOT restart: `supervisor.py` would restart the watchdog AND the overnight
+  driver. The watchdog restart is now safe (`packet_is_done()` skips slot 2's already-DONE
+  TTC-RECENSUS-F1-R3; slot 0's pid is live so it is untouched; slot 1 would only fail its
+  branch-held redispatch), but restarting the overnight driver is a behavioral/orchestration
+  decision, and the stack may have been stopped intentionally because an orchestrator session is
+  active today (orchestrator commit `2fdf11a`, 09-13). Owner/orchestrator call.
+- Exact command a human/orchestrator should start from: confirm the stop was not intentional, then
+  `Start-Process python -ArgumentList 'loop\supervisor.py' -WorkingDirectory C:\Users\stefa\look`
+  (supervisor then restores watchdog + overnight + cargoq). If you want the watchdog only:
+  `Start-Process python -ArgumentList 'loop\watchdog.py' -WorkingDirectory C:\Users\stefa\look`.
+  Delete the stale `loop\watchdog.lock` first only if watchdog.py refuses to start (it self-checks
+  the lock pid, so it should be fine). Priority: medium.
+- Carried unchanged: RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1
+  non_z_axis pin; TOR-C flip-or-pin. The earlier "duplicate supervisors + duplicate cargoq" item
+  is now moot (the duplicates are gone). Orphan 35748 is gone.
