@@ -1,0 +1,512 @@
+{
+  "id": "FHC-G6-CERT-COST-SCALE",
+  "status": "DONE",
+  "contracts": [
+    "FHC-G6-CERT-COST-SCALE"
+  ],
+  "anchors_verified": {
+    "A1": 4,
+    "A2": 16
+  },
+  "notes": "Per-phase cost decomposition of the certified multi-station spline loft for both category-6 rows. bd_bridge loft/facts path instrumented with additive per-call phase timers (bd_facts.timing.phases: section_extraction_ms, loft_surface_ms, patch_certification_ms, bbox_ms; bd_stl.phases: mesh_build_ms, stl_write_ms); all existing fields unchanged and byte-identical outputs. Dominant phase is the per-patch interval certification (binding-layer volume_facts, outside write_allow): largest power_unit facts call 24398.5 ms of which 24278.0 ms (99.5%) is certification; largest suspension_rear call 4479.9 ms of which 4386.1 ms (97.9%). No whitelisted bd_bridge-only fix (angle tables / enclosure-walk allocation / per-span reuse) touches the certification path, so the packet stop condition applies -> SPEC_GAP: certified bracket-decomposition engineering, theory-adjacent, back to the register. Byte identity held: beam_wing volume 2366637.6965246294 and STL FNV 17095488309390686321 unchanged (before==after); bracket equality. Neither heavy row terminates within the 120 s generous bound (recorded as data, not asserted); decomposition captured from completed authoring facts calls.",
+  "spec_gap": {
+    "stop_condition": "dominant phase is the per-patch certification and no whitelist fix applies",
+    "dominant_phase": "per-patch interval certification (crate::python::binding::volume_facts)",
+    "why_no_whitelist_fix": "the certification cost lives in the binding-layer MONO-2 interval integration, not in bd_bridge; the whitelist (angle tables, enclosure-walk allocation/evaluation order, per-span reuse) can only touch section extraction / loft surface / bbox, which are <2% of the cost, and write_allow does not include the binding module",
+    "register_section": "docs/F1_HYPERCAR_GAP_REGISTER.md section 5 (perf, pending profile) -> graduates to theory-adjacent bracket decomposition"
+  },
+  "decomposition": {
+    "environment": "Windows x86_64; cargo test -p truck123d --test cert_cost_scale --locked (debug test profile); one fresh process per heavy row; in-process wall-clock phase timers, thread-local per bd_facts/bd_stl call",
+    "instrumentation_commit_subject": "truck123d: certified-loft cost decomposition + whitelisted fixes (FHC-G6)",
+    "summary": {
+      "build_power_unit": {
+        "completed_facts_calls": 132,
+        "calls_with_certification": 44,
+        "largest_call_ms": 24398.46,
+        "largest_call_phases_ms": {
+          "bbox_ms": 55.334,
+          "loft_surface_ms": 38.145,
+          "patch_certification_ms": 24277.968,
+          "section_extraction_ms": 7.809
+        },
+        "largest_call_patch_share_pct": 99.51,
+        "total_facts_ms": 36159.522,
+        "total_phases_ms": {
+          "bbox_ms": 245.379,
+          "loft_surface_ms": 218.024,
+          "patch_certification_ms": 35510.8,
+          "section_extraction_ms": 22.527
+        },
+        "total_patch_share_pct": 98.21,
+        "terminated_within_120s_bound": false
+      },
+      "build_suspension_rear": {
+        "completed_facts_calls": 16,
+        "calls_with_certification": 4,
+        "largest_call_ms": 4479.871,
+        "largest_call_phases_ms": {
+          "bbox_ms": 45.168,
+          "loft_surface_ms": 41.097,
+          "patch_certification_ms": 4386.14,
+          "section_extraction_ms": 2.123
+        },
+        "largest_call_patch_share_pct": 97.91,
+        "total_facts_ms": 5928.186,
+        "total_phases_ms": {
+          "bbox_ms": 66.205,
+          "loft_surface_ms": 58.939,
+          "patch_certification_ms": 5763.949,
+          "section_extraction_ms": 3.338
+        },
+        "total_patch_share_pct": 97.23,
+        "terminated_within_120s_bound": false
+      }
+    },
+    "raw_samples_calls_with_certification": {
+      "build_power_unit": [
+        {
+          "call": 1,
+          "wall_ms": 1148.926,
+          "facts_ms": 1147.991,
+          "bbox_ms": 3.107,
+          "loft_surface_ms": 2.742,
+          "patch_certification_ms": 1140.781,
+          "section_extraction_ms": 0.37
+        },
+        {
+          "call": 4,
+          "wall_ms": 24415.698,
+          "facts_ms": 24398.46,
+          "bbox_ms": 55.334,
+          "loft_surface_ms": 38.145,
+          "patch_certification_ms": 24277.968,
+          "section_extraction_ms": 7.809
+        },
+        {
+          "call": 7,
+          "wall_ms": 190.559,
+          "facts_ms": 189.66,
+          "bbox_ms": 5.09,
+          "loft_surface_ms": 4.259,
+          "patch_certification_ms": 178.746,
+          "section_extraction_ms": 0.352
+        },
+        {
+          "call": 10,
+          "wall_ms": 211.662,
+          "facts_ms": 210.918,
+          "bbox_ms": 4.216,
+          "loft_surface_ms": 3.368,
+          "patch_certification_ms": 200.511,
+          "section_extraction_ms": 0.301
+        },
+        {
+          "call": 13,
+          "wall_ms": 218.153,
+          "facts_ms": 217.348,
+          "bbox_ms": 2.479,
+          "loft_surface_ms": 3.357,
+          "patch_certification_ms": 210.467,
+          "section_extraction_ms": 0.106
+        },
+        {
+          "call": 16,
+          "wall_ms": 215.05,
+          "facts_ms": 214.288,
+          "bbox_ms": 4.441,
+          "loft_surface_ms": 1.954,
+          "patch_certification_ms": 206.906,
+          "section_extraction_ms": 0.25
+        },
+        {
+          "call": 19,
+          "wall_ms": 236.54,
+          "facts_ms": 235.758,
+          "bbox_ms": 4.447,
+          "loft_surface_ms": 3.919,
+          "patch_certification_ms": 226.116,
+          "section_extraction_ms": 0.332
+        },
+        {
+          "call": 22,
+          "wall_ms": 238.222,
+          "facts_ms": 237.363,
+          "bbox_ms": 1.904,
+          "loft_surface_ms": 3.046,
+          "patch_certification_ms": 229.055,
+          "section_extraction_ms": 0.107
+        },
+        {
+          "call": 25,
+          "wall_ms": 243.283,
+          "facts_ms": 242.449,
+          "bbox_ms": 4.653,
+          "loft_surface_ms": 3.852,
+          "patch_certification_ms": 232.648,
+          "section_extraction_ms": 0.343
+        },
+        {
+          "call": 28,
+          "wall_ms": 217.77,
+          "facts_ms": 217.025,
+          "bbox_ms": 5.392,
+          "loft_surface_ms": 3.714,
+          "patch_certification_ms": 206.713,
+          "section_extraction_ms": 0.333
+        },
+        {
+          "call": 31,
+          "wall_ms": 233.638,
+          "facts_ms": 232.855,
+          "bbox_ms": 4.352,
+          "loft_surface_ms": 5.103,
+          "patch_certification_ms": 222.163,
+          "section_extraction_ms": 0.288
+        },
+        {
+          "call": 34,
+          "wall_ms": 223.052,
+          "facts_ms": 222.244,
+          "bbox_ms": 4.621,
+          "loft_surface_ms": 3.919,
+          "patch_certification_ms": 212.406,
+          "section_extraction_ms": 0.326
+        },
+        {
+          "call": 37,
+          "wall_ms": 217.975,
+          "facts_ms": 217.121,
+          "bbox_ms": 3.983,
+          "loft_surface_ms": 3.495,
+          "patch_certification_ms": 208.414,
+          "section_extraction_ms": 0.315
+        },
+        {
+          "call": 50,
+          "wall_ms": 217.724,
+          "facts_ms": 216.828,
+          "bbox_ms": 5.399,
+          "loft_surface_ms": 4.415,
+          "patch_certification_ms": 205.354,
+          "section_extraction_ms": 0.382
+        },
+        {
+          "call": 53,
+          "wall_ms": 244.015,
+          "facts_ms": 241.98,
+          "bbox_ms": 6.116,
+          "loft_surface_ms": 2.813,
+          "patch_certification_ms": 228.006,
+          "section_extraction_ms": 0.471
+        },
+        {
+          "call": 56,
+          "wall_ms": 225.49,
+          "facts_ms": 224.666,
+          "bbox_ms": 8.171,
+          "loft_surface_ms": 3.71,
+          "patch_certification_ms": 211.457,
+          "section_extraction_ms": 0.364
+        },
+        {
+          "call": 59,
+          "wall_ms": 262.428,
+          "facts_ms": 261.592,
+          "bbox_ms": 4.425,
+          "loft_surface_ms": 3.56,
+          "patch_certification_ms": 252.323,
+          "section_extraction_ms": 0.318
+        },
+        {
+          "call": 62,
+          "wall_ms": 221.515,
+          "facts_ms": 220.705,
+          "bbox_ms": 4.88,
+          "loft_surface_ms": 4.107,
+          "patch_certification_ms": 210.469,
+          "section_extraction_ms": 0.305
+        },
+        {
+          "call": 65,
+          "wall_ms": 209.117,
+          "facts_ms": 208.339,
+          "bbox_ms": 2.796,
+          "loft_surface_ms": 3.657,
+          "patch_certification_ms": 200.578,
+          "section_extraction_ms": 0.328
+        },
+        {
+          "call": 68,
+          "wall_ms": 221.386,
+          "facts_ms": 220.568,
+          "bbox_ms": 4.496,
+          "loft_surface_ms": 3.574,
+          "patch_certification_ms": 211.205,
+          "section_extraction_ms": 0.372
+        },
+        {
+          "call": 71,
+          "wall_ms": 214.028,
+          "facts_ms": 213.25,
+          "bbox_ms": 4.597,
+          "loft_surface_ms": 3.597,
+          "patch_certification_ms": 203.794,
+          "section_extraction_ms": 0.309
+        },
+        {
+          "call": 74,
+          "wall_ms": 215.218,
+          "facts_ms": 214.37,
+          "bbox_ms": 4.803,
+          "loft_surface_ms": 3.833,
+          "patch_certification_ms": 204.499,
+          "section_extraction_ms": 0.348
+        },
+        {
+          "call": 77,
+          "wall_ms": 237.703,
+          "facts_ms": 236.799,
+          "bbox_ms": 4.792,
+          "loft_surface_ms": 3.818,
+          "patch_certification_ms": 226.876,
+          "section_extraction_ms": 0.365
+        },
+        {
+          "call": 80,
+          "wall_ms": 226.154,
+          "facts_ms": 225.353,
+          "bbox_ms": 4.496,
+          "loft_surface_ms": 3.656,
+          "patch_certification_ms": 215.748,
+          "section_extraction_ms": 0.314
+        },
+        {
+          "call": 93,
+          "wall_ms": 548.948,
+          "facts_ms": 548.02,
+          "bbox_ms": 6.678,
+          "loft_surface_ms": 5.38,
+          "patch_certification_ms": 534.578,
+          "section_extraction_ms": 0.381
+        },
+        {
+          "call": 96,
+          "wall_ms": 550.184,
+          "facts_ms": 549.228,
+          "bbox_ms": 6.886,
+          "loft_surface_ms": 5.926,
+          "patch_certification_ms": 534.904,
+          "section_extraction_ms": 0.452
+        },
+        {
+          "call": 99,
+          "wall_ms": 684.608,
+          "facts_ms": 683.288,
+          "bbox_ms": 12.037,
+          "loft_surface_ms": 13.548,
+          "patch_certification_ms": 654.461,
+          "section_extraction_ms": 1.415
+        },
+        {
+          "call": 102,
+          "wall_ms": 639.867,
+          "facts_ms": 638.365,
+          "bbox_ms": 12.492,
+          "loft_surface_ms": 11.225,
+          "patch_certification_ms": 611.489,
+          "section_extraction_ms": 0.726
+        },
+        {
+          "call": 105,
+          "wall_ms": 641.103,
+          "facts_ms": 639.825,
+          "bbox_ms": 10.742,
+          "loft_surface_ms": 9.037,
+          "patch_certification_ms": 614.071,
+          "section_extraction_ms": 0.686
+        },
+        {
+          "call": 108,
+          "wall_ms": 680.819,
+          "facts_ms": 679.426,
+          "bbox_ms": 10.0,
+          "loft_surface_ms": 8.25,
+          "patch_certification_ms": 658.794,
+          "section_extraction_ms": 0.633
+        },
+        {
+          "call": 111,
+          "wall_ms": 676.441,
+          "facts_ms": 675.337,
+          "bbox_ms": 10.841,
+          "loft_surface_ms": 12.596,
+          "patch_certification_ms": 649.412,
+          "section_extraction_ms": 0.76
+        },
+        {
+          "call": 114,
+          "wall_ms": 647.569,
+          "facts_ms": 645.879,
+          "bbox_ms": 10.579,
+          "loft_surface_ms": 8.589,
+          "patch_certification_ms": 624.114,
+          "section_extraction_ms": 0.641
+        },
+        {
+          "call": 117,
+          "wall_ms": 144.313,
+          "facts_ms": 143.499,
+          "bbox_ms": 3.082,
+          "loft_surface_ms": 2.441,
+          "patch_certification_ms": 136.987,
+          "section_extraction_ms": 0.24
+        },
+        {
+          "call": 120,
+          "wall_ms": 36.294,
+          "facts_ms": 35.727,
+          "bbox_ms": 0.321,
+          "loft_surface_ms": 1.829,
+          "patch_certification_ms": 32.832,
+          "section_extraction_ms": 0.141
+        },
+        {
+          "call": 123,
+          "wall_ms": 36.715,
+          "facts_ms": 36.154,
+          "bbox_ms": 0.317,
+          "loft_surface_ms": 1.684,
+          "patch_certification_ms": 33.343,
+          "section_extraction_ms": 0.146
+        },
+        {
+          "call": 126,
+          "wall_ms": 37.103,
+          "facts_ms": 36.578,
+          "bbox_ms": 0.272,
+          "loft_surface_ms": 1.812,
+          "patch_certification_ms": 33.77,
+          "section_extraction_ms": 0.135
+        },
+        {
+          "call": 129,
+          "wall_ms": 36.511,
+          "facts_ms": 36.079,
+          "bbox_ms": 0.484,
+          "loft_surface_ms": 2.123,
+          "patch_certification_ms": 32.757,
+          "section_extraction_ms": 0.133
+        },
+        {
+          "call": 132,
+          "wall_ms": 35.856,
+          "facts_ms": 35.308,
+          "bbox_ms": 0.332,
+          "loft_surface_ms": 1.602,
+          "patch_certification_ms": 32.638,
+          "section_extraction_ms": 0.139
+        },
+        {
+          "call": 135,
+          "wall_ms": 35.466,
+          "facts_ms": 34.889,
+          "bbox_ms": 0.276,
+          "loft_surface_ms": 1.657,
+          "patch_certification_ms": 32.199,
+          "section_extraction_ms": 0.137
+        },
+        {
+          "call": 138,
+          "wall_ms": 35.815,
+          "facts_ms": 35.287,
+          "bbox_ms": 0.271,
+          "loft_surface_ms": 1.877,
+          "patch_certification_ms": 32.364,
+          "section_extraction_ms": 0.141
+        },
+        {
+          "call": 141,
+          "wall_ms": 35.273,
+          "facts_ms": 34.936,
+          "bbox_ms": 0.1,
+          "loft_surface_ms": 1.669,
+          "patch_certification_ms": 32.658,
+          "section_extraction_ms": 0.1
+        },
+        {
+          "call": 144,
+          "wall_ms": 40.608,
+          "facts_ms": 40.289,
+          "bbox_ms": 0.106,
+          "loft_surface_ms": 1.749,
+          "patch_certification_ms": 37.892,
+          "section_extraction_ms": 0.13
+        },
+        {
+          "call": 147,
+          "wall_ms": 39.622,
+          "facts_ms": 39.023,
+          "bbox_ms": 0.289,
+          "loft_surface_ms": 1.754,
+          "patch_certification_ms": 36.195,
+          "section_extraction_ms": 0.143
+        },
+        {
+          "call": 150,
+          "wall_ms": 35.461,
+          "facts_ms": 34.89,
+          "bbox_ms": 0.285,
+          "loft_surface_ms": 1.661,
+          "patch_certification_ms": 32.143,
+          "section_extraction_ms": 0.142
+        }
+      ],
+      "build_suspension_rear": [
+        {
+          "call": 1,
+          "wall_ms": 757.75,
+          "facts_ms": 756.599,
+          "bbox_ms": 9.125,
+          "loft_surface_ms": 7.862,
+          "patch_certification_ms": 738.215,
+          "section_extraction_ms": 0.4
+        },
+        {
+          "call": 4,
+          "wall_ms": 4484.698,
+          "facts_ms": 4479.871,
+          "bbox_ms": 45.168,
+          "loft_surface_ms": 41.097,
+          "patch_certification_ms": 4386.14,
+          "section_extraction_ms": 2.123
+        },
+        {
+          "call": 7,
+          "wall_ms": 333.562,
+          "facts_ms": 332.53,
+          "bbox_ms": 5.19,
+          "loft_surface_ms": 4.838,
+          "patch_certification_ms": 320.834,
+          "section_extraction_ms": 0.395
+        },
+        {
+          "call": 16,
+          "wall_ms": 334.605,
+          "facts_ms": 333.429,
+          "bbox_ms": 6.722,
+          "loft_surface_ms": 5.143,
+          "patch_certification_ms": 318.76,
+          "section_extraction_ms": 0.421
+        }
+      ]
+    }
+  },
+  "verification": {
+    "cargo_fmt_check_p_truck123d": "PASS (exit 0)",
+    "cargo_clippy_p_truck123d_all_targets_no_deps_D_warnings": "BLOCKED by pre-existing clippy lints in truck123d (unrelated test/lib code) and vendor/truck/** (off-limits); the literal done-when command also lints workspace-member vendor crates. No new lint is introduced by this change.",
+    "cargo_test_p_truck123d_test_cert_cost_scale_locked": "PASS 3 passed; 0 failed (241.42 s)",
+    "beam_wing_identity": "PASS volume=2366637.6965246294 stl_fnv=17095488309390686321 stl_len=17088084 tris=341760",
+    "phase_timers_present_and_additive": "PASS",
+    "heavy_rows_decomposition_recorded": "PASS (both rows killed at the 120 s bound; decomposition recorded)"
+  }
+}
