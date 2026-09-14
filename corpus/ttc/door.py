@@ -554,6 +554,37 @@ class _Frame:
     def _rotation_columns(self):
         return (self.x_dir, self.y_dir, self.z_dir)
 
+    def IsIdentity(self):
+        """build123d/OCC ``Location.IsIdentity()``: whether the recorded frame
+        is the identity placement.
+
+        Answered from the recorded placement algebra (the frame's own origin
+        and orthonormal columns), never an OCC consultation -- the landed
+        identity row of the MONO-3 placement model."""
+        def same(a, b):
+            return all(abs(a[i] - b[i]) < 1e-12 for i in range(3))
+
+        return (
+            same(self.o, (0.0, 0.0, 0.0))
+            and same(self.x_dir, (1.0, 0.0, 0.0))
+            and same(self.y_dir, (0.0, 1.0, 0.0))
+            and same(self.z_dir, (0.0, 0.0, 1.0))
+        )
+
+    def Transformation(self):
+        """build123d/OCC ``Location.Transformation()``: the recorded exact
+        isometry as a placement data row (origin plus the orthonormal rotation
+        columns).
+
+        Data only: the kernel applies the isometry (MONO-3), the row never
+        consults OCC geometry."""
+        return {
+            "origin": list(self.o),
+            "x_dir": list(self.x_dir),
+            "y_dir": list(self.y_dir),
+            "z_dir": list(self.z_dir),
+        }
+
     def _is_pure_z(self):
         xd, yd, zd = self.x_dir, self.y_dir, self.z_dir
         if not (abs(zd[0]) < 1e-15 and abs(zd[1]) < 1e-15 and abs(zd[2] - 1.0) < 1e-15):
@@ -790,6 +821,8 @@ class Pos(_Frame):
             o = args[0].to_tuple()
         elif len(args) == 1 and isinstance(args[0], (tuple, list)) and len(args[0]) == 3:
             o = _point3(args[0])
+        elif len(args) == 2:
+            o = (_num(args[0]), _num(args[1]), 0.0)
         elif len(args) == 3:
             o = (_num(args[0]), _num(args[1]), _num(args[2]))
         else:
@@ -1277,6 +1310,41 @@ def RectangleRounded(width, height, radius, rotation=0.0, **kwargs):
     return face
 
 
+def Rectangle(width, height, rotation=0.0, **kwargs):
+    """build123d ``Rectangle(width, height)`` -- the unrounded rectangle
+    profile: four straight line edges, the unrounded sibling of the landed
+    ``RectangleRounded`` vocabulary.
+
+    The profile is centered on the local origin (``width`` along +X, ``height``
+    along +Y); ``rotation`` (degrees) rotates it about +Z. The recorded carrier
+    is the exact closed line loop the polygon/prism handlers already answer, so
+    the kernel certifies the exact area and extrema -- never a chord polygon.
+    """
+    if kwargs:
+        option = sorted(kwargs)[0]
+        _refuse(
+            "a rectangle option is not answered exactly by a kernel-engine row: "
+            + option
+        )
+    w = _num(width)
+    h = _num(height)
+    if not math.isfinite(w) or not math.isfinite(h) or w <= 0.0 or h <= 0.0:
+        _refuse(
+            "a rectangle outside the recorded exact vocabulary is not a "
+            "kernel-engine row"
+        )
+    hw = 0.5 * w
+    hh = 0.5 * h
+    corners = [(-hw, -hh), (hw, -hh), (hw, hh), (-hw, hh)]
+    edges = [
+        Edge.make_line(corners[i], corners[(i + 1) % 4]) for i in range(4)
+    ]
+    face = Face(Wire(edges))
+    if _num(rotation) != 0.0:
+        return Rotation(0.0, 0.0, _num(rotation)) * face
+    return face
+
+
 def Helix(*args, **kwargs):
     """build123d ``Helix(pitch, height, radius)`` -- a helical path carrier.
 
@@ -1565,6 +1633,24 @@ class Face:
         idiom reads the section face back for `loft`. The selection is
         iterable and indexable, exactly as the corpus consumes it."""
         return [self]
+
+    def vertices(self):
+        """The recorded boundary vertices of the section, as data rows.
+
+        A recorded edge answers its defining samples (a line its endpoints, a
+        spline its control samples); an exact conic edge (circle/ellipse/arc)
+        records no polyline samples and contributes nothing. Data only -- the
+        consuming arm answers the exact carrier or refuses typed, never an
+        untyped attribute failure."""
+        out = []
+        seen = set()
+        for edge in self.edges:
+            for point in getattr(edge, "points", None) or []:
+                key = (point.x, point.y, point.z)
+                if key not in seen:
+                    seen.add(key)
+                    out.append(point)
+        return out
 
     def _profile_boolean(self, other, verb):
         """Record a planar two-contour section (the corpus's `Circle(a) -
@@ -2166,6 +2252,53 @@ class _Shape:
         round-trip, so the row passes through unchanged."""
         return self
 
+    def Located(self, loc):
+        """build123d/OCC ``Shape.Located(location)``: the placed copy of this
+        row under the landed placement algebra.
+
+        The recorded isometry composes over the row's own frame (MONO-3); a
+        non-frame argument refuses typed. A group places its whole subtree."""
+        if not isinstance(loc, _Frame):
+            _refuse(
+                "Located expects a frame carrier",
+                code="E_NOT_A_KERNEL_ROW",
+                verb="Located",
+                carrier="occ_probe",
+                phase="authoring",
+            )
+        if isinstance(self, Compound):
+            return self.locate(loc)
+        if isinstance(self, _Part):
+            return _apply_frame_to_part(self, loc)
+        _refuse(
+            "Located of a non-placed carrier is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="Located",
+            carrier="occ_probe",
+            phase="authoring",
+        )
+        return None
+
+    def ShapeType(self):
+        """build123d/OCC ``Shape.ShapeType()``: the recorded carrier kind as a
+        type row.
+
+        A placed solid row answers ``"solid"``; a group answers ``"compound"``.
+        The answer is the recorded carrier kind, never an OCC topology
+        consultation."""
+        return "solid"
+
+    def Mass(self):
+        """OCC ``GProp_GProps.Mass()``: the certified volume of the row (the
+        already-computed per-part fact, unit density)."""
+        return self.volume
+
+    def VolumeProperties_s(self, props, *args):
+        """OCC ``BRepGProp.VolumeProperties_s``: fill ``props`` with the
+        certified volume of the row (the already-computed per-part fact)."""
+        props._volume = self.volume
+        return props
+
     def _boolean(self, other, mode, verb=None):
         """Record one BooleanOp row over two kernel-engine solids and dispatch.
 
@@ -2504,6 +2637,10 @@ class Compound(_Shape):
     def children(self):
         """build123d ``Compound.children``: the direct child shapes."""
         return self._children
+
+    def ShapeType(self):
+        """The recorded carrier kind of the group row (``"compound"``)."""
+        return "compound"
 
     def _copy(self):
         """Deep placement copy: children are duplicated (geometry shared),
@@ -3621,7 +3758,10 @@ def fillet(edges, radius, **kwargs):
     unchanged). A blend the kernel cannot close refuses typed, never
     approximates."""
     edge_list = list(edges)
-    base = edge_list[0]._base if edge_list else getattr(edges, "_owner", None)
+    if edge_list and hasattr(edge_list[0], "_base"):
+        base = edge_list[0]._base
+    else:
+        base = getattr(edges, "_owner", None)
     if not isinstance(base, _Shape):
         _refuse("a fillet edge selection outside the recorded base carrier is not a kernel-engine row")
     recorded = [edge._selector() for edge in edge_list]
@@ -3804,6 +3944,9 @@ _TRUCK_NAMES = [
     "Wire",
     "Face",
     "Compound",
+    "Shape",
+    "Part",
+    "Solid",
     "Box",
     "Cylinder",
     "Sphere",
@@ -3831,10 +3974,119 @@ _TRUCK_NAMES = [
     "Cone",
     "RegularPolygon",
     "RectangleRounded",
+    "Rectangle",
     "Helix",
     "FilletPolyline",
     "make_hull",
 ]
+
+
+class Shape:
+    """build123d ``Shape``: the base anchor of the drop-in's construction rows.
+
+    A kernel-engine row carries no OCC geometry, so ``Shape.cast`` of an OCC
+    shape refuses TYPED naming the probe carrier; a recorded row is its own
+    anchor and casts to itself."""
+
+    @staticmethod
+    def cast(obj):
+        if isinstance(obj, _Shape):
+            return obj
+        _refuse(
+            "Shape.cast is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="cast",
+            carrier="occ_probe",
+            phase="authoring",
+        )
+        return None
+
+
+class Part:
+    """build123d ``Part``: the placed-solid constructor/anchor row.
+
+    ``Part(obj)`` anchors a recorded kernel-engine row (returns it unchanged);
+    an OCC shape is not a kernel-engine row and refuses TYPED."""
+
+    def __new__(cls, obj=None, *args, **kwargs):
+        if isinstance(obj, _Shape):
+            return obj
+        _refuse(
+            "a Part over an OCC shape is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="Part",
+            carrier="occ_probe",
+            phase="authoring",
+        )
+        return None
+
+
+class Solid:
+    """build123d ``Solid``: the solid constructor/anchor namespace.
+
+    ``Solid.make_loft`` / ``make_cylinder`` / ``make_sphere`` are the landed
+    constructor arms; ``Solid(obj)`` anchors a recorded row and refuses TYPED
+    for an OCC shape."""
+
+    def __new__(cls, obj=None, *args, **kwargs):
+        if isinstance(obj, _Shape):
+            return obj
+        _refuse(
+            "a Solid over an OCC shape is not a kernel-engine row",
+            code="E_NOT_A_KERNEL_ROW",
+            verb="Solid",
+            carrier="occ_probe",
+            phase="authoring",
+        )
+        return None
+
+    @classmethod
+    def make_loft(cls, sections, ruled=False, **kwargs):
+        """build123d ``Solid.make_loft(wires, ruled=...)`` -- the landed
+        N-station loft (MONO-2-NSTATION-LOFT).
+
+        The corpus's structural members (`_strut`, `_hull_plate`,
+        `_upright_shell`) build a loft from placed section Wires. Each
+        recorded Wire is wrapped as its planar Face and routed to the same
+        ``loft`` arm the ``bd.loft`` name answers: a line section stack
+        certifies through the exact ruled carrier, a periodic spline
+        section stack through the certified canonical N-station arm. A
+        section outside the recorded wire/face carrier refuses typed naming
+        the open carrier.
+        """
+        if kwargs:
+            option = sorted(kwargs)[0]
+            _refuse(
+                "a make_loft option is not a kernel-engine row: " + option
+            )
+        faces = []
+        for section in sections:
+            if isinstance(section, Face):
+                faces.append(section)
+            elif isinstance(section, Wire):
+                faces.append(make_face(section))
+            else:
+                _refuse(
+                    "a make_loft section outside the recorded wire/face "
+                    "carrier is not a kernel-engine row",
+                    code="E_UNSUPPORTED_ENVELOPE",
+                    verb="make_loft",
+                    carrier="loft_section",
+                    phase="authoring",
+                )
+        return loft(*faces, ruled=ruled)
+
+    @classmethod
+    def make_cylinder(cls, radius, height, plane=None, **kwargs):
+        if plane is not None and isinstance(plane, Plane):
+            return plane * Cylinder(radius, height)
+        return Cylinder(radius, height)
+
+    @classmethod
+    def make_sphere(cls, radius, plane=None, **kwargs):
+        if plane is not None and isinstance(plane, Plane):
+            return plane * Sphere(radius)
+        return Sphere(radius)
 
 
 def _build_truck_module():
@@ -3863,63 +4115,6 @@ def _build_truck_module():
         raise exc
 
     bd.__getattr__ = _unmapped_name
-
-    class _ShapeMixin:
-        @staticmethod
-        def cast(wrapped):
-            _refuse("Shape.cast is not a kernel-engine row")
-
-    class _SolidMixin:
-        @classmethod
-        def make_loft(cls, sections, ruled=False, **kwargs):
-            """build123d ``Solid.make_loft(wires, ruled=...)`` -- the landed
-            N-station loft (MONO-2-NSTATION-LOFT).
-
-            The corpus's structural members (`_strut`, `_hull_plate`,
-            `_upright_shell`) build a loft from placed section Wires. Each
-            recorded Wire is wrapped as its planar Face and routed to the same
-            ``loft`` arm the ``bd.loft`` name answers: a line section stack
-            certifies through the exact ruled carrier, a periodic spline
-            section stack through the certified canonical N-station arm. A
-            section outside the recorded wire/face carrier refuses typed naming
-            the open carrier.
-            """
-            if kwargs:
-                option = sorted(kwargs)[0]
-                _refuse(
-                    "a make_loft option is not a kernel-engine row: " + option
-                )
-            faces = []
-            for section in sections:
-                if isinstance(section, Face):
-                    faces.append(section)
-                elif isinstance(section, Wire):
-                    faces.append(make_face(section))
-                else:
-                    _refuse(
-                        "a make_loft section outside the recorded wire/face "
-                        "carrier is not a kernel-engine row",
-                        code="E_UNSUPPORTED_ENVELOPE",
-                        verb="make_loft",
-                        carrier="loft_section",
-                        phase="authoring",
-                    )
-            return loft(*faces, ruled=ruled)
-
-        @classmethod
-        def make_cylinder(cls, radius, height, plane=None, **kwargs):
-            if plane is not None and isinstance(plane, Plane):
-                return plane * Cylinder(radius, height)
-            return Cylinder(radius, height)
-
-        @classmethod
-        def make_sphere(cls, radius, plane=None, **kwargs):
-            if plane is not None and isinstance(plane, Plane):
-                return plane * Sphere(radius)
-            return Sphere(radius)
-
-    bd.Shape = _ShapeMixin
-    bd.Solid = _SolidMixin
     bd.Edge.make_line = Edge.make_line
     bd.Edge.make_spline = Edge.make_spline
     return bd
