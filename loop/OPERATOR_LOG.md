@@ -10719,3 +10719,38 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   SPEC_GAP, and the dead substrate stack all carried unchanged.
 - Leaving: HEAD `50d7010` + this cycle's STATE/log commit; FHC-G1 SPEC_GAP escalated; the flux-calculus
   frontier parked pending adjudication.
+
+## 2026-09-14T03:36Z - operator cycle: 2 workers RUNNING; nothing landable/unblockable/flippable; registry untouched
+
+- Health (step 1): `slot_status` = 2 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX attempt-2, pid 25588, branch
+  re-forked from `b502a85` = base, events fresh; slot 1 LOOP-MACH-1, pid 29092, events fresh) + slot 2
+  IDLE residue (TTC-RECENSUS-F1-R3 row DONE) + slots 3-7 FINISHED landed residue. Heartbeat exactly 1
+  (27872; the second `-match` is this operator's own query shell). watchdog/supervisor/overnight 0
+  (carried dead; did NOT restart). cargoq UP (ping ok, queued 0, running false). Disk 12.4 GB free
+  (BELOW the 15 GB goal, above the 8 GB floor); RAM 1.5-2.4 GB free (BELOW the 3 GB floor - two workers
+  + active orchestrator resident). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
+  2026-09-11.
+- Landable (step 2): NONE. Slots 0/1 RUNNING (no RESULT.json). Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD `b502a85`
+  (`git merge-base --is-ancestor` TRUE); RESULT statuses 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE /
+  6 DONE / 7 LANDED; slot 2 IDLE residue. Nothing landed this cycle.
+- Unblock (step 3): NONE. Both RUNNING workers progressing (events <0.5 min old; slot 0 mid-spec-read);
+  slot 2 is landed residue with no QUESTION/402/dirty state. No reset/redispatch.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique, last-wins): 267 DONE / 85 READY / 10
+  BLOCKED / 2 SUPERSEDED. Did NOT edit `PACKETS.jsonl` - an ACTIVE orchestrator is modifying it (READY
+  84 -> 85 this cycle) and the lost-update race has cost two sessions; "when in doubt, escalate". All 10
+  BLOCKED owner/semantic parked or needs unlanded; the only needs-landed row BG-CK-SPLINE-CENSUS (needs
+  BG-CK-P0-PREVALENCE DONE) is OWNER-CANCELLED -> left BLOCKED, not flipped (semantic/owner decision).
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (2 running, 6 free);
+  slot-assigned packets: 6"; RG-23/RG-9 write-set clash with the RUNNING G1 on
+  `truck123d/src/bd_bridge.rs`; FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T03:36Z] block and
+  prepended the labeled [operator 2026-09-14T03:36Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): none new. FHC-G1 attempt-2 running (prior SPEC_GAP carried); RG-23/RG-9 packet
+  files/anchor gap carried; FHC-G10 SPEC_GAP carried; dead substrate stack carried. Health note: disk
+  12.4 GB (below 15 goal) and RAM <3 GB with two workers resident - no action taken (janitor cannot
+  reclaim live slot targets; killing language servers would disturb the active orchestrator).
+- Leaving: HEAD `b502a85` + this cycle's STATE/log commit; 2 workers running; registry untouched pending
+  orchestrator quiescence.
