@@ -2352,9 +2352,11 @@ fn spline_loft_volume_rows(
         return Err(Refusal::Empty);
     }
     let mut loops: Vec<Vec<SpanPoly3>> = Vec::with_capacity(sections.len());
+    let section_started = std::time::Instant::now();
     for section in sections {
         loops.push(spline_loop_spans(section)?);
     }
+    add_phase(&PHASE_SECTION_NS, section_started);
     let span_count = loops.first().map(Vec::len).unwrap_or(0);
     if span_count == 0 {
         return Err(open_smooth_loft());
@@ -2364,6 +2366,7 @@ fn spline_loft_volume_rows(
             return Err(open_smooth_loft());
         }
     }
+    let surface_started = std::time::Instant::now();
     let v = station_params(&loops)?;
     let station_count = loops.len();
     let mut volume_rows = Vec::new();
@@ -2407,6 +2410,7 @@ fn spline_loft_volume_rows(
             });
         }
     }
+    add_phase(&PHASE_LOFT_SURFACE_NS, surface_started);
     Ok((volume_rows, loops))
 }
 
@@ -2415,6 +2419,7 @@ fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f
     let mut value = 0.0f64;
     let mut lo = 0.0f64;
     let mut hi = 0.0f64;
+    let certify_started = std::time::Instant::now();
     for row in &rows {
         let json = crate::python::binding::volume_facts(row).map_err(|_| open_smooth_loft())?;
         let outcome: serde_json::Value = serde_json::from_str(&json).map_err(|_| Refusal::Empty)?;
@@ -2431,6 +2436,7 @@ fn certified_spline_loft_volume(sections: &[Vec<ProfileEdge>]) -> Result<(f64, f
             .and_then(serde_json::Value::as_f64)
             .ok_or(Refusal::Empty)?;
     }
+    add_phase(&PHASE_PATCH_CERTIFY_NS, certify_started);
 
     // The planar end caps: `(1/3) d A` with the recorded-loop winding, exactly
     // as the landed line-loft arm's cap terms.
@@ -4366,11 +4372,47 @@ thread_local! {
     /// kernel closure, so a thread-local is the call's own counter).
     static FACTS_CACHE_HITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     static PATCH_CACHE_HITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// FHC-G6 per-phase wall-clock accumulators (nanoseconds). Additive
+    /// diagnostics only: they never influence any measured fact or artifact.
+    static PHASE_SECTION_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PHASE_LOFT_SURFACE_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PHASE_PATCH_CERTIFY_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PHASE_BBOX_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PHASE_MESH_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PHASE_STL_WRITE_NS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 fn reset_cache_counters() {
     FACTS_CACHE_HITS.with(|cell| cell.set(0));
     PATCH_CACHE_HITS.with(|cell| cell.set(0));
+}
+
+/// FHC-G6: clears the per-call phase accumulators.
+fn reset_phase_timers() {
+    for cell in [
+        &PHASE_SECTION_NS,
+        &PHASE_LOFT_SURFACE_NS,
+        &PHASE_PATCH_CERTIFY_NS,
+        &PHASE_BBOX_NS,
+        &PHASE_MESH_NS,
+        &PHASE_STL_WRITE_NS,
+    ] {
+        cell.with(|c| c.set(0));
+    }
+}
+
+/// FHC-G6: adds one completed phase interval to its accumulator.
+fn add_phase(
+    cell: &'static std::thread::LocalKey<std::cell::Cell<u64>>,
+    started: std::time::Instant,
+) {
+    let ns = started.elapsed().as_nanos().min(u64::MAX as u128) as u64;
+    cell.with(|c| c.set(c.get().saturating_add(ns)));
+}
+
+/// FHC-G6: the accumulated milliseconds of one phase for the current call.
+fn phase_ms(cell: &'static std::thread::LocalKey<std::cell::Cell<u64>>) -> f64 {
+    cell.with(std::cell::Cell::get) as f64 / 1.0e6
 }
 
 fn facts_cache_hit_count() -> u64 {
@@ -4403,7 +4445,9 @@ fn tree_facts_uncached(root: &TreeNode) -> Result<Facts, Refusal> {
     let mut count = 0u64;
     let mut min = [f64::INFINITY; 3];
     let mut max = [f64::NEG_INFINITY; 3];
+    let bbox_started = std::time::Instant::now();
     count_and_union(root, &mut count, &mut min, &mut max)?;
+    add_phase(&PHASE_BBOX_NS, bbox_started);
     if count == 0 || !min[0].is_finite() {
         return Err(Refusal::Empty);
     }
@@ -6931,12 +6975,15 @@ pub fn write_tree_stl(
     path: &str,
     deflection: Option<f64>,
 ) -> Result<u64, Refusal> {
+    let mesh_started = std::time::Instant::now();
     let triangles = tree_mesh(root, deflection)?;
+    add_phase(&PHASE_MESH_NS, mesh_started);
     if triangles.is_empty() {
         return Err(Refusal::Empty);
     }
     let count = u64::try_from(triangles.len()).map_err(|_| Refusal::Empty)?;
     let triangle_count = u32::try_from(triangles.len()).map_err(|_| Refusal::Empty)?;
+    let write_started = std::time::Instant::now();
     let mut bytes: Vec<u8> = Vec::new();
     bytes.extend_from_slice(&[0u8; 80]);
     bytes.extend_from_slice(&triangle_count.to_le_bytes());
@@ -6948,6 +6995,7 @@ pub fn write_tree_stl(
         bytes.extend_from_slice(&0u16.to_le_bytes());
     }
     std::fs::write(path, bytes).map_err(|_| Refusal::Empty)?;
+    add_phase(&PHASE_STL_WRITE_NS, write_started);
     Ok(count)
 }
 
@@ -10857,11 +10905,16 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
     let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let construct_ms = construct_started.elapsed().as_secs_f64() * 1000.0;
     reset_cache_counters();
+    reset_phase_timers();
     let facts_started = std::time::Instant::now();
     let outcome = crate::gil::with_kernel_gil_released(py, move || tree_facts(&tree));
     let facts_ms = facts_started.elapsed().as_secs_f64() * 1000.0;
     let cache_hit = facts_cache_hit_count() > 0;
     let patch_cache_hits = patch_cache_hit_count();
+    let section_extraction_ms = phase_ms(&PHASE_SECTION_NS);
+    let loft_surface_ms = phase_ms(&PHASE_LOFT_SURFACE_NS);
+    let patch_certification_ms = phase_ms(&PHASE_PATCH_CERTIFY_NS);
+    let bbox_ms = phase_ms(&PHASE_BBOX_NS);
     match outcome {
         Ok(facts) => {
             let mut value = serde_json::json!({
@@ -10903,6 +10956,12 @@ pub fn bd_facts(py: Python<'_>, tree_json: &str) -> PyResult<String> {
                         "facts_ms": facts_ms,
                         "cache_hit": cache_hit,
                         "patch_cache_hits": patch_cache_hits,
+                        "phases": {
+                            "section_extraction_ms": section_extraction_ms,
+                            "loft_surface_ms": loft_surface_ms,
+                            "patch_certification_ms": patch_certification_ms,
+                            "bbox_ms": bbox_ms,
+                        },
                     }),
                 );
             }
@@ -10927,15 +10986,23 @@ pub fn bd_stl(
 ) -> PyResult<String> {
     let tree = parse_tree(tree_json).map_err(|message| parse_error_to_pyerr(py, &message))?;
     let owned_path = path.to_string();
+    reset_phase_timers();
     let mesh_started = std::time::Instant::now();
     let outcome = crate::gil::with_kernel_gil_released(py, move || {
         write_tree_stl(&tree, &owned_path, deflection)
     });
     let mesh_ms = mesh_started.elapsed().as_secs_f64() * 1000.0;
+    let mesh_build_ms = phase_ms(&PHASE_MESH_NS);
+    let stl_write_ms = phase_ms(&PHASE_STL_WRITE_NS);
     match outcome {
-        Ok(triangles) => serde_json::to_string(
-            &serde_json::json!({ "triangles": triangles, "mesh_ms": mesh_ms }),
-        )
+        Ok(triangles) => serde_json::to_string(&serde_json::json!({
+            "triangles": triangles,
+            "mesh_ms": mesh_ms,
+            "phases": {
+                "mesh_build_ms": mesh_build_ms,
+                "stl_write_ms": stl_write_ms,
+            },
+        }))
         .map_err(|e| PyRuntimeError::new_err(format!("stl serialization failed: {e}"))),
         Err(refusal) => Err(refusal_to_pyerr(py, &refusal)),
     }
