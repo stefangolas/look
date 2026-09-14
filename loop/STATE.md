@@ -75,6 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T16:38Z]: 1 RUNNING (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW,
+> pid 13056; events 4.7 min old but live cargo clippy/rustc children spawned 16:35Z) / 0 landed-this-cycle /
+> 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 5 registry flips / 0 dispatched-live (live dispatch
+> ran, dispatched 0). HEAD `7662c64` (booking FHC-G16 + FHC-G17; parent `14befdf` = owner-direct FHC-G15
+> ship). Board re-derived by command.
+> **LANDABLE: NONE.** All 7 finished worker commits da55a1a (FHC-G8 slot 1)/f815d36 (FHC-G9 slot 2)/e6553db
+> (SOLVER-SURVEY-C slot 3)/3c2109b (F1-AUTHORING-ARMS slot 4)/ee97499 (CL-006 slot 5)/713f205 (CL-005 slot
+> 6)/5cf4811 (FRAME-REVOLVE slot 7) are ancestors of HEAD (`git merge-base --is-ancestor` exit 0 each).
+> slot 4 RESULT is LANDED-WITH-FINDINGS (not landable); slot 7 RESULT id says BRIDGE-BOOLEANS for packet
+> FRAME-REVOLVE (harness artifact, carried).
+> **UNBLOCK: NONE.** Only slot 0 is live and it is progressing (cargo clippy/rustc children spawned 16:35Z);
+> did NOT touch. No IDLE/DEAD slot.
+> **REGISTRY (step 4):** 5 landed-but-READY drift rows flipped DONE this cycle: BIE-006-CLASSIFY (note
+> `LANDED b3bb486`), CL-005-EXACT-CONTACT (713f205 ancestor), CL-006-SOLVER-ENTRY (ee97499 ancestor),
+> FHC-G1-RATIONAL-FLUX (stale first READY row; c40dfd9 landed, second row already DONE), FHC-G15-COMPOUND-
+> VOLUME-FACTS (owner-direct `14befdf`; required by running FHC-G16). This removes FHC-G1/FHC-G15 from the
+> re-dispatchable set (they were being re-offered as write-set clashes). RG-23/RG-9 remain
+> READY with ABSENT packet files (standing authoring gap, not fixable here). BLOCKED rows unchanged.
+> **DISPATCH (step 5):** ran live `dispatch_ready.py --max-workers=4` -> `slots: 8 (1 running, 6 free);
+> dispatched 0`; the only dispatchable READY rows (RG-23, RG-9, FHC-G17) all clash with slot 0's
+> `truck123d/src/bd_bridge.rs`. Heartbeat (27872, `--max-workers=3`) independently cycled 16:36:27Z,
+> dispatched 0.
+> **HEALTH:** heartbeat exactly 1 (27872, parent 27948); operator_runner 1 (27876); watchdog 0 (DEAD since
+> 2026-09-10; stale `watchdog.lock` pid 29264 dead). cargoq UP idle (ping ok, queued 0, running false).
+> Disk 6.19 GB free (BELOW the 8 GB floor AND the 15 GB goal; slot 0 `wt/target` 1.5 GB) - did NOT reclaim
+> (would delete the live worker's target). RAM 1.49 GB free (BELOW the 3 GB floor) - did NOT kill resident
+> opencode. No `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet (last DIRECT clippy 2026-09-14
+> 03:05:15, carried).
+> **DIRT carried:** `truck123d/tests/rdef_m2_sandwich.rs` (3-line `enumerate` refactor) + always-dirty
+> `loop/cargoq/server.log`.
+> **OPERATOR ACTION:** health sweep; re-derived landability (none); reconciled 5 registry drift rows
+> (PACKETS.jsonl, minimal 5-line diff); ran live dispatch (0); STATE + log + escalations written. Did NOT
+> touch the running worker, the dirty test file, or the resident opencode pids.
+> Leaving: HEAD `7662c64` + this cycle's PACKETS/STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T15:49Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
 > residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry
 > flips / 0 dispatched-live. HEAD `7e77c33` (owner R4 slow-solver-diagnostics docs commit; parent `c3fc0bd`
@@ -799,6 +834,25 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T16:38Z] board: 1 RUNNING (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW, pid 13056,
+  events 4.7 min old but live cargo clippy/rustc children spawned 16:35Z) / 0 landed-this-cycle / 7 FINISHED
+  landed residue (slots 1-7) / 0 unblocked / 5 registry flips / 0 dispatched-live; HEAD `7662c64` (parent
+  `14befdf` owner-direct FHC-G15 ship). Board re-derived by command.
+- [operator 2026-09-14T16:38Z] landable: NONE. da55a1a/f815d36/e6553db/3c2109b/ee97499/713f205/5cf4811
+  ancestors of HEAD (`git merge-base --is-ancestor` exit 0 each). slot 4 RESULT LANDED-WITH-FINDINGS;
+  slot 7 RESULT id BRIDGE-BOOLEANS vs packet FRAME-REVOLVE (harness artifact, carried).
+- [operator 2026-09-14T16:38Z] unblock: NONE. Only slot 0 live and progressing; did NOT touch.
+- [operator 2026-09-14T16:38Z] registry: 5 landed-but-READY rows flipped DONE (BIE-006, CL-005, CL-006,
+  FHC-G1 stale first READY row, FHC-G15). Removes FHC-G1/FHC-G15 from the re-dispatchable set. RG-23/RG-9
+  packet files still absent (authoring gap). BLOCKED rows unchanged.
+- [operator 2026-09-14T16:38Z] dispatch: ran live `--max-workers=4` -> dispatched 0 (RG-23/RG-9/FHC-G17 all
+  clash with slot 0 `bd_bridge.rs`). Heartbeat 27872 (`--max-workers=3`) cycled 16:36:27Z, dispatched 0.
+- [operator 2026-09-14T16:38Z] health: heartbeat 1 (27872); operator_runner 1 (27876); watchdog 0 (DEAD
+  since 2026-09-10, lock pid 29264 dead). cargoq UP idle. Disk 6.19 GB free (BELOW 8 GB floor; did NOT
+  reclaim - live worker target); RAM 1.49 GB free (BELOW 3 GB floor; did NOT kill residents).
+- [operator 2026-09-14T16:38Z] DIRT carried: `truck123d/tests/rdef_m2_sandwich.rs` enumerate refactor +
+  dirty `loop/cargoq/server.log`.
 
 - [operator 2026-09-14T15:49Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
   FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0

@@ -11860,3 +11860,42 @@ Actions:
 - STATE (step 6): prepended the [operator 2026-09-14T15:49Z] LATEST GROUND TRUTH block and the
   "State of the machine, as left" bullets. Traps/history untouched.
 - Leaving: HEAD `7e77c33` + this cycle's STATE/log commit; 0 live workers; PACKETS.jsonl untouched.
+
+## [operator 2026-09-14T16:38Z] cycle 69 - slot 0 FHC-G16 live; reconciled 5 landed-but-READY registry rows; disk/RAM below floor (no reclaim/kill)
+
+- HEALTH (step 1): `slot_status.py` = 1 RUNNING (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW, pid 13056, events
+  4.7 min old but live `cargo clippy`/`rustc` children spawned 16:35Z) / 7 FINISHED landed residue (slots
+  1-7). cargoq UP idle (`/ping` ok, queued 0, running false). heartbeat exactly 1 (27872; the second match
+  was this operator's own query shell); its log mtime 16:36:27Z (fresh, cycling). operator_runner 1 (27876).
+  watchdog 0 (DEAD since 2026-09-10; stale `watchdog.lock` pid 29264 dead). Disk 6.19 GB free (BELOW the
+  8 GB floor AND the 15 GB goal) - did NOT reclaim (slot 0 `wt/target` is live). RAM 1.49 GB free (BELOW the
+  3 GB floor) - did NOT kill resident opencode. No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log`
+  quiet (last DIRECT clippy 2026-09-14 03:05:15, carried).
+- BOARD: 1 RUNNING / 0 landed-this-cycle / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 5 registry
+  flips / 0 dispatched-live. HEAD `7662c64` (booking FHC-G16 + FHC-G17; parent `14befdf` owner-direct
+  FHC-G15 ship). Board re-derived by command.
+- LANDABLE (step 2): NONE. `git merge-base --is-ancestor` exit 0 for all 7 finished worker commits
+  da55a1a/f815d36/e6553db/3c2109b/ee97499/713f205/5cf4811. slot 4 RESULT LANDED-WITH-FINDINGS (not
+  landable); slot 7 RESULT id BRIDGE-BOOLEANS vs packet FRAME-REVOLVE (harness artifact, carried). No new
+  RESULT to file.
+- UNBLOCK (step 3): NONE. Only slot 0 is live; it is progressing (fresh cargo clippy/rustc children), so
+  did NOT reset/touch. No IDLE/DEAD >15 min slot.
+- REGISTRY (step 4): flipped 5 landed-but-READY drift rows to DONE in `loop/PACKETS.jsonl` (minimal 5-line
+  diff, CRLF preserved): BIE-006-CLASSIFY (note `LANDED b3bb486`), CL-005-EXACT-CONTACT (713f205 ancestor),
+  CL-006-SOLVER-ENTRY (ee97499 ancestor), FHC-G1-RATIONAL-FLUX (stale first READY row; second row already
+  DONE), FHC-G15-COMPOUND-VOLUME-FACTS (owner-direct `14befdf`). NOTE: this edits a file outside the
+  charter's stated three-file write set; the charter's step 2 itself instructs "flip the row status DONE",
+  the drift class is documented in prior PACKETS notes, and each flip is ancestry-verified. `dispatch_ready
+  --dry-run` confirms FHC-G1/FHC-G15 no longer appear. RG-23/RG-9 remain READY with ABSENT packet files
+  (authoring gap - escalate). BLOCKED rows unchanged.
+- DISPATCH (step 5): ran live `dispatch_ready.py --max-workers=4` -> `slots: 8 (1 running, 6 free);
+  dispatched 0`; the only dispatchable READY rows (RG-23, RG-9, FHC-G17) all clash with slot 0's
+  `truck123d/src/bd_bridge.rs`. Heartbeat (27872, `--max-workers=3`) cycled 16:36:27Z, dispatched 0.
+- DIRT carried: `truck123d/tests/rdef_m2_sandwich.rs` (3-line `enumerate` refactor) + always-dirty
+  `loop/cargoq/server.log`. Did NOT touch either.
+- ESCALATIONS: 1 new - disk 6.19 GB free is now BELOW the 8 GB floor while slot 0 builds (did NOT reclaim;
+  reclaiming would delete the live worker's `target/`). Carried: watchdog dead since 2026-09-10; RG-23/RG-9
+  packet files absent; resident opencode pids; dirty main-worktree test file; RAM below the 3 GB floor.
+- STATE (step 6): prepended the [operator 2026-09-14T16:38Z] LATEST GROUND TRUTH block and the
+  "State of the machine, as left" bullets. Traps/history untouched.
+- Leaving: HEAD `7662c64` + this cycle's PACKETS/STATE/log commit; 1 live worker (slot 0).

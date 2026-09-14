@@ -3070,3 +3070,16 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - OPERATOR ACTION: did NOT kill or signal either; reported only.
 - START FROM: `Get-CimInstance Win32_Process -Filter "Name='opencode.exe'"` and each parent chain; decide
   interactive (leave) vs orphan (kill to reclaim ~1.3 GB combined).
+
+## [operator 2026-09-14T16:38Z] disk below the 8 GB floor with a live build
+
+- WHAT: `Get-PSDrive C` shows 6.19 GB free - below the operator's 8 GB floor and the 15 GB goal - while
+  slot 0 (FHC-G16-ADMISSION-PAIRS-NARROW) has live `cargo clippy`/`rustc` children (spawned 16:35Z) and a
+  1.5 GB `loop/slots/0/wt/target`.
+- WHY HUMAN/ORCHESTRATOR: reclaiming now (`janitor.py` target delete) would destroy the running worker's
+  build tree; the operator must not break a progressing worker. Disk pressure with an active build is an
+  owner call (grow the volume, clear non-loop scratch, or accept the risk).
+- OPERATOR ACTION: did NOT reclaim, did NOT kill anything; reported only. `python loop/janitor.py status`
+  lists only slot 0 targets (0.0 GB `slots/0/target` + 1.5 GB `slots/0/wt/target`), both live.
+- START FROM: `Get-PSDrive C`; `python loop/janitor.py status`; separate large non-loop scratch
+  (home-dir PNGs/renders, `benchmarks/`, `scratch/`) from the live slot-0 target before any reclaim.
