@@ -55,3 +55,31 @@ truck-certified = { path = "../vendor/truck/truck-certified" }
 [dev-dependencies]
 # auto-initialize only for the test build (embedded interpreter in tests).
 pyo3 = { version = "0.29.2", default-features = false, features = ["macros", "auto-initialize"] }
+
+[lints.clippy]
+# Clippy 1.97 baseline hygiene (toolchain bump manufactured these on
+# clippy-green landings; recorded in loop/STATE.md traps). The certified
+# numerical code deliberately indexes by proven invariant, uses NaN-safe
+# negated partial-ord comparisons, and carries certificate-shape choices.
+# Per-site fixes land with the packets that touch those sites.
+indexing_slicing = "allow"
+neg_cmp_op_on_partial_ord = "allow"
+large_enum_variant = "allow"
+excessive_precision = "allow"
+type_complexity = "allow"
+collapsible_if = "allow"
+get_first = "allow"
+useless_conversion = "allow"
+field_reassign_with_default = "allow"
+needless_range_loop = "allow"
+unnecessary_lazy_evaluations = "allow"
+manual_range_contains = "allow"
+manual_contains = "allow"
+assign_op_pattern = "allow"
+for_kv_map = "allow"
+new_without_default = "allow"
+ptr_arg = "allow"
+should_implement_trait = "allow"
+single_match = "allow"
+needless_borrow = "allow"
+needless_borrows_for_generic_args = "allow"
