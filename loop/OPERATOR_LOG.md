@@ -11021,3 +11021,41 @@ Actions:
   substrate stack (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator
   (HANDOFF `63c1272` + CI fix-forward `cba1c30`).
 - Leaving: HEAD `1538dab` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
+
+## Operator cycle 2026-09-14T06:42Z (deepseek-v4-flash)
+
+- Health sweep (step 1): `slot_status` = 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, events
+  16.7 min old, changed=3, branch @1ddd138 = base, no RESULT) + 2 IDLE residue (slot 1 FHC-G1 dead
+  residue pid=-, events 124 min old; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue
+  (slots 3-7). Heartbeat exactly 1 (27872; the second `-match` is this operator's own query shell).
+  operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead; not restarted).
+  cargoq UP (ping ok, queued 2, running=true = slot-0 `test --profile quick -p truck123d --lib -j 1
+  boolean_volume`). Disk 12.33 GB free (above 8 floor, below 15 goal); RAM 3.61 GB free (above 3 floor;
+  janitor sampled 2.7-3.6). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 09-11.
+- Land (step 2): NONE landable. Slot 0 has no RESULT.json (RUNNING); slot 1 has no RESULT.json (dead
+  residue); slots 3-7 RESULT statuses DONE/LANDED-WITH-FINDINGS/DONE/DONE/LANDED but their worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 are all ancestors of HEAD `6246f00` (already landed); slots 1/2
+  commits e1bda17/f0ae3ab also ancestors. Nothing to merge.
+- Unblock (step 3): NONE. Slot 0 alive and progressing (cargoq running its lib-test filter; events stale
+  because the tool call blocks on the queue, not stalled) -> do not disturb. Slot 1 is a dead residue of
+  the SAME packet as the RUNNING slot-0 run -> did NOT reset/redispatch (would duplicate); the heartbeat
+  itself tried slot 1 and was safely refused ("branch packet/FHC-G1-RATIONAL-FLUX is held by worktree
+  slots/0/wt ... release it manually"). Slot 2 landed residue. No QUESTION.md in slots 0/1/2. No action.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked or needs still READY (DEF-TESS needs
+  DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 READY);
+  BG-CK-SPLINE-CENSUS has needs DONE but is owner-cancelled. None mechanically flippable. Not edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 7 free);
+  slot-assigned packets: 4"; RG-23/RG-9 ANCHOR CHECK FAILED (their registry `packet` field is empty, so
+  no packet file exists); FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; slot-1 FHC-G1 flagged DEAD dispatch
+  (would reset+delete+redispatch the running packet); `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T06:42Z] block and
+  prepended the labeled [operator 2026-09-14T06:42Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): no NEW escalation. Carried unchanged: the 0xC0000409 / RAM-zone line (RAM above
+  the 3 GB floor, but the slot-0 lib test now TIMES OUT after 2400 s rather than crashing - the worker
+  churns; watch whether it ever produces a RESULT); FHC-G1 prior SPEC_GAP adjudication (retrying on slot
+  0); RG-23/RG-9 packet files absent; FHC-D/G8/G9 blocked on FHC-G1; dead substrate stack
+  (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator (`63c1272`/`cba1c30`).
+- Leaving: HEAD `6246f00` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.

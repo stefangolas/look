@@ -75,43 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T06:20Z]: 1 RUNNING + 2 IDLE residue (slots 1-2) + 5 FINISHED
-> landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live. HEAD
-> `1538dab` (the 05:56Z operator STATE/log commit; orchestrator HANDOFF `63c1272` + CI fix-forward
-> `cba1c30` remain in history). Board re-derived by command.
-> **FHC-G1-RATIONAL-FLUX is RUNNING on slot 0** - opencode worker pid 28304 (parent cmd 39724) alive,
-> CPU 656 s, child powershell 26064 running since 02:08:33 local; `slot_status` events 8.4 min old (a
-> step_start with no following tool call), changed=3, branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138` (=base,
-> no work), no RESULT. The cargoq job `cargo test --profile quick -p truck123d --lib --locked -j 1` in
-> slot0/wt TIMED OUT after 2400 s at 02:17:55 local (the prior identical run crashed 0xC0000409 at
-> 01:28:19); cargoq then started the next queued job `cargo test -p look --test geometry_fingerprint`
-> (main worktree). Progressing, do NOT disturb.
-> **Slot 1 IDLE = FHC-G1 residue** (pid=- DEAD; events 100 min old; changed=0; RESULT absent). Same packet
-> as the RUNNING slot-0 run -> did NOT reset/redispatch. The heartbeat's 02:07:23 cycle again tried and was
-> safely refused ("branch ... held by worktree slots/0/wt ... release manually"), so no duplicate exists.
+> LATEST GROUND TRUTH [operator 2026-09-14T06:42Z]: 1 RUNNING (slot 0, blocked on cargoq) + 2 IDLE
+> residue (slots 1-2) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0
+> flipped / 0 dispatched-live. HEAD `6246f00` (the 06:20Z operator STATE/log commit; parent `1538dab`).
+> Board re-derived by command.
+> **FHC-G1-RATIONAL-FLUX is RUNNING on slot 0** - pid 39724 ALIVE (parent cmd; low CPU, work in the child
+> shell); `slot_status` events 16.7 min old, changed=3, branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138`
+> (=base, no work), no RESULT. Blocked on a long cargoq job: `cargo test --profile quick -p truck123d
+> --lib --locked -j 1 boolean_volume` (queued 2, running=true) - the same lib-test family that crashed
+> 0xC0000409 then timed out after 2400 s in prior cycles. Progressing, do NOT disturb.
+> **Slot 1 IDLE = FHC-G1 residue** (pid=- DEAD; events 124 min old; changed=0; no RESULT/QUESTION). Same
+> packet as the RUNNING slot-0 run -> did NOT reset/redispatch. The heartbeat's latest cycle again tried
+> slot 1 and was safely refused ("branch packet/FHC-G1-RATIONAL-FLUX is held by worktree
+> slots/0/wt ... release it manually"), so no duplicate exists.
 > **Slot 2 IDLE residue** TTC-RECENSUS-F1-R3 row DONE (landed).
 > **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable (no DONE RESULT
-> unlanded), slot-0 worker progressing, slots 1-2 intentional residue, dispatch REAL idle. STATE + log
-> committed.
+> unlanded), slot-0 worker progressing, slots 1-2 intentional residue, dispatch REAL idle (dry-run only;
+> heartbeat owns live dispatch). STATE + log committed.
 > **Frontier**: FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1 (running); RG-23/RG-9 `packet` field empty -> packet
 > files absent (anchor check fails) -> carried.
-> **Registry**: re-derived READ-ONLY (364 unique / 366 lines, last-wins): 268 DONE / 84 READY / 10 BLOCKED
-> / 2 SUPERSEDED (mtime 04:08:38Z, unchanged). All 10 BLOCKED owner/semantic parked; none mechanically
-> flippable (BG-CK-SPLINE-CENSUS needs landed but is owner-cancelled; DEF-TESS/DEF-SEEDRAY-B/TOR-C needs
-> still READY). NOT edited.
+> **Registry**: re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10 BLOCKED / 2
+> SUPERSEDED. All 10 BLOCKED owner/semantic parked; none mechanically flippable (BG-CK-SPLINE-CENSUS
+> needs landed but is owner-cancelled; DEF-TESS/DEF-SEEDRAY-B/TOR-C needs still READY). NOT edited.
 > **SUBSTRATE**: heartbeat exactly 1 (27872, alive since 09-09; the 2nd `-match` is the operator's own
 > query shell). operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not
-> restarted). cargoq UP (ping ok, queued 3, running=true = `cargo test -p look --test
-> geometry_fingerprint`).
-> **Disk 14.89 GB free (above the 8 GB floor, below the 15 GB goal); RAM 3.59 GB free (ABOVE the 3 GB
-> floor).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11. The
-> 0xC0000409/RAM-zone escalation is carried (RAM above the floor; the slot-0 lib test still times out).
-> **Observation**: active orchestrator commits `63c1272`/`cba1c30` present (do not disturb); opencode
-> 17560 (since 01:11 local) alive but childless/idle - possibly a session, not writing PACKETS.jsonl
-> (mtime 04:08:38Z unchanged). Main worktree dirty set `loop/cargoq/server.log` +
+> restarted). cargoq UP (ping ok, queued 2, running=true = slot-0 `test -p truck123d --lib ...
+> boolean_volume`).
+> **Disk 12.33 GB free (above the 8 GB floor, below the 15 GB goal); RAM 3.61 GB free (ABOVE the 3 GB
+> floor; janitor sampled 2.7-3.6).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
+> 2026-09-11. The 0xC0000409/RAM-zone escalation is carried (RAM above the floor; the slot-0 lib test
+> still times out).
+> **Observation**: active orchestrator commits `63c1272`/`cba1c30` + the 06:20Z operator commit `6246f00`
+> present (do not disturb); main worktree dirty set `loop/cargoq/server.log` +
 > `truck123d/tests/rdef_m2_sandwich.rs` + untracked `benchmarks/*`/`loop/baselines/*` (outside operator
 > scope; not touched).
-> Leaving: HEAD `1538dab` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
+> Leaving: HEAD `6246f00` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
 
 
 ## Pick up here
@@ -156,6 +154,40 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T06:42Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, blocked on
+  cargoq `test --profile quick -p truck123d --lib -j 1 boolean_volume`; events 16.7 min old, changed=3,
+  branch @1ddd138 = base, no RESULT) + 2 IDLE residue (slot 1 FHC-G1 dead residue pid=-, events 124 min
+  old; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed / 0
+  unblocked / 0 flipped / 0 dispatched-live; HEAD `6246f00` (the 06:20Z operator commit). Board
+  re-derived by command.
+- [operator 2026-09-14T06:42Z] landable: NONE. Slot 0 no RESULT.json; slot 1 no RESULT.json (dead
+  residue); slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2
+  e1bda17/f0ae3ab all ancestors of HEAD (`git merge-base --is-ancestor` TRUE, exit 0 each). Slot 0
+  base `1ddd138` also ancestor. Nothing landed.
+- [operator 2026-09-14T06:42Z] unblock: NONE. Slot 0 alive/progressing (cargoq running its
+  `boolean_volume` lib job); slot 1 dead residue of the same packet as the RUNNING slot-0 run -> did
+  NOT reset/redispatch; the heartbeat's slot-1 attempt safely refused ("branch ... held by worktree
+  slots/0/wt ... release it manually"). Slot 2 landed residue. No QUESTION.md in slots 0/1/2. No action.
+- [operator 2026-09-14T06:42Z] registry re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked or needs still READY
+  (DEF-TESS/DEF-SEEDRAY-B/TOR-C); none mechanically flippable (BG-CK-SPLINE-CENSUS needs landed but is
+  owner-cancelled). NOT edited.
+- [operator 2026-09-14T06:42Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; manual +
+  heartbeat is the known double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8
+  (0 running, 7 free); slot-assigned packets: 4"; RG-23/RG-9 ANCHOR CHECK FAILED (their `packet` field
+  is empty -> files absent); FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; slot-1 FHC-G1 flagged DEAD dispatch
+  (would reset+delete+redispatch -> duplicate of the RUNNING slot-0 run; heartbeat refuses it);
+  `dispatched 0` = REAL idle.
+- [operator 2026-09-14T06:42Z] health: heartbeat exactly 1 (27872; the second `-match` = operator's own
+  query shell). operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not
+  restarted). cargoq UP (ping ok, queued 2, running=true; `stats` shows the slot-0 lib test's prior
+  0xC0000409/timeout and the current `boolean_volume` run). **Disk 12.33 GB free (above 8 floor, below 15
+  goal); RAM 3.61 GB free (ABOVE 3 floor; janitor sampled 2.7-3.6).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T06:42Z] Observation: active orchestrator commits `63c1272`/`cba1c30` + the 06:20Z
+  operator commit `6246f00` present (do not disturb); main worktree dirty set `loop/cargoq/server.log` +
+  `truck123d/tests/rdef_m2_sandwich.rs` + untracked `benchmarks/*`/`loop/baselines/*` (outside operator
+  scope; not touched). HEAD is `6246f00`.
 - [operator 2026-09-14T06:20Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, opencode worker 28304 /
   parent cmd 39724 alive, child powershell 26064 since 02:08:33 local; events 8.4 min old, changed=3,
   branch @1ddd138 = base, no RESULT) + 2 IDLE residue (slot 1 FHC-G1 dead residue pid=-, events 100 min
