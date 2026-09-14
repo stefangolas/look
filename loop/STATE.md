@@ -75,6 +75,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T13:51Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
+> residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry
+> flips / 0 dispatched-live. HEAD `0a509ea` (the 13:24Z operator STATE/log commit; unchanged this cycle).
+> Board re-derived by command.
+> **LANDABLE: NONE.** Worker commits da55a1a (FHC-G8 slot 1) / f815d36 (FHC-G9 slot 2) and slots 3-7
+> e6553db/3c2109b/ee97499/713f205/5cf4811 are all ancestors of HEAD (`git merge-base --is-ancestor`
+> exit 0 each); slot 0 SPEC_GAP not landable; FHC-D `000cb11` NOT an ancestor (exit 1) but its packet is
+> DONE (carried, do NOT merge).
+> **UNBLOCK: NONE.** 0 RUNNING; all 8 `worker.pid` files dead (slot_status pid=- for all); slot 0 is the
+> SPEC_GAP residue of a packet whose DONE implementation already landed (slot 1) -> did NOT reset/
+> redispatch. Only QUESTION.md is slot 5 (2026-09-05 residue); no new QUESTION.
+> **REGISTRY (step 4):** re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY / 10 BLOCKED /
+> 2 SUPERSEDED. 78/80 READY carry the dispatcher's LANDED_RE marker (`landed <hex>`, case-insensitive
+> regex) and are skipped correctly; only RG-23/RG-9 lack one (packet files ABSENT). All 10 BLOCKED
+> owner/semantic parked (6 needs=[]/None; DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES READY;
+> DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 READY; BG-CK-SPLINE-CENSUS needs
+> BG-CK-P0-PREVALENCE DONE but owner-cancelled) - NO mechanical flip. Stale FHC-G1 READY row carried - do
+> NOT re-measure (would arm a duplicate). NOT edited.
+> **DISPATCH (step 5):** did NOT run live (heartbeat 27872 owns dispatch, 10-min cadence; last log cycle
+> 13:43Z, next due ~13:53Z; manual+heartbeat = double-dispatch race). `dispatch_ready --dry-run
+> --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9
+> ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle.
+> **HEALTH:** heartbeat exactly 1 (27872; log cycle 13:43Z, cycling); operator_runner 1 (27876);
+> watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq UP but BUSY (ping ok, queued 0,
+> running=true = a `cargo build --release -p truck123d --locked` in the main worktree, submitted 09:48:04
+> local via cargoq, not a slot worker). Disk 10.0 GB free (above 8 floor, below 15 goal); RAM 0.4 GB free
+> (BELOW the 3 GB floor, 0 workers, chrome + the release build resident). No `%TEMP%/look-verify-baseline-*`
+> leaks; fallback.log quiet (last DIRECT clippy 2026-09-14 03:05:15, carried).
+> **OPERATOR ACTION:** health sweep; re-derived landability (none); registry read-only (no flip); did NOT
+> run live dispatch; did NOT reclaim disk (above floor); STATE + log written. Leaving: HEAD `0a509ea` +
+> this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T13:24Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
 > residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry
 > flips / 0 dispatched-live. HEAD `bae4e03` (the 13:02Z operator STATE/log commit; unchanged this cycle).
@@ -626,6 +658,29 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T13:51Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
+  FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0
+  dispatched-live; HEAD `0a509ea`. Board re-derived by command.
+- [operator 2026-09-14T13:51Z] landable: NONE. Slots 1-7 worker commits da55a1a/f815d36/e6553db/3c2109b/
+  ee97499/713f205/5cf4811 all ancestors of HEAD (`git merge-base --is-ancestor` exit 0 each); slot 0
+  SPEC_GAP; FHC-D `000cb11` not an ancestor (exit 1) but packet DONE (carried, do not merge).
+- [operator 2026-09-14T13:51Z] unblock: NONE. 0 running, all 8 worker.pid dead; slot 0 is SPEC_GAP residue of
+  a packet whose DONE implementation already landed (slot 1) -> did NOT reset/redispatch. Only QUESTION.md
+  is slot 5 (2026-09-05 residue); no new QUESTION.
+- [operator 2026-09-14T13:51Z] registry re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY /
+  10 BLOCKED / 2 SUPERSEDED. 78/80 READY carry the dispatcher LANDED_RE marker (case-insensitive); only
+  RG-23/RG-9 lack one (packet files absent). All 10 BLOCKED owner/semantic parked -> no flip. Stale FHC-G1
+  READY row carried (do NOT re-measure). NOT edited.
+- [operator 2026-09-14T13:51Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch, 10-min cadence;
+  last log cycle 13:43Z, next ~13:53Z). dry-run = `slots: 8 (0 running, 8 free); slot-assigned packets: 6;
+  dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7,
+  A5 40->56 = REAL idle.
+- [operator 2026-09-14T13:51Z] health: heartbeat 1 (27872, log cycle 13:43Z); operator_runner 1 (27876);
+  watchdog/supervisor/overnight 0 (carried dead). cargoq UP busy (a release build in the main worktree
+  submitted 09:48 local, not a slot worker). Disk 10.0 GB free (above 8 floor, below 15 goal); RAM 0.4 GB
+  free (BELOW 3 GB floor, 0 workers, chrome resident). No `%TEMP%/look-verify-baseline-*` leaks;
+  fallback.log quiet (2026-09-14 03:05:15 clippy bypass carried).
 
 - [operator 2026-09-14T13:24Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
   FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0
