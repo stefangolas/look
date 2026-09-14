@@ -342,7 +342,8 @@ fn produced_carrier_class(op: &FacadeOp, profile: CarrierClass) -> Option<Carrie
         | FacadeOp::PushSketch
         | FacadeOp::Pop
         | FacadeOp::Mode { .. }
-        | FacadeOp::SandwichProbe(_) => None,
+        | FacadeOp::SandwichProbe(_)
+        | FacadeOp::RationalFluxProbe(_) => None,
     }
 }
 
@@ -429,6 +430,226 @@ pub struct SandwichOutcome {
     /// `CoincidenceWithoutExactCarrier`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub floor: Option<f64>,
+}
+
+// ---------------------------------------------------------------------------
+// FHC-G1-RATIONAL-FLUX -- the two-channel flux certificate and the MONO-9
+// interval fold.
+//
+// Every exact output of the landed polynomial arm embeds as the degenerate
+// two-channel certificate `(q, q; 0, 0)`: the exact channel is the closed
+// interval `[q, q]` and both the migration width `w_m` and the interval width
+// `w_i` are zero. The rational arm returns a genuine enclosure `[l, h]` with
+// `w_i = h - l`; composition is Minkowski (interval) addition, and a fold of
+// same-mode certificates adds the channels componentwise. Mixed-mode nesting
+// still evaluates pairwise (the caller composes two certificates at a time).
+// ---------------------------------------------------------------------------
+
+/// The per-cell flux outcome of the certified surface arm: the exact scalar of
+/// the polynomial fast path (`cell_flux_exact`'s `W = const` special case), or
+/// the certified enclosure the reciprocal-power kernel returns for a rational
+/// (`W != const`) patch.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FluxCert {
+    /// The exact polynomial flux `q` (embeds as `(q, q; 0, 0)`).
+    Exact(f64),
+    /// The certified enclosure `[lo, hi]` of the rational flux.
+    Enclosure {
+        /// The certified lower bound.
+        lo: f64,
+        /// The certified upper bound.
+        hi: f64,
+    },
+}
+
+impl FluxCert {
+    /// The closed flux bracket, whatever the channel.
+    pub fn bracket(&self) -> (f64, f64) {
+        match self {
+            FluxCert::Exact(q) => (*q, *q),
+            FluxCert::Enclosure { lo, hi } => (*lo, *hi),
+        }
+    }
+
+    /// The certificate value (the exact scalar, or the enclosure midpoint).
+    pub fn value(&self) -> f64 {
+        let (lo, hi) = self.bracket();
+        if lo == hi { lo } else { 0.5 * (lo + hi) }
+    }
+
+    /// The MONO-9 Minkowski addition: exact + exact stays exact (the closed
+    /// interval `[a+b, a+b]`); any enclosure yields the interval sum. This is
+    /// the only composition the fold uses, so a same-mode chain folds without
+    /// ever expanding a scalar as if it were exact.
+    pub fn minkowski_add(&self, other: &FluxCert) -> FluxCert {
+        match (self, other) {
+            (FluxCert::Exact(a), FluxCert::Exact(b)) => FluxCert::Exact(a + b),
+            _ => {
+                let (alo, ahi) = self.bracket();
+                let (blo, bhi) = other.bracket();
+                FluxCert::Enclosure {
+                    lo: alo + blo,
+                    hi: ahi + bhi,
+                }
+            }
+        }
+    }
+
+    /// The two-channel certificate `(l, h; w_m, w_i)` of this flux outcome:
+    /// the exact channel `[l, h]` plus the migration width `w_m` and the
+    /// interval width `w_i`. An exact output migrates as `(q, q; 0, 0)`; a
+    /// rational enclosure carries `w_m = 0`, `w_i = h - l`.
+    pub fn two_channel(&self) -> TwoChannelCertificate {
+        let (lo, hi) = self.bracket();
+        TwoChannelCertificate {
+            lo,
+            hi,
+            width_migration: 0.0,
+            width_interval: hi - lo,
+        }
+    }
+}
+
+/// The two-channel certificate `(l, h; w_m, w_i)`: the exact channel `[l, h]`,
+/// the migration width `w_m`, and the interval width `w_i`. Composition is
+/// Minkowski addition of every channel.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TwoChannelCertificate {
+    /// The exact lower channel.
+    pub lo: f64,
+    /// The exact upper channel.
+    pub hi: f64,
+    /// The migration width channel.
+    pub width_migration: f64,
+    /// The interval width channel.
+    pub width_interval: f64,
+}
+
+impl TwoChannelCertificate {
+    /// The exact migration `(q, q; 0, 0)` of a polynomial output.
+    pub fn exact(value: f64) -> TwoChannelCertificate {
+        TwoChannelCertificate {
+            lo: value,
+            hi: value,
+            width_migration: 0.0,
+            width_interval: 0.0,
+        }
+    }
+
+    /// The additive (Minkowski) composition of two certificates.
+    pub fn add(&self, other: &TwoChannelCertificate) -> TwoChannelCertificate {
+        TwoChannelCertificate {
+            lo: self.lo + other.lo,
+            hi: self.hi + other.hi,
+            width_migration: self.width_migration + other.width_migration,
+            width_interval: self.width_interval + other.width_interval,
+        }
+    }
+
+    /// The certified total width `w_m + w_i`.
+    pub fn total_width(&self) -> f64 {
+        self.width_migration + self.width_interval
+    }
+}
+
+/// The MONO-9 same-mode interval fold: certificates fold by Minkowski addition
+/// (`Exact(x) = [x, x]`). Returns `None` for an empty chain.
+pub fn fold_flux_certificates(certificates: &[FluxCert]) -> Option<FluxCert> {
+    let mut iter = certificates.iter();
+    let first = iter.next()?;
+    Some(iter.fold(*first, |acc, cert| acc.minkowski_add(cert)))
+}
+
+/// The MONO-9 same-mode fold in the two-channel `(l, h; w_m, w_i)` algebra:
+/// every certificate migrates to its two channels and the fold adds them
+/// componentwise. An empty chain folds to the exact identity `(0, 0; 0, 0)`.
+pub fn fold_two_channel_certificates(certificates: &[FluxCert]) -> TwoChannelCertificate {
+    certificates
+        .iter()
+        .fold(TwoChannelCertificate::exact(0.0), |acc, cert| {
+            acc.add(&cert.two_channel())
+        })
+}
+
+/// One sub-command row of the rational-flux door probe (the FHC-G1 CHK-9
+/// reachability surface). Every field is data; the bridge runs the requested
+/// kernel entry and reports the certified outcome or a typed refusal tag.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RationalFluxProbeRow {
+    /// The requested kernel entry.
+    pub kind: RationalFluxKind,
+    /// The base patch 2-cycle (`cell_flux`/`boolean_volume`/`classify`).
+    #[serde(default)]
+    pub patches: Vec<SandwichPatchRow>,
+    /// The tool patch 2-cycle (`boolean_volume`).
+    #[serde(default)]
+    pub tool: Vec<SandwichPatchRow>,
+    /// The boolean mode (`boolean_volume`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<ModeValue>,
+    /// The parameter cells `[u_lo, u_hi, v_lo, v_hi]` (`cell_flux`).
+    #[serde(default)]
+    pub cells: Vec<[f64; 4]>,
+    /// The univariate weight Bernstein coefficients (`reciprocal`).
+    #[serde(default)]
+    pub coeffs: Vec<f64>,
+    /// The reciprocal power `k >= 1` (`reciprocal`).
+    #[serde(default)]
+    pub k: usize,
+    /// The truncation order `r` (`reciprocal`).
+    #[serde(default)]
+    pub order: usize,
+    /// The membership sample point (`classify`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub point: Option<[f64; 3]>,
+    /// The membership cast direction (`classify`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub direction: Option<[f64; 3]>,
+}
+
+/// The requested kernel entry of a rational-flux probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RationalFluxKind {
+    /// The certified per-cell flux of each patch (`cell_flux_certified`).
+    CellFlux,
+    /// The reciprocal-power integral (Thm 5.2).
+    Reciprocal,
+    /// The certified rational boolean volume of two patch 2-cycles.
+    BooleanVolume,
+    /// The certified rational membership of a point.
+    Classify,
+    /// The MONO-9 certificate fold of the probe's `certificates`.
+    Fold,
+}
+
+/// The certified outcome of one rational-flux probe.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct RationalFluxOutcome {
+    /// Always `true` on the `Ok` path.
+    pub ok: bool,
+    /// The per-cell (or folded) flux brackets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub brackets: Vec<[f64; 2]>,
+    /// The scalar value of the reciprocal integral.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
+    /// The certified error bound of the reciprocal integral.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<f64>,
+    /// The certified boolean volume value (the bracket midpoint).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub volume: Option<f64>,
+    /// The certified membership verdict (`inside`/`outside`/`indeterminate`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
+    /// The typed refusal tag, when the kernel refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refusal: Option<String>,
 }
 
 /// One row of a submitted facade session. Every row is data only; the kernel
@@ -591,6 +812,12 @@ pub enum FacadeOp {
     /// the admission dichotomy and the sandwich rule and records the certified
     /// outcome on the report; the row is the CHK-9 door reachability surface.
     SandwichProbe(SandwichProbeRow),
+    /// FHC-G1-RATIONAL-FLUX: the certified rational-flux probe (the CHK-9
+    /// reachability surface for the reciprocal-power kernel, the rational
+    /// surface arm and the MONO-9 certificate fold). The bridge runs the
+    /// requested kernel entry and records the certified outcome or the typed
+    /// refusal tag on the report.
+    RationalFluxProbe(RationalFluxProbeRow),
 }
 
 /// The submitted session table: the ordered operation log a builder session
@@ -638,6 +865,10 @@ pub struct FacadeReport {
     /// (omitted otherwise).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sandwich: Option<SandwichOutcome>,
+    /// The FHC-G1 rational-flux probe outcome, when the session ran one
+    /// (omitted otherwise).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rational_flux: Option<RationalFluxOutcome>,
     /// The export entries, in session order.
     pub exports: Vec<ExportEntry>,
 }
@@ -663,6 +894,7 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
     let mut pending_mode: Option<ModeValue> = None;
     let mut boolean_events: Vec<SweptBooleanEvent> = Vec::new();
     let mut sandwich: Option<SandwichOutcome> = None;
+    let mut rational_flux: Option<RationalFluxOutcome> = None;
 
     for op in &table.ops {
         match op {
@@ -799,6 +1031,14 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
                 selection_pending = false;
                 sandwich = Some(crate::bd_bridge::certify_sandwich_probe(probe));
             }
+            FacadeOp::RationalFluxProbe(probe) => {
+                // FHC-G1: run the requested rational-flux kernel entry over the
+                // recorded patch data. The probe is a door reachability
+                // surface: it does not touch the carrier state or the export
+                // ledger.
+                selection_pending = false;
+                rational_flux = Some(crate::bd_bridge::certify_rational_flux_probe(probe));
+            }
         }
     }
 
@@ -809,6 +1049,7 @@ pub fn run_facade(table: &FacadeTable) -> Result<FacadeReport, Refusal> {
         constructive,
         boolean_events,
         sandwich,
+        rational_flux,
         exports,
     })
 }
