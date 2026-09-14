@@ -3009,3 +3009,21 @@ uncommitted - left for the orchestrator, no dispatch impact.
   rows (RG-23/RG-9), whose packet files are ABSENT. The real frontier needs packet authoring (orchestrator
   work), not dispatch. Carried: slot-0 FHC-G8 SPEC_GAP; FHC-D `000cb11` duplicate; FHC-G1 stale READY row;
   dead substrate stack.
+
+## [operator 2026-09-14T14:34Z] dirty main worktree: uncommitted clippy refactor of a test file
+
+- WHAT: `git status` in the main worktree (`C:/Users/stefa/look`, branch `integration/kernel-bg`, HEAD
+  `bfc0ecc`) shows `M truck123d/tests/rdef_m2_sandwich.rs` - an uncommitted 3-line `needless_range_loop`
+  style refactor (`for a in 0..2 { for b in 0..2 {` -> `for (a, corner_row) in corners.iter().enumerate() {
+  for (b, corner) in corner_row.iter().enumerate() {`, using `corner[k]` instead of `corners[a][b][k]`).
+  `loop/cargoq/server.log` is also modified (expected - the server writes it continuously).
+- WHY HUMAN/ORCHESTRATOR: a dirty main worktree is the "left mid-probe" hazard ORCHESTRATOR.md warns about;
+  it can also make a later `cargo check`/CI read a tree the committed HEAD does not describe. The operator
+  charter allows editing exactly three files (STATE/OPERATOR_LOG/OPERATOR_ESCALATIONS) and does not permit
+  committing, so I did NOT touch it. The change is plausibly a leftover from the nightly CI clippy
+  fix-forward (the same `needless_range_loop` class fixed in `examples/step_face_timing.rs` at cba1c30),
+  but it may equally be intentional owner WIP.
+- OPERATOR ACTION: did NOT stage, commit, revert, or check out the file; reported only. No worker is
+  running, so nothing depends on it this cycle.
+- START FROM: `git -C C:/Users/stefa/look diff -- truck123d/tests/rdef_m2_sandwich.rs`; decide commit
+  (clippy fix) vs `git checkout --` (leftover).
