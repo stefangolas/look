@@ -39,7 +39,7 @@ anchors:
   - {id: A2, expect: 4, cmd: "grep -c 'boolean_product_volume_certified' truck123d/src/bd_bridge.rs"}
   - {id: A3, expect: 2, cmd: "grep -c 'placed_box_patches' truck123d/src/bd_bridge.rs"}
   - {id: A4, expect: 3, cmd: "grep -c 'node_box_patches' truck123d/src/bd_bridge.rs"}
-  - {id: A5, expect: 41, cmd: "grep -c 'VolumeRow' truck123d/src/bd_bridge.rs"}
+  - {id: A5, expect: 40, cmd: "grep -c 'VolumeRow' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 100, ctx_tokens: 350000}
 ```
 
@@ -139,7 +139,7 @@ any file outside `write_allow`; `#[ignore]`, deleted or weakened tests, bare
 
 ```json
 {"id":"FHC-G1-RATIONAL-FLUX","status":"DONE","contracts":["FHC-G1-RATIONAL-FLUX"],
- "anchors_verified":{"A1":6,"A2":4,"A3":2,"A4":3,"A5":41},
+ "anchors_verified":{"A1":6,"A2":4,"A3":2,"A4":3,"A5":40},
  "rows_flipped":[],"rows_still_refused":[],
  "notes":"suite 1-11 verdicts; end-to-end union record; before/after row verdicts"}
 ```
