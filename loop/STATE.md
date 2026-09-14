@@ -75,6 +75,43 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [nightly-owner-session 2026-09-14T09:5xZ]: **CI GREEN - both push-gate
+> workflows SUCCESS on HEAD `4b011cd`** (cross-platform + release-binaries; first green since
+> the STEP-stack un-gate). 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER, fresh) / slot 0 IDLE
+> (orphan killed, see below) / slot 2 IDLE residue / slots 3-7 FINISHED landed residue. Board
+> re-derived by command. Full session detail: `loop/nightly_ops/OPS_LOG_2026-09-14.md`.
+> **CI FIX-FORWARD COMPLETE (owner-away session):** (a) cba1c30 - all FIVE clippy sites in
+> `examples/step_face_timing.rs` (the handoff listed 4; L731 collapsible-if was the 5th); the
+> local gate `cargo clippy -p look --all-targets -D warnings` had never been run because the
+> loop's checks are `--lib`-scoped and qtest skips examples. (b) 4b011cd - geometry_fingerprint
+> goldens refreshed 1860/5580 -> 1704/5112 and 9518/28554 -> 9380/28140, ATTRIBUTED to bc96e82
+> (DEF-TESS-ANALYTIC-SEAM-R2, 09-08: no more invented vertices on source trims -> fewer seam
+> triangles). The handoff's platform-split theory is DISPROVEN: all 7 CI targets + local agree
+> on one number set, and cafa70d was verified to still reproduce its own goldens under the
+> pinned 1.97.1 toolchain (throwaway-worktree run, evidence `loop/nightly_ops/fp_cafa70d.log`)
+> - the drift is bc96e82 alone. Vertices = 3x triangles held exactly. Bounds assertions green.
+> **HEDGE INSTALLED:** local `.git/hooks/pre-push` (uncommitted) runs the exact CI gates
+> (`clippy --locked --all-targets -- -D warnings` + `fmt --all -- --check`) before any push.
+> Owner follow-up suggested: committed `.githooks/pre-push` + install-docs wiring.
+> **CARRIED (owner item, not a push gate):** `gpu-metal-correctness-virtual` scheduled nightly
+> fails on hosted virtual GPU (`renders_generated_glb_to_png`: no `gpu_render` timing = no real
+> adapter) - failing every scheduled run since 07-27, last green 07-27. Known class per AGENTS.md
+> (hosted virtual GPU = correctness evidence only). Needs a real-GPU runner or an explicit
+> adapter-presence precondition - owner decision, do NOT loosen the assertion.
+> **ORPHAN RESOLVED:** the 09:31Z-escalated slot-0 duplicate hazard was closed by this session -
+> killed the orphaned FHC-G8 worker tree (pid 25800 + descendants) after re-deriving that its
+> reset worktree had changed=0 and its in-flight work was already archived in
+> `loop/slots/0/abandoned-20260914-052959.patch` (18729 B). Slot 1's fresh duplicate (pid 37052)
+> is the legitimate run; no re-duplication is possible (FHC-G8's write-set self-clashes while its
+> row is RUNNING). Root cause (the STALLED heuristic misfire) remains OPEN in
+> OPERATOR_ESCALATIONS 09:31Z - fix dispatch_ready.py:523/539-545 before trusting auto-stale
+> kills again.
+> **HEALTH at entry:** heartbeat exactly 1 + operator_runner exactly 1 (the `=2` matches are the
+> documented self-match of the query shell); cargoq UP (slot-1 worker job running; 1 queued job =
+> the dead orphan's discarded lib test, clears at timeout); **disk 9.5 GB free, RAM 3.55 GB free
+> (both above floors)**. No `%TEMP%/look-verify-baseline-*` leaks. Machine left in the state the
+> 20-min operator machinery expects; no dispatch performed (heartbeat owns it).
+
 > LATEST GROUND TRUTH [operator 2026-09-14T09:31Z]: 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER
 > DUPLICATE pid 37052, fresh) + 1 STALLED (slot 0, FHC-G8 orphan pid 25800 alive against a reset
 > worktree) / 0 landed-this-cycle / 1 IDLE residue (slot 2) / 5 FINISHED landed residue (slots 3-7)
