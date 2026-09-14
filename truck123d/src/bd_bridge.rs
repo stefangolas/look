@@ -7708,6 +7708,7 @@ pub mod membership {
 
     use truck_certified::construct::patches::{PatchParent, TensorBernsteinPatch};
     use truck_certified::construct::volume_facts::{VolumeOptions, certify_patch_form};
+    use truck_certified::formal::exact::{CertifiedInterval, Expansion};
     use truck_certified::kernel::patch::IBox2;
 
     use crate::facade::ModeValue;
@@ -9354,6 +9355,22 @@ pub mod membership {
         if patch.orientation != 1.0 && patch.orientation != -1.0 {
             return Err(BooleanVolumeRefusal::NonRegularPatch);
         }
+        // FHC-G8: the planarity router runs ahead of the generic 2D
+        // certification on every admitted patch. A planar hit replaces the
+        // 2D `k = 3` problem with boundary work; a miss falls through.
+        if let Some(outcome) = planar_patch_flux(patch, cell) {
+            let (lo, hi) = outcome?;
+            let (lo, hi) = if patch.orientation < 0.0 {
+                (-hi, -lo)
+            } else {
+                (lo, hi)
+            };
+            return Ok(if lo == hi {
+                crate::facade::FluxCert::Exact(lo)
+            } else {
+                crate::facade::FluxCert::Enclosure { lo, hi }
+            });
+        }
         if patch.unit_weight() {
             let (lo, hi) = cell_flux_exact(patch, cell)?;
             return Ok(if lo == hi {
@@ -9437,6 +9454,554 @@ pub mod membership {
             }
         }
         out
+    }
+
+    // =======================================================================
+    // FHC-G8-PLANARITY-ROUTER -- exact planar-face flux without generic 2D
+    // certification.
+    //
+    // A patch is planar exactly when its homogeneous control net `(A_ij, w_ij)`
+    // lies in one hyperplane through the origin of `R^4`: there is a `(nu, c)`
+    // with `nu . A_ij = c w_ij` for every control index (Thm 8.1). The test is
+    // a coefficient scan over the exact control net, so it is
+    // parametrization-independent: the degenerate fan centroid does not exist
+    // for this router. A planar hit routes the flux to the boundary
+    // area-vector form `(1/3) c (nu . A_vec) / (nu . nu)` with
+    // `A_vec = (1/2) oint X x dX`: polynomial boundary edges integrate
+    // exactly, rational edges through the 1D `k = 2` reciprocal-power
+    // certificate. A miss falls through unchanged to the generic 2D
+    // certification, and a routed face never disagrees with it.
+    // =======================================================================
+
+    /// A certified planar patch: the exact hyperplane `nu . X = c` plus the
+    /// `f64` plane data and the oriented surface normal `X_u x X_v`.
+    struct PlanarPatch {
+        nu: [Expansion; 3],
+        c: Expansion,
+        nu_f64: [f64; 3],
+        c_f64: f64,
+        normal: [f64; 3],
+    }
+
+    /// One boundary side of a patch's unit parameter square, in increasing
+    /// parameter order.
+    #[derive(Clone, Copy)]
+    enum PatchSide {
+        /// `v = 0`, parameter `u`.
+        VMin,
+        /// `u = 1`, parameter `v`.
+        UMax,
+        /// `v = 1`, parameter `u` (traversed decreasing).
+        VMax,
+        /// `u = 0`, parameter `v` (traversed decreasing).
+        UMin,
+    }
+
+    /// The exact expansion of one `f64` scalar.
+    fn expansion_point(x: f64) -> Expansion {
+        Expansion::zero().grow(x)
+    }
+
+    /// The one `f64` an exact expansion rounds to (the midpoint of its
+    /// certified enclosure, degenerate at a representable value).
+    fn expansion_mid(e: &Expansion) -> f64 {
+        if e.is_zero() {
+            return 0.0;
+        }
+        let iv = CertifiedInterval::from_expansion(e);
+        0.5 * (iv.lo + iv.hi)
+    }
+
+    /// The exact `3x3` determinant `det[p; q; r]` as an expansion.
+    fn det3_expansion(p: [f64; 3], q: [f64; 3], r: [f64; 3]) -> Expansion {
+        let m0 = Expansion::from_product(q[1], r[2])
+            .merge(&Expansion::from_product(q[2], r[1]).negate());
+        let m1 = Expansion::from_product(q[0], r[2])
+            .merge(&Expansion::from_product(q[2], r[0]).negate());
+        let m2 = Expansion::from_product(q[0], r[1])
+            .merge(&Expansion::from_product(q[1], r[0]).negate());
+        expansion_point(p[0])
+            .mul_expansion(&m0)
+            .merge(&expansion_point(p[1]).mul_expansion(&m1).negate())
+            .merge(&expansion_point(p[2]).mul_expansion(&m2))
+    }
+
+    /// The `3x3` minor of the three homogeneous rows with one column dropped.
+    fn det3_drop(u: &[f64; 4], v: &[f64; 4], w: &[f64; 4], drop: usize) -> Expansion {
+        let mut cols = [0usize; 3];
+        let mut k = 0;
+        for c in 0..4 {
+            if c != drop {
+                cols[k] = c;
+                k += 1;
+            }
+        }
+        det3_expansion(
+            [u[cols[0]], u[cols[1]], u[cols[2]]],
+            [v[cols[0]], v[cols[1]], v[cols[2]]],
+            [w[cols[0]], w[cols[1]], w[cols[2]]],
+        )
+    }
+
+    /// Whether two homogeneous control vectors are linearly dependent (every
+    /// `2x2` minor vanishes, exactly).
+    fn homogeneous_dependent(a: &[f64; 4], b: &[f64; 4]) -> bool {
+        for i in 0..4 {
+            for j in (i + 1)..4 {
+                let minor = Expansion::from_product(a[i], b[j])
+                    .merge(&Expansion::from_product(a[j], b[i]).negate());
+                if !minor.is_zero() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Whether `w` lies in the span of the independent rows `u`, `v` (every
+    /// `3x3` minor of the `3x4` row matrix vanishes, exactly).
+    fn in_span3(u: &[f64; 4], v: &[f64; 4], w: &[f64; 4]) -> bool {
+        for drop in 0..4 {
+            if !det3_drop(u, v, w, drop).is_zero() {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// The exact `R^4` cross product of three homogeneous rows: the vector
+    /// orthogonal to all three, with `n3 = -c` for the plane `nu . X = c`.
+    fn cross4(u: &[f64; 4], v: &[f64; 4], w: &[f64; 4]) -> [Expansion; 4] {
+        [
+            det3_drop(u, v, w, 0),
+            det3_drop(u, v, w, 1).negate(),
+            det3_drop(u, v, w, 2),
+            det3_drop(u, v, w, 3).negate(),
+        ]
+    }
+
+    /// The oriented surface normal direction `X_u x X_v` at a non-degenerate
+    /// sample, made consistent with the coefficient plane normal `nu`.
+    fn oriented_normal(patch: &Patch, nu: [f64; 3]) -> Option<[f64; 3]> {
+        for (u, v) in [
+            (0.5, 0.5),
+            (0.25, 0.25),
+            (0.75, 0.75),
+            (0.25, 0.75),
+            (0.75, 0.25),
+        ] {
+            let n = patch_normal_point(patch, u, v);
+            let len = super::v3_norm(n);
+            if len > 0.0 && len.is_finite() {
+                let unit = [n[0] / len, n[1] / len, n[2] / len];
+                if super::v3_dot(unit, nu) >= 0.0 {
+                    return Some(unit);
+                }
+                return Some([-unit[0], -unit[1], -unit[2]]);
+            }
+        }
+        None
+    }
+
+    /// The exact coefficient-plane detector (Thm 8.1). Returns the certified
+    /// planar hyperplane and oriented normal, or `None` when no plane fits
+    /// (the patch falls through to the generic path) or the control net is
+    /// degenerate (rank `< 3`, no genuine 2-D surface).
+    fn detect_planar_patch(patch: &Patch) -> Option<PlanarPatch> {
+        let count = patch.rows.checked_mul(patch.cols)?;
+        if count < 3 || patch.data.len() < count || patch.weights.len() < count {
+            return None;
+        }
+        let homogeneous = |i: usize| -> [f64; 4] {
+            let a = patch.data[i];
+            let w = patch.weights[i];
+            [a[0], a[1], a[2], w]
+        };
+        let first = homogeneous(0);
+        let mut second = None;
+        for i in 1..count {
+            if !homogeneous_dependent(&first, &homogeneous(i)) {
+                second = Some(i);
+                break;
+            }
+        }
+        let second = second?;
+        let second_vec = homogeneous(second);
+        let mut third = None;
+        for i in 0..count {
+            if i != second && !in_span3(&first, &second_vec, &homogeneous(i)) {
+                third = Some(i);
+                break;
+            }
+        }
+        let third = third?;
+        let third_vec = homogeneous(third);
+        let n = cross4(&first, &second_vec, &third_vec);
+        for i in 0..count {
+            let p = homogeneous(i);
+            let mut acc = Expansion::zero();
+            for (k, &coord) in p.iter().enumerate() {
+                acc = acc.merge(&n[k].mul_expansion(&expansion_point(coord)));
+            }
+            if !acc.is_zero() {
+                return None;
+            }
+        }
+        let nu = [n[0].clone(), n[1].clone(), n[2].clone()];
+        let c = n[3].negate();
+        let nu_f64 = [
+            expansion_mid(&nu[0]),
+            expansion_mid(&nu[1]),
+            expansion_mid(&nu[2]),
+        ];
+        let c_f64 = expansion_mid(&c);
+        if !nu_f64.iter().all(|x| x.is_finite()) || !c_f64.is_finite() {
+            return None;
+        }
+        if !(super::v3_norm(nu_f64) > 0.0) {
+            return None;
+        }
+        let normal = oriented_normal(patch, nu_f64)?;
+        Some(PlanarPatch {
+            nu,
+            c,
+            nu_f64,
+            c_f64,
+            normal,
+        })
+    }
+
+    /// The boundary control curve `(P_i, w_i)` of one side, in increasing
+    /// parameter order.
+    fn side_curve(patch: &Patch, side: PatchSide) -> (Vec<[f64; 3]>, Vec<f64>) {
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let mut points = Vec::new();
+        let mut weights = Vec::new();
+        match side {
+            PatchSide::VMin => {
+                for i in 0..rows {
+                    points.push(patch.data[i * cols]);
+                    weights.push(patch.weights[i * cols]);
+                }
+            }
+            PatchSide::UMax => {
+                for j in 0..cols {
+                    let index = (rows - 1) * cols + j;
+                    points.push(patch.data[index]);
+                    weights.push(patch.weights[index]);
+                }
+            }
+            PatchSide::VMax => {
+                for i in 0..rows {
+                    let index = i * cols + (cols - 1);
+                    points.push(patch.data[index]);
+                    weights.push(patch.weights[index]);
+                }
+            }
+            PatchSide::UMin => {
+                for j in 0..cols {
+                    points.push(patch.data[j]);
+                    weights.push(patch.weights[j]);
+                }
+            }
+        }
+        (points, weights)
+    }
+
+    /// The four oriented boundary sides with their traversal sign for the
+    /// counter-clockwise unit-square loop.
+    fn boundary_sides() -> [(PatchSide, f64); 4] {
+        [
+            (PatchSide::VMin, 1.0),
+            (PatchSide::UMax, 1.0),
+            (PatchSide::VMax, -1.0),
+            (PatchSide::UMin, -1.0),
+        ]
+    }
+
+    /// The scalar Bernstein coefficients of `nu . (P x P')` for one boundary
+    /// curve `P` (a polynomial of degree `d`, derivative degree `d - 1`).
+    fn cross_boundary_numerator(nu: [f64; 3], points: &[[f64; 3]]) -> Option<Vec<f64>> {
+        let d = points.len().checked_sub(1)?;
+        if d == 0 {
+            return Some(vec![0.0]);
+        }
+        let deriv: Vec<[f64; 3]> = (0..d)
+            .map(|i| {
+                let a = points[i];
+                let b = points[i + 1];
+                let s = d as f64;
+                [s * (b[0] - a[0]), s * (b[1] - a[1]), s * (b[2] - a[2])]
+            })
+            .collect();
+        let mut out = vec![0.0f64; 2 * d];
+        for (axis, (j, l)) in [(1usize, 2usize), (2, 0), (0, 1)].into_iter().enumerate() {
+            let pj: Vec<f64> = points.iter().map(|p| p[j]).collect();
+            let pl: Vec<f64> = points.iter().map(|p| p[l]).collect();
+            let dj: Vec<f64> = deriv.iter().map(|p| p[j]).collect();
+            let dl: Vec<f64> = deriv.iter().map(|p| p[l]).collect();
+            let positive = bernstein_scalar_product(&pj, &dl);
+            let negative = bernstein_scalar_product(&pl, &dj);
+            let coef = nu[axis];
+            for k in 0..out.len() {
+                let value = positive.get(k).copied().unwrap_or(0.0)
+                    - negative.get(k).copied().unwrap_or(0.0);
+                out[k] += coef * value;
+            }
+        }
+        Some(out)
+    }
+
+    /// The exact polynomial boundary flux of one unit-weight side
+    /// (`int_0^1 nu . (X x X_t) dt`), through the exact Bernstein integral.
+    fn polynomial_side_integral(nu: [f64; 3], points: &[[f64; 3]]) -> f64 {
+        let Some(numerator) = cross_boundary_numerator(nu, points) else {
+            return 0.0;
+        };
+        numerator.iter().sum::<f64>() / (numerator.len() as f64)
+    }
+
+    /// The exact monomial coefficients of a Bernstein polynomial (the `t^j`
+    /// expansion of `sum c_i C(n,i) t^i (1-t)^(n-i)`).
+    fn bern_to_mono(coeffs: &[f64]) -> Vec<f64> {
+        let n = coeffs.len() - 1;
+        let mut out = vec![0.0f64; n + 1];
+        for (i, ci) in coeffs.iter().enumerate() {
+            let base = ci * binomial(n, i);
+            for l in 0..=(n - i) {
+                let j = i + l;
+                let term = if l % 2 == 0 {
+                    base * binomial(n - i, l)
+                } else {
+                    -base * binomial(n - i, l)
+                };
+                out[j] += term;
+            }
+        }
+        out
+    }
+
+    /// The monomial convolution `a * b`.
+    fn mono_mul(a: &[f64], b: &[f64]) -> Vec<f64> {
+        let mut out = vec![0.0f64; a.len() + b.len() - 1];
+        for (i, ai) in a.iter().enumerate() {
+            for (j, bj) in b.iter().enumerate() {
+                out[i + j] += ai * bj;
+            }
+        }
+        out
+    }
+
+    /// The Bernstein coefficients of a monomial polynomial, by the exact
+    /// identity `t^j = sum_i C(i,j)/C(degree,j) B_i(t)`.
+    fn mono_to_bern(mono: &[f64], degree: usize) -> Vec<f64> {
+        let mut out = vec![0.0f64; degree + 1];
+        for (i, slot) in out.iter_mut().enumerate() {
+            let mut value = 0.0f64;
+            for (j, &a) in mono.iter().enumerate() {
+                if j > i || a == 0.0 {
+                    continue;
+                }
+                let ratio = binomial(i, j) / binomial(degree, j);
+                value += a * ratio;
+            }
+            *slot = value;
+        }
+        out
+    }
+
+    /// The certified `int_0^1 N(t) W(t)^{-k} dt` for a strictly-positive
+    /// univariate Bernstein weight `W` and a polynomial numerator `N`, through
+    /// the same geometric-series polynomialization as
+    /// [`reciprocal_power_integral`] (Theorem 5.2). Returns `(value, error)`.
+    fn reciprocal_weighted_integral(
+        numerator: &[f64],
+        weight: &[f64],
+        k: usize,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        if numerator.is_empty() || weight.len() < 2 || k == 0 {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        if numerator
+            .iter()
+            .chain(weight.iter())
+            .any(|c| !c.is_finite())
+        {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        let mut w_lo = f64::INFINITY;
+        let mut w_hi = f64::NEG_INFINITY;
+        for &c in weight {
+            w_lo = w_lo.min(c);
+            w_hi = w_hi.max(c);
+        }
+        if w_lo <= 0.0 {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        if w_hi == w_lo {
+            // A constant weight side is polynomial: `int N / w^k` is exact.
+            let sum: f64 = numerator.iter().sum::<f64>() / (numerator.len() as f64);
+            return Ok((sum / w_lo.powi(k as i32), 0.0));
+        }
+        let center = 0.5 * (w_lo + w_hi);
+        let delta = (w_hi - w_lo) / (w_hi + w_lo);
+        if !(delta < 1.0) || !delta.is_finite() {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let e: Vec<f64> = weight.iter().map(|v| (v - center) / center).collect();
+        let c_inv_k = 1.0 / center.powi(k as i32);
+        let one_minus = 1.0 - delta;
+        if one_minus <= 0.0 {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let max_numerator = numerator.iter().fold(0.0f64, |a, &v| a.max(v.abs()));
+        if max_numerator == 0.0 {
+            return Ok((0.0, 0.0));
+        }
+        let exact_sum = one_minus.powf(-(k as f64));
+        let target = 1.0e-12 * max_numerator;
+        let e_mono = bern_to_mono(&e);
+        let weight_degree = weight.len() - 1;
+        let mut order = 0usize;
+        let mut value;
+        let mut bound;
+        loop {
+            let degree = order * weight_degree;
+            let mut acc = vec![0.0f64; 1];
+            let mut power = vec![1.0f64];
+            for j in 0..=order {
+                let binom = binomial(j + k - 1, k - 1);
+                let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+                let scale = sign * binom;
+                let len = acc.len().max(power.len());
+                acc.resize(len, 0.0);
+                for (i, &v) in power.iter().enumerate() {
+                    acc[i] += scale * v;
+                }
+                if j < order {
+                    power = mono_mul(&power, &e_mono);
+                }
+            }
+            let q: Vec<f64> = mono_to_bern(&acc, degree)
+                .iter()
+                .map(|v| v * c_inv_k)
+                .collect();
+            let product = bernstein_scalar_product(numerator, &q);
+            value = product.iter().sum::<f64>() / (product.len() as f64);
+            let mut series = 0.0f64;
+            for j in 0..=order {
+                series += binomial(j + k - 1, k - 1) * delta.powi(j as i32);
+            }
+            let tail = c_inv_k * (exact_sum - series);
+            let max_q = q.iter().fold(0.0f64, |a, &v| a.max(v.abs()));
+            let guard = 64.0 * max_q * f64::EPSILON * ((q.len()) as f64);
+            bound = (tail + guard) * max_numerator;
+            if !bound.is_finite() || bound <= target || order >= 64 {
+                break;
+            }
+            order += 1;
+        }
+        if !value.is_finite() || !bound.is_finite() {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        Ok((value, bound))
+    }
+
+    /// The certified boundary flux of one rational side
+    /// (`int_0^1 nu . (X x X_t) dt` with `X = P / W`), through the 1D `k = 2`
+    /// reciprocal-power certificate `X x X_t = (P x P') / W^2`.
+    fn rational_side_integral(
+        nu: [f64; 3],
+        points: &[[f64; 3]],
+        weights: &[f64],
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let Some(numerator) = cross_boundary_numerator(nu, points) else {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        };
+        reciprocal_weighted_integral(&numerator, weights, 2)
+    }
+
+    /// The exact flux of a planar polynomial patch through the boundary form
+    /// `(1/3) c (nu . A_vec) / (nu . nu)`, `A_vec = (1/2) oint X x dX`.
+    fn planar_polynomial_flux(patch: &Patch, plane: &PlanarPatch) -> (f64, f64) {
+        let nu = plane.nu_f64;
+        let mut nu_dot_area = 0.0f64;
+        for (side, sign) in boundary_sides() {
+            let (points, _) = side_curve(patch, side);
+            nu_dot_area += sign * polynomial_side_integral(nu, &points);
+        }
+        let nu_dot_area = 0.5 * nu_dot_area;
+        let nu_nu = super::v3_dot(nu, nu);
+        let value = plane.c_f64 * nu_dot_area / (3.0 * nu_nu);
+        (value, value)
+    }
+
+    /// The certified flux of a planar rational patch through the boundary form
+    /// and the 1D `k = 2` reciprocal-power certificate.
+    fn planar_rational_flux(
+        patch: &Patch,
+        plane: &PlanarPatch,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        let nu = plane.nu_f64;
+        let mut nu_dot_area = 0.0f64;
+        let mut error = 0.0f64;
+        for (side, sign) in boundary_sides() {
+            let (points, weights) = side_curve(patch, side);
+            let (value, bound) = rational_side_integral(nu, &points, &weights)?;
+            nu_dot_area += sign * value;
+            error += bound;
+        }
+        let nu_dot_area = 0.5 * nu_dot_area;
+        let error = 0.5 * error;
+        let nu_nu = super::v3_dot(nu, nu);
+        let scale = plane.c_f64 / (3.0 * nu_nu);
+        let center = scale * nu_dot_area;
+        let radius = scale.abs() * error;
+        let lo = down(center - radius);
+        let hi = up(center + radius);
+        if !lo.is_finite() || !hi.is_finite() || lo > hi {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        Ok((lo, hi))
+    }
+
+    /// The router entry: `Some(bracket)` when the patch is planar and the
+    /// boundary form certifies it, `None` to fall through to the generic path.
+    /// The parameter `cell` is the sub-square being certified: a planar parent
+    /// has planar children, so the router runs on the exact child net.
+    fn planar_patch_flux(
+        patch: &Patch,
+        cell: &ParamCell,
+    ) -> Option<Result<(f64, f64), BooleanVolumeRefusal>> {
+        let child = child_patch(patch, cell);
+        let plane = detect_planar_patch(&child)?;
+        if child.unit_weight() {
+            Some(Ok(planar_polynomial_flux(&child, &plane)))
+        } else {
+            Some(planar_rational_flux(&child, &plane))
+        }
+    }
+
+    /// The exact child patch over `cell` (the parent itself for the unit
+    /// square), preserving the homogeneous planarity of the parent.
+    fn child_patch(patch: &Patch, cell: &ParamCell) -> Patch {
+        if cell.u_lo == 0.0 && cell.u_hi == 1.0 && cell.v_lo == 0.0 && cell.v_hi == 1.0 {
+            return patch.clone();
+        }
+        let data = sub_net(patch, cell);
+        let weights = if patch.unit_weight() {
+            vec![1.0f64; patch.rows * patch.cols]
+        } else {
+            sub_weight_net(patch, cell)
+        };
+        Patch {
+            rows: patch.rows,
+            cols: patch.cols,
+            data,
+            weights,
+            orientation: patch.orientation,
+        }
     }
 
     /// The certified reciprocal-power integral of `W^{-k}` over `[0, 1]`
@@ -11253,6 +11818,17 @@ pub mod membership {
     /// the whole box.
     fn patch_cone(row: &VolumeRow) -> Result<NormalCone, RegimeRefusal> {
         let raw = parse_raw(row).map_err(|_| RegimeRefusal::SingularParametrization)?;
+        // FHC-G8: a planar patch's normal cone is the single plane normal, so
+        // its certified half-angle is exactly zero and the degenerate fan
+        // centroid cannot drive `s_up` to the refusal threshold.
+        if let Ok(patch) = parse_rational_patch(row) {
+            if let Some(plane) = detect_planar_patch(&patch) {
+                return Ok(NormalCone {
+                    anchor: plane.normal,
+                    s_up: 0.0,
+                });
+            }
+        }
         let patch = TensorBernsteinPatch::try_new(
             row.numerator.clone(),
             row.weights.clone(),
@@ -11356,6 +11932,21 @@ pub mod membership {
         let mut lo = 0.0f64;
         let mut hi = 0.0f64;
         for row in rows {
+            // FHC-G8: a planar face certifies through the exact boundary form,
+            // so a fan cap whose weight net does not factor no longer refuses
+            // the face-form certificate.
+            if let Ok(patch) = parse_rational_patch(row) {
+                if let Some(Ok((flo, fhi))) = planar_patch_flux(&patch, &ParamCell::unit()) {
+                    if row.orientation < 0.0 {
+                        lo += -fhi;
+                        hi += -flo;
+                    } else {
+                        lo += flo;
+                        hi += fhi;
+                    }
+                    continue;
+                }
+            }
             let patch = TensorBernsteinPatch::try_new(
                 row.numerator.clone(),
                 row.weights.clone(),
