@@ -145,3 +145,15 @@ any file outside `write_allow`; `#[ignore]`, deleted or weakened tests, bare
 ```
 
 Commit subject: `truck123d: rational-weight patch flux through the certified funnel (FHC-G1)`.
+
+## ADJUDICATION NOTE (2026-09-14, orchestrator — the 2026-09-13 attempt's SPEC_GAP is REJECTED as premature)
+
+The first attempt returned SPEC_GAP with zero source changes, citing stop-condition 2 ("an admission
+widening exposes a pair the contact-cover hypotheses do not cover"). Stop-condition 2 fires when an
+IMPLEMENTED widening exposes an uncovered pair mid-suite; it cannot fire a priori. Fresh evidence
+against the claim: `f1/nose` (canonical CYLINDER+CYLINDER) refuses today with
+`E_UNSUPPORTED_ENVELOPE / carrier: cylinder*cylinder / phase: admission` — the pair dies AT
+ADMISSION, before the contact-cover layer ever sees it. The widening IS the fix; Theorem 5.2 + T6
+(normative) govern what happens after. Implementation order is mandatory for the next attempt:
+(1) reciprocal kernel + tests 1-8 on synthetic patches; (2) admission widening;
+(3) MONO-9 interval fold; (4) end-to-end test 9 LAST. Do not reason about test 9 before (1) exists.
