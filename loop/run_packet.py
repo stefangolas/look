@@ -205,6 +205,82 @@ def first_session_id(events_log):
     return None
 
 
+def next_attempt_no(packet_id):
+    """The next free attempt number, from the filed evidence directory."""
+    d = REPO_ROOT / 'loop' / 'results' / packet_id
+    n = 0
+    if d.is_dir():
+        for p in d.glob('*.json'):
+            if p.stem.isdigit():
+                n = max(n, int(p.stem))
+    return n + 1
+
+
+def mint_attempt(packet_path, wt, slot, slot_root):
+    """Freeze an immutable attempt identity for this dispatch.
+
+    `attempt_id = <packet_id>/<NNNN>` with `base_sha` captured at fork, before
+    the worker has touched anything. Old attempts' evidence lives at
+    `loop/results/<packet_id>/<NNNN>.json` and is never overwritten, so a
+    re-booking can always read what the previous attempt did and why it was
+    rejected. The identity is written into the slot as `attempt.json`, and
+    the SQLite claim is taken when the live state DB is enabled.
+    """
+    import dispatch_ready
+
+    packet_id = Path(packet_path).stem
+    base_sha = (git_lines(wt, 'rev-parse', 'HEAD') or [''])[0]
+    attempt_id = None
+    if dispatch_ready.state_enabled():
+        conn = dispatch_ready.init_state(
+            dispatch_ready.connect_state(dispatch_ready.state_db_path()))
+        try:
+            attempt_id = dispatch_ready.claim_for_dispatch(
+                conn, packet_id, base_sha, slot, f'slot{slot}')
+        finally:
+            conn.close()
+        if attempt_id is None:
+            sys.exit(f"state.sqlite refuses to dispatch {packet_id}: an "
+                     "attempt is already live (CLAIMED/RUNNING/FINISHED/"
+                     "ADJUDICATING/LANDED). Resolve or reap it first.")
+    no = (dispatch_ready.attempt_no(attempt_id) if attempt_id
+          else next_attempt_no(packet_id))
+    attempt_id = attempt_id or f'{packet_id}/{no:04d}'
+    record = {
+        'attempt_id': attempt_id,
+        'packet_id': packet_id,
+        'attempt_no': no,
+        'base_sha': base_sha,
+        'slot': slot,
+        'branch': (git_lines(wt, 'rev-parse', '--abbrev-ref', 'HEAD')
+                   or ['?'])[0],
+    }
+    (slot_root / 'attempt.json').write_text(
+        json.dumps(record, indent=2) + '\n', encoding='utf-8')
+    (slot_root / 'attempt_id').write_text(attempt_id, encoding='ascii')
+    (slot_root / 'base_sha').write_text(base_sha, encoding='ascii')
+    (slot_root / 'outbox').mkdir(exist_ok=True)
+    print(f"attempt {attempt_id} (base {base_sha[:7]})")
+    return record
+
+
+def publish_outbox(slot_root):
+    """Normalize the worker's result into slots/<N>/outbox/RESULT.json.
+
+    A worker may write the result at its worktree root (the packet template's
+    instruction) or directly into the outbox; the supervisor accepts both and
+    leaves the canonical copy in the outbox so the landing side has one place
+    to read.
+    """
+    src = slot_root / 'wt' / 'RESULT.json'
+    outbox = slot_root / 'outbox'
+    outbox.mkdir(exist_ok=True)
+    if src.is_file():
+        shutil.copyfile(src, outbox / 'RESULT.json')
+        return outbox / 'RESULT.json'
+    return None
+
+
 def archive_and_reset(slot_root, wt, dirty):
     """Archive a dead run's edits to a patch beside the slot, then hard-reset
     the worktree. Shared by the --reset dispatch path and --reset-only; the
@@ -335,6 +411,11 @@ def main():
         print(f"context bundle: {ctx.name} written ({len(ctx.read_text(encoding='utf-8').splitlines())} lines)")
     except Exception as exc:  # noqa: BLE001 - deliberately best-effort
         print(f"context bundle skipped: {exc}")
+
+    # Immutable attempt identity (LOOP-MACH-1 item 2): minted here, base_sha
+    # frozen at fork, and written beside the slot. The supervisor commits the
+    # declared paths as-delivered and files the result under this identity.
+    mint_attempt(packet_path, wt, args.slot, slot_root)
 
     resume_session = None
     if args.session_id:
