@@ -10836,3 +10836,49 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator opencode 37844.
 - Leaving: HEAD `89ffb75` + this cycle's STATE/log commit; slot-1 worker running; registry untouched
   pending orchestrator quiescence.
+
+## 2026-09-14T05:08Z - operator cycle: FHC-G1-RATIONAL-FLUX re-dispatched on slot 0 (RUNNING, progressing); HEAD advanced again by the active orchestrator; nothing landable/unblockable/flippable
+
+- Health (step 1): `slot_status` = 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 = cmd.exe alive
+  since 00:56:33 local -> opencode 28304; events mtime 01:08:00 local, <1 min old; `cargo qcheck -p
+  truck123d` iterating via cargoq in 1-4 s incremental steps - progressing, do NOT disturb) + slot 1 IDLE
+  dead residue (same packet; worker.pid 12764 now DEAD, events 30.5 min old, changed=0, RESULT absent) +
+  slot 2 IDLE residue (TTC-RECENSUS-F1-R3 row DONE) + slots 3-7 FINISHED landed residue. Heartbeat
+  exactly 1 (27872, alive since 09-09; the second `-match` hit is this operator's own query shell).
+  watchdog/supervisor/overnight 0 (carried dead; did NOT restart). cargoq UP (ping ok, queued 0,
+  running=true = slot-0 qcheck; `clippy --workspace --lib` DONE exit 0 at 01:02:07 local). **Disk 9.74 GB
+  free (BELOW the 15 GB goal, above the 8 GB floor); RAM 2.08 GB free (BELOW the 3 GB floor).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- **NEW: the FHC-G1 frontier moved to slot 0.** The live FHC-G1-RATIONAL-FLUX worker that was slot 1 at
+  04:47Z is gone (pid 12764 dead); a fresh dispatch now RUNS on slot 0 (created 00:56:33 local, attempt
+  `FHC-G1-RATIONAL-FLUX/0001`, base `1ddd138`). Slot 1 is its dead residue. Did NOT reset/redispatch slot
+  1 - same packet as the live slot-0 run, would duplicate.
+- **NEW: HEAD advanced** `1ddd138` -> `07de6d4` via two more vendor hygiene commits (`b2e75ae` clippy-1.97
+  cross-platform blocks, `07de6d4` rustfmt) by the ACTIVE orchestrator (opencode 37844). Operator commit
+  `1ddd138` is an ancestor.
+- Landable (step 2): NONE. Slot 0 RUNNING (no RESULT.json); slot 1 no RESULT.json (dead residue); slots
+  3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
+  `07de6d4` (`git merge-base --is-ancestor` TRUE); `b86dd69` (preserved hung-attempt WIP) NOT an ancestor.
+  Nothing landed.
+- Unblock (step 3): NONE. Slot 0 alive/progressing; slot 1 dead residue of the same packet as the live
+  slot-0 run -> did NOT reset/redispatch; slot 2 landed residue. Only QUESTION.md on disk is slot 5
+  (2026-09-05, landed residue). No action.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked; none mechanically flippable (the
+  all-needs-DONE rows - BG-CK-SPLINE-CENSUS owner-cancelled, BG-AUD-FIX-004 OWNER_BLOCKED, RDEF-M4/M5,
+  MONO-10, SEM-PCURVE-MASTER, DEF-SPINEFRAME-GRAZE - are all semantic/owner gated). Did NOT edit (active
+  orchestrator owns PACKETS.jsonl; lost-update risk).
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 6 free);
+  slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-D/FHC-G8/FHC-G9
+  blocked on FHC-G1; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T05:08Z] block and
+  prepended the labeled [operator 2026-09-14T05:08Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): no NEW escalation. Carried unchanged: the 04:47Z 0xC0000409 cargo-test /
+  RAM-zone line (disk has recovered to 9.74 GB, above the 8 GB floor; RAM still 2.08 GB, below the 3 GB
+  floor); FHC-G1 prior SPEC_GAP adjudication (now retrying on slot 0); RG-23/RG-9 packet files absent +
+  write-set clash; FHC-D/G8/G9 blocked on FHC-G1; dead substrate stack
+  (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator opencode 37844.
+- Leaving: HEAD `07de6d4` + this cycle's STATE/log commit; slot-0 worker running; registry untouched
+  pending orchestrator quiescence.

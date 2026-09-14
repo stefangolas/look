@@ -75,40 +75,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T04:47Z]: 1 RUNNING + 1 IDLE dead attempt + 1 IDLE residue
-> + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
-> dispatched-live. HEAD `89ffb75` (advanced from `146620a` by the ACTIVE orchestrator: vendor clippy
-> allow-list commits `74c23f5` + `89ffb75`). Board re-derived by command.
-> **FHC-G1-RATIONAL-FLUX retry is RUNNING** - slot 1, pid 12764 (alive; opencode 2132), blocked in a
-> long direct `cargo test -p truck123d --tests --locked --no-fail-fast` (powershell 31896 -> cargo 37812,
-> created 00:36:53 local; the documented DLL workaround - run scoped tests with the interpreter dir on
-> PATH). events stale ~11 min ONLY because of that blocking tool call; NOT stalled - do NOT disturb.
-> changed 3 (`truck123d/src/bd_bridge.rs`, `truck123d/src/facade.rs`, new `truck123d/tests/rational_flux.rs`).
-> **Slot 0 IDLE = FHC-G1 attempt-1 residue** (attempt_id `FHC-G1-RATIONAL-FLUX/0001`, base `b86dd69`,
-> no RESULT/QUESTION); WIP checkpoint commit `b86dd69` "orchestrator recovery - attempt hung on API;
-> work preserved" is NOT an ancestor of HEAD. Did NOT reset/redispatch - would duplicate the live
-> slot-1 retry.
-> **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable (no DONE RESULT),
-> slot-1 worker progressing, slot-0 residue is an intentionally preserved hung attempt, dispatch is REAL
-> idle. STATE + log committed.
-> **Frontier**: FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1 (running); RG-23/RG-9 write-set clash with the
-> RUNNING G1 on `truck123d/src/bd_bridge.rs` AND their packet files are still absent -> carried.
+> LATEST GROUND TRUTH [operator 2026-09-14T05:08Z]: 1 RUNNING + 2 IDLE residue (slots 1-2) + 5 FINISHED
+> landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live. HEAD
+> `07de6d4` (advanced from `1ddd138` by the ACTIVE orchestrator: vendor rustfmt/clippy hygiene
+> `b2e75ae` + `07de6d4`). Board re-derived by command.
+> **FHC-G1-RATIONAL-FLUX is RUNNING on slot 0** - pid 39724 (cmd.exe, created 00:56:33 local) -> opencode
+> 28304; events fresh (last step_start 01:08:13 local, <1 min old); attempt `FHC-G1-RATIONAL-FLUX/0001`;
+> branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138` (=base, no work yet). Actively running `cargo qcheck -p
+> truck123d` (cargoq, 1-4 s incremental) - progressing, do NOT disturb.
+> **Slot 1 IDLE = FHC-G1 residue** (worker.pid 12764 now DEAD; events 30.5 min old; changed=0; RESULT
+> absent). Same packet as the RUNNING slot-0 run -> did NOT reset/redispatch (would duplicate). **Slot 2
+> IDLE residue** TTC-RECENSUS-F1-R3 row DONE (landed).
+> **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable (no DONE RESULT
+> unlanded), slot-0 worker progressing, slots 1-2 intentional residue, dispatch REAL idle. STATE + log
+> committed.
+> **Frontier**: FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1 (running); RG-23/RG-9 packet files still absent
+> (anchor check fails) AND write-set clash with the RUNNING G1 on `truck123d/src/bd_bridge.rs` -> carried.
 > **Registry**: re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10 BLOCKED / 2
-> SUPERSEDED. UNCHANGED since 04:20Z (PACKETS.jsonl mtime 04:08:38Z). All 10 BLOCKED owner/semantic
-> parked; none mechanically flippable. NOT edited this cycle (active orchestrator owns the registry).
-> **SUBSTRATE**: heartbeat exactly 1 (27872). watchdog/supervisor/overnight 0 (carried dead, not
-> restarted). cargoq UP (ping ok, queued 0, running=true = the active orchestrator's `cargo clippy
-> --workspace --lib --locked`, START 00:41:48 local). **Disk 6.2-6.8 GB free (BELOW the 8 GB floor);
-> RAM 1.14 GB free (BELOW the 3 GB floor).** `loop/cargoq/server.log` shows `cargo test -p truck123d`
-> (and `--lib`) exiting 3221225781 (0xC0000409) three times at 00:29:52-00:30:02 local - the RAM-zone
-> signature; ESCALATED this cycle. No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
-> 2026-09-11.
-> **Observation**: active orchestrator opencode 37844 (since 09-12) + 9416 (this operator session)
-> present (do not disturb); main worktree dirty set EXPANDED - 12 `vendor/truck/*/src/lib.rs`
-> (orchestrator clippy WIP) + `truck123d/tests/rdef_m2_sandwich.rs` + `loop/cargoq/server.log` (outside
-> operator scope; not touched).
-> Leaving: HEAD `89ffb75` + this cycle's STATE/log commit; slot-1 worker running; registry untouched
-> pending orchestrator quiescence.
+> SUPERSEDED. All 10 BLOCKED owner/semantic parked; none mechanically flippable. NOT edited (active
+> orchestrator owns PACKETS.jsonl).
+> **SUBSTRATE**: heartbeat exactly 1 (27872, alive since 09-09). watchdog/supervisor/overnight 0 (carried
+> dead, not restarted). cargoq UP (ping ok, queued 0, running=true = slot-0 `qcheck -p truck123d`).
+> **Disk 9.74 GB free (BELOW the 15 GB goal, above the 8 GB floor); RAM 2.08 GB free (BELOW the 3 GB
+> floor).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11. The 04:47Z
+> 0xC0000409/disk escalation is carried (disk recovered above the 8 GB floor; RAM still low).
+> **Observation**: active orchestrator opencode 37844 (since 09-12) present (do not disturb); this
+> operator session is opencode 22404. Main worktree dirty set outside operator scope; not touched.
+> Leaving: HEAD `07de6d4` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
 
 
 ## Pick up here
@@ -153,6 +146,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T05:08Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, events
+  fresh <1 min, `cargo qcheck -p truck123d` iterating) + 2 IDLE residue (slot 1 FHC-G1 dead residue,
+  pid 12764 DEAD; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
+  landed / 0 unblocked / 0 flipped / 0 dispatched-live; HEAD `07de6d4` (orchestrator vendor hygiene
+  `b2e75ae` + `07de6d4`). Board re-derived by command.
+- [operator 2026-09-14T05:08Z] landable: NONE. Slot 0 RUNNING (no RESULT.json); slot 1 no RESULT.json
+  (dead residue); slots 3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2
+  fd40760/f0ae3ab all ancestors of HEAD `07de6d4` (`git merge-base --is-ancestor` TRUE); `b86dd69` NOT
+  an ancestor (preserved WIP). Nothing landed.
+- [operator 2026-09-14T05:08Z] unblock: NONE. Slot 0 alive/progressing; slot 1 dead residue of the same
+  packet as the RUNNING slot-0 run -> did NOT reset/redispatch; slot 2 landed residue. Only QUESTION.md
+  on disk is slot 5 (2026-09-05, landed residue). No action.
+- [operator 2026-09-14T05:08Z] registry re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked; none mechanically flippable.
+  NOT edited (active orchestrator).
+- [operator 2026-09-14T05:08Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch).
+  `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 6 free); slot-assigned packets: 5";
+  RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1;
+  `dispatched 0` = REAL idle.
+- [operator 2026-09-14T05:08Z] health: heartbeat exactly 1 (27872; second `-match` = operator's own
+  query shell). watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq UP (ping ok, queued
+  0, running=true = slot-0 `qcheck -p truck123d`; `clippy --workspace --lib` DONE exit 0 at 01:02:07).
+  **Disk 9.74 GB free (BELOW 15 goal, above 8 floor); RAM 2.08 GB free (BELOW 3 floor).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T05:08Z] Observation: active orchestrator opencode 37844 (since 09-12) + this
+  operator session opencode 22404 present - do not disturb; main worktree dirty set outside operator
+  scope, not touched.
 - [operator 2026-09-14T04:47Z] board: 1 RUNNING (slot 1 FHC-G1-RATIONAL-FLUX retry, pid 12764 alive;
   opencode 2132 blocked in a long direct `cargo test -p truck123d --tests --locked --no-fail-fast`,
   powershell 31896 -> cargo 37812 created 00:36:53 local; events stale ~11 min due to that blocking tool
