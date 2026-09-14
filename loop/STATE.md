@@ -8253,3 +8253,93 @@ G1 -> D -> E -> census R4 -> gap-register update -> push origin/main.]
    Operator runner and this session are both committing to integration/
    kernel-bg; HEAD moved fd40760 -> 56ca001/5730716 (operator) -> 1ce49bd
    -> a347cce (this session).
+
+[ORCHESTRATOR HANDOFF 2026-09-14 ~05:4xZ - session close. Read this, then
+ORCHESTRATOR.md, then slot_status.py. THE FLUX-CALCULUS WAVE IS AUTHORED AND
+RUNNING; CI IS ONE EXAMPLES-CLIPPY FIX FROM GREEN; G1 IS LIVE ON SLOT 0.]
+
+ACCOMPLISHED THIS SESSION (2026-09-13/14):
+1. G6-CERT-COST-SCALE LANDED (97aaf27, twice-confirmed SPEC_GAP: per-patch
+   interval certification dominates - 99.8% of facts time; no whitelisted
+   fix; span-reuse memo zero hits). Result filed. G10 ran, SPEC_GAP filed
+   honestly (covariance law not exact over landed representation;
+   re-bookable only with exact unplaced-patch recovery).
+2. LOOP-MACH-1 LANDED (c9477f5, 9/9 acceptance green at merged HEAD):
+   atomic claim/lease (SQLite WAL), immutable attempt IDs, supervisor-side
+   write-set enforcement (kills git add -A), transactional landing,
+   two-state outcomes. RESULT was destroyed by a slot-worktree branch
+   switch mid-adjudication - filed as a provenance-noted recovery copy
+   (loop/results/LOOP-MACH-1.json). Shadow-mode flip to the SQLite
+   dispatch path is the FIRST machinery follow-up (equivalence cycle
+   required; today a duplicate G1 dispatch fired DURING the landing - the
+   JSONL path is still racy).
+3. THE FLUX-CALCULUS WAVE AUTHORED (docs/
+   CERTIFIED_FLUX_CALCULUS_INTEGRATION_MAP.md maps the owner's Certified
+   Flux Calculus proposal onto the codebase): G1 amended (new normative
+   theory - Theorem 5.2 reciprocal kernel, exponent-3 identity; L5
+   precondition DROPPED; implementation order MANDATED: kernel + tests
+   1-8 first, admission widening, end-to-end union LAST - attempt-1's
+   SPEC_GAP was REJECTED as premature with evidence: f1/nose refuses
+   E_UNSUPPORTED_ENVELOPE / cylinder*cylinder / phase:admission, i.e.
+   pre-widening the pair never reaches contact-cover) + NEW: G8
+   planarity router (absorbs FHC-E - the coefficient-plane test is
+   parametrization-independent, the fan-cap degeneracy dissolves), G9
+   Green/trim (faces with holes, no interior meshing), G11 adaptive
+   certification controller, G12 floor/diffuser carrier, G13 chamfer,
+   G14 moment queries. FHC-E SUPERSEDED by G8. CRATES_NONEMPTY lint now
+   exempts loop-only harness write sets.
+4. CI ACTIVATED AND MOSTLY FIXED: pushed ~155 commits to origin/main
+   (HEAD 07de6d4); release.yml gained the rolling prerelease channel
+   (push to main -> 6-target matrix -> rolling tag; install.sh still
+   resolves stable only). GATE-4 ceiling 111->114; kernel-gates.sh exec
+   bit restored; STEP dependency stack UN-GATED from cfg(windows) (was
+   the macOS/Linux E0433); clippy 1.97 baseline hygiene across vendor
+   (certified, stepio, + all 11 crate lib.rs) and truck123d ([lints]
+   table) - ~450 manufactured sites resolved, ONE REAL BUG fixed
+   (bd_bridge.rs:3785 dead conditional, byte-identical).
+
+CI STATE (still red, two named causes - the fix-forward list):
+a) cross-platform: clippy in examples/step_face_timing.rs - 4 sites:
+   L164 + L667 type_complexity (factor type aliases), L345 redundant
+   `as usize` cast, L570 redundant closure. Trivial fixes.
+b) release-binaries: geometry_fingerprint fails on non-Windows targets -
+   "bracket/washer triangle count moved". Platform-dependent tessellation
+   (libm sin/cos differ across OS) vs Windows-recorded baselines. Fix =
+   per-target-triple baselines or platform-gated exact-count assertion
+   (determinism law is per-platform; cross-platform exactness was never
+   true). DO NOT widen to a range silently - record per-platform truth.
+c) NOTE: hosted runners auto-bumped to clippy 1.98 mid-session - the
+   toolchain is now PINNED to 1.97.1 in both workflows (146620a). Bump
+   the pin deliberately with an allow-list review, never let it drift.
+
+DOCKET (7 authored packets): G1 RUNNING (slot 0, attempt FHC-G1-
+RATIONAL-FLUX/0001, healthy - 1,700+ lines in bd_bridge/facade at last
+check, events fresh). Then: G8 -> G9 -> G11 -> FHC-D -> G12 -> G13 ->
+G14 (all authored, preflighted, serialized on bd_bridge.rs). Then
+census R4 (40 rows, fresh python per row, generous timeout, quiet
+board) -> gap-register close -> v0.2.0 tag. Conditional: aero/
+powertrain named carriers (R4 decides if TRIM/MONO-8 already closed
+them); G10 re-book (needs exact unplaced-patch recovery).
+
+MACHINE/LOOP NOTES: heartbeat 27872 + operator runner 27876 + cargoq
+ALIVE; supervisor/watchdog/overnight-driver DOWN (carried - landing is
+manual until LOOP-MACH-1's machinery flips live). RAM ~3 GiB free
+(Dropbox+Discord killed, session-scoped). The duplicate-dispatch race
+fired DURING LOOP-MACH-1's landing (G1 on two slots) - resolved by
+keeping the established worker; the machinery prevents it only after
+the shadow-mode flip. Slot-1 worktree was found checked out on the
+WRONG branch (packet/FHC-G1-... with an operator e1bda17 commit) -
+verify slot worktree branch before trusting its tree. vendor/truck
+lib.rs files now all carry the documented clippy hygiene block AFTER
+their own attr regions (placement matters: a later deny group beats an
+earlier allow; and [lints] tables lose to source-level deny groups -
+use lib.rs attributes for vendored crates).
+
+PICK UP HERE: (1) fix the 4 example clippy sites (above) + push;
+(2) implement per-platform geometry_fingerprint baselines; (3) get CI
+green (both workflows); (4) adjudicate G1 (scoped checks at merged
+HEAD: clippy -p truck123d --all-targets, test rational_flux --locked,
+door spot-check) - file attempt evidence under the new convention;
+(5) cascade the wave; (6) census R4; (7) register + v0.2.0 tag +
+announce on issue #3 (the wgpu-256-MiB reporter: fixed on main since
+ae616ba, ships with v0.2.0).
