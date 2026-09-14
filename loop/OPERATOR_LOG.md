@@ -10882,3 +10882,48 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator opencode 37844.
 - Leaving: HEAD `07de6d4` + this cycle's STATE/log commit; slot-0 worker running; registry untouched
   pending orchestrator quiescence.
+
+## 2026-09-14 05:32 UTC (operator cycle)
+
+Board at start: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX) + 2 IDLE residue (slots 1-2) + 5 FINISHED
+landed residue (slots 3-7); HEAD `cba1c30`. Program: the MONO-CLOSURE / solver-coverage wave; FHC-G1
+frontier.
+
+Health sweep:
+- cargoq ping OK (queued 1, running true = `test -p look --test geometry_fingerprint`). History shows
+  the slot-0 worker's `qcheck -p truck123d` and the rational_flux test family iterating (with several
+  clippy/test exit 101s and one historical 0xC0000409 test exit - all pre-existing).
+- Heartbeat exactly ONE (27872, alive since 09-09); operator_runner exactly ONE (27876). A naive
+  `-match` counts a 2nd only from this operator's own query shell.
+- Watchdog/supervisor/overnight: ZERO (carried dead; not restarted).
+- Disk 8.0 GB free (AT the 8 GB floor, below the 15 GB goal); RAM 3.2-3.6 GB free (above the 3 GB
+  floor). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+
+Actions:
+- Landing (step 2): NONE. Slot 0 RUNNING (no RESULT.json); slot 1 no RESULT.json (dead residue); slots
+  3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 f0ae3ab/e1bda17 all ancestors of
+  HEAD `cba1c30` (`git merge-base --is-ancestor` TRUE). Nothing landed.
+- Unblock (step 3): NONE. Slot 0 alive/progressing; slot 1 dead residue of the same packet as the live
+  slot-0 run -> did NOT reset/redispatch (would duplicate); slot 2 landed residue. Only QUESTION.md on
+  disk is slot 5 (2026-09-05, landed residue). No action.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED (PACKETS.jsonl mtime 04:08:38Z, unchanged). All 10 BLOCKED owner/semantic
+  parked; none mechanically flippable. Did NOT edit (active orchestrator owns PACKETS.jsonl;
+  lost-update risk).
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free);
+  slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-D/FHC-G8/FHC-G9
+  blocked on FHC-G1; `dispatched 0` = REAL idle.
+- Janitor: `janitor.py status` = free 8.0 GB disk / 3.2 GB RAM; slot-1 dead wt/target 3.7 GB, slot-0
+  live wt/target 1.0 GB. `janitor.py ensure --need 5` = "8.0 GB free, need 5.0 - OK" (no reclaim run;
+  active orchestrator owns the machine).
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T05:32Z] block and
+  prepended the labeled [operator 2026-09-14T05:32Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): no NEW escalation. Carried unchanged: the 04:47Z 0xC0000409 / RAM-zone line (RAM
+  recovered above the 3 GB floor; disk now AT the 8 GB floor, slot-1 dead target 3.7 GB is the obvious
+  reclaim when the active orchestrator quiesces); FHC-G1 prior SPEC_GAP adjudication (now retrying on
+  slot 0); RG-23/RG-9 packet files absent; FHC-D/G8/G9 blocked on FHC-G1; dead substrate stack
+  (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator (HANDOFF `63c1272` +
+  CI fix-forward `cba1c30`).
+- Leaving: HEAD `cba1c30` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.

@@ -75,33 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T05:08Z]: 1 RUNNING + 2 IDLE residue (slots 1-2) + 5 FINISHED
+> LATEST GROUND TRUTH [operator 2026-09-14T05:32Z]: 1 RUNNING + 2 IDLE residue (slots 1-2) + 5 FINISHED
 > landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live. HEAD
-> `07de6d4` (advanced from `1ddd138` by the ACTIVE orchestrator: vendor rustfmt/clippy hygiene
-> `b2e75ae` + `07de6d4`). Board re-derived by command.
-> **FHC-G1-RATIONAL-FLUX is RUNNING on slot 0** - pid 39724 (cmd.exe, created 00:56:33 local) -> opencode
-> 28304; events fresh (last step_start 01:08:13 local, <1 min old); attempt `FHC-G1-RATIONAL-FLUX/0001`;
-> branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138` (=base, no work yet). Actively running `cargo qcheck -p
-> truck123d` (cargoq, 1-4 s incremental) - progressing, do NOT disturb.
-> **Slot 1 IDLE = FHC-G1 residue** (worker.pid 12764 now DEAD; events 30.5 min old; changed=0; RESULT
-> absent). Same packet as the RUNNING slot-0 run -> did NOT reset/redispatch (would duplicate). **Slot 2
-> IDLE residue** TTC-RECENSUS-F1-R3 row DONE (landed).
+> `cba1c30` (advanced from `07de6d4` by the ACTIVE orchestrator: HANDOFF `63c1272` + CI fix-forward
+> `cba1c30` "fix all 5 clippy sites in step_face_timing"). Board re-derived by command.
+> **FHC-G1-RATIONAL-FLUX is RUNNING on slot 0** - pid 39724 alive; events fresh (~2.6 min old at sweep);
+> attempt `FHC-G1-RATIONAL-FLUX/0001`; branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138` (=base, no work yet).
+> Actively iterating (rational_flux test family in cargoq history) - progressing, do NOT disturb.
+> **Slot 1 IDLE = FHC-G1 residue** (pid=- DEAD; events 54.3 min old; changed=0; RESULT absent). Same packet
+> as the RUNNING slot-0 run -> did NOT reset/redispatch (would duplicate). **Slot 2 IDLE residue**
+> TTC-RECENSUS-F1-R3 row DONE (landed).
 > **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable (no DONE RESULT
-> unlanded), slot-0 worker progressing, slots 1-2 intentional residue, dispatch REAL idle. STATE + log
-> committed.
+> unlanded), slot-0 worker progressing, slots 1-2 intentional residue, dispatch REAL idle. `janitor ensure
+> --need 5` = "8.0 GB free, need 5.0 - OK" (no reclaim run; active orchestrator owns the machine). STATE +
+> log committed.
 > **Frontier**: FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1 (running); RG-23/RG-9 packet files still absent
-> (anchor check fails) AND write-set clash with the RUNNING G1 on `truck123d/src/bd_bridge.rs` -> carried.
+> (anchor check fails) -> carried.
 > **Registry**: re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10 BLOCKED / 2
-> SUPERSEDED. All 10 BLOCKED owner/semantic parked; none mechanically flippable. NOT edited (active
-> orchestrator owns PACKETS.jsonl).
-> **SUBSTRATE**: heartbeat exactly 1 (27872, alive since 09-09). watchdog/supervisor/overnight 0 (carried
-> dead, not restarted). cargoq UP (ping ok, queued 0, running=true = slot-0 `qcheck -p truck123d`).
-> **Disk 9.74 GB free (BELOW the 15 GB goal, above the 8 GB floor); RAM 2.08 GB free (BELOW the 3 GB
-> floor).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11. The 04:47Z
-> 0xC0000409/disk escalation is carried (disk recovered above the 8 GB floor; RAM still low).
-> **Observation**: active orchestrator opencode 37844 (since 09-12) present (do not disturb); this
-> operator session is opencode 22404. Main worktree dirty set outside operator scope; not touched.
-> Leaving: HEAD `07de6d4` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
+> SUPERSEDED (mtime 04:08:38Z, unchanged). All 10 BLOCKED owner/semantic parked; none mechanically
+> flippable. NOT edited (active orchestrator owns PACKETS.jsonl).
+> **SUBSTRATE**: heartbeat exactly 1 (27872, alive since 09-09; the 2nd `-match` is the operator's own
+> query shell). operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not
+> restarted). cargoq UP (ping ok, queued 1, running=true = `test -p look --test geometry_fingerprint`).
+> **Disk 8.0 GB free (AT the 8 GB floor, below the 15 GB goal; slot-1 dead wt/target holds 3.7 GB, slot-0
+> live wt/target 1.0 GB); RAM 3.2-3.6 GB free (ABOVE the 3 GB floor).** No
+> `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11. The 04:47Z 0xC0000409
+> RAM-zone escalation is carried (RAM recovered above the floor; disk now at the floor).
+> **Observation**: active orchestrator commits `63c1272`/`cba1c30` present (do not disturb); this operator
+> session is opencode 22404. Main worktree dirty set outside operator scope; not touched.
+> Leaving: HEAD `cba1c30` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
 
 
 ## Pick up here
@@ -146,6 +148,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T05:32Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, events ~2.6
+  min old, iterating the rational_flux test family) + 2 IDLE residue (slot 1 FHC-G1 dead residue, pid=-;
+  slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed / 0 unblocked /
+  0 flipped / 0 dispatched-live; HEAD `cba1c30` (orchestrator HANDOFF `63c1272` + CI fix-forward
+  `cba1c30`). Board re-derived by command.
+- [operator 2026-09-14T05:32Z] landable: NONE. Slot 0 RUNNING (no RESULT.json); slot 1 no RESULT.json
+  (dead residue); slots 3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2
+  f0ae3ab/e1bda17 all ancestors of HEAD `cba1c30` (`git merge-base --is-ancestor` TRUE). Nothing landed.
+- [operator 2026-09-14T05:32Z] unblock: NONE. Slot 0 alive/progressing; slot 1 dead residue of the same
+  packet as the RUNNING slot-0 run -> did NOT reset/redispatch; slot 2 landed residue. Only QUESTION.md on
+  disk is slot 5 (2026-09-05, landed residue). No action.
+- [operator 2026-09-14T05:32Z] registry re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED (PACKETS.jsonl mtime 04:08:38Z, unchanged). All 10 BLOCKED
+  owner/semantic parked; none mechanically flippable. NOT edited (active orchestrator).
+- [operator 2026-09-14T05:32Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch).
+  `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5";
+  RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1;
+  `dispatched 0` = REAL idle.
+- [operator 2026-09-14T05:32Z] health: heartbeat exactly 1 (27872; second `-match` = operator's own
+  query shell). operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not
+  restarted). cargoq UP (ping ok, queued 1, running=true = `test -p look --test geometry_fingerprint`;
+  history shows the slot-0 `qcheck -p truck123d` iterating). **Disk 8.0 GB free (AT the 8 GB floor, below
+  the 15 GB goal); RAM 3.2-3.6 GB free (ABOVE the 3 GB floor).** `janitor ensure --need 5` = OK (no
+  reclaim). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T05:32Z] Observation: active orchestrator commits `63c1272` (HANDOFF) + `cba1c30`
+  (CI fix-forward) present - do not disturb; this operator session is opencode 22404. Main worktree dirty
+  set outside operator scope, not touched.
 - [operator 2026-09-14T05:08Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, events
   fresh <1 min, `cargo qcheck -p truck123d` iterating) + 2 IDLE residue (slot 1 FHC-G1 dead residue,
   pid 12764 DEAD; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
