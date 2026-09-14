@@ -9512,6 +9512,684 @@ pub mod membership {
         Ok((value, up(tail) + guard))
     }
 
+    // -----------------------------------------------------------------------
+    // FHC-G9-GREEN-TRIM-INTEGRATION -- Green-reduction trim integration.
+    //
+    // The divergence-form face flux `(1/3) ∬_Ω X·(X_u×X_v)` over a trimmed
+    // parameter region Ω is never meshed: Green's theorem reduces it to the
+    // oriented trim boundary. With the exact u-antiderivative `Q = ∫ g du` of
+    // the density `g = (1/3) X·(X_u×X_v)` (Lemma 9.2: a cumulative-sum
+    // coefficient map, degree r → r+1), `∬_Ω g du dv = ∮_{∂Ω} Q dv`. The
+    // boundary pullback is exact for polynomial trim segments and a 1D
+    // reciprocal-power certificate for rational ones (G1's kernel). A rational
+    // surface polynomializes first and Green-reduces the retained terms.
+    // -----------------------------------------------------------------------
+
+    /// A bivariate scalar Bernstein net (rows over `u`, columns over `v`).
+    #[derive(Clone)]
+    struct ScalarNet {
+        rows: usize,
+        cols: usize,
+        c: Vec<f64>,
+    }
+
+    impl ScalarNet {
+        /// The coefficient at Bernstein index `(i, j)`.
+        fn at(&self, i: usize, j: usize) -> f64 {
+            self.c[i * self.cols + j]
+        }
+        /// The largest coefficient magnitude (the Bernstein hull sup norm).
+        fn sup_abs(&self) -> f64 {
+            self.c.iter().fold(0.0f64, |m, v| m.max(v.abs()))
+        }
+    }
+
+    /// The `u`-directional Bernstein derivative of a scalar net.
+    fn scalar_deriv_u(net: &ScalarNet) -> ScalarNet {
+        if net.rows < 2 {
+            return ScalarNet {
+                rows: 1,
+                cols: net.cols,
+                c: vec![0.0; net.cols],
+            };
+        }
+        let degree = (net.rows - 1) as f64;
+        let rows = net.rows - 1;
+        let mut c = vec![0.0f64; rows * net.cols];
+        for i in 0..rows {
+            for j in 0..net.cols {
+                c[i * net.cols + j] = degree * (net.at(i + 1, j) - net.at(i, j));
+            }
+        }
+        ScalarNet {
+            rows,
+            cols: net.cols,
+            c,
+        }
+    }
+
+    /// The `v`-directional Bernstein derivative of a scalar net.
+    fn scalar_deriv_v(net: &ScalarNet) -> ScalarNet {
+        if net.cols < 2 {
+            return ScalarNet {
+                rows: net.rows,
+                cols: 1,
+                c: vec![0.0; net.rows],
+            };
+        }
+        let degree = (net.cols - 1) as f64;
+        let cols = net.cols - 1;
+        let mut c = vec![0.0f64; net.rows * cols];
+        for i in 0..net.rows {
+            for j in 0..cols {
+                c[i * cols + j] = degree * (net.at(i, j + 1) - net.at(i, j));
+            }
+        }
+        ScalarNet {
+            rows: net.rows,
+            cols,
+            c,
+        }
+    }
+
+    /// The exact degree-grown product of two bivariate scalar nets (the L2
+    /// tensor-Bernstein product identity on the coefficient grids).
+    fn scalar_mul(a: &ScalarNet, b: &ScalarNet) -> ScalarNet {
+        let ma = a.rows - 1;
+        let na = a.cols - 1;
+        let mb = b.rows - 1;
+        let nb = b.cols - 1;
+        let rows = ma + mb + 1;
+        let cols = na + nb + 1;
+        let mut out = vec![0.0f64; rows * cols];
+        for i1 in 0..a.rows {
+            for j1 in 0..a.cols {
+                for i2 in 0..b.rows {
+                    for j2 in 0..b.cols {
+                        let scale = binomial(ma, i1)
+                            * binomial(mb, i2)
+                            * binomial(na, j1)
+                            * binomial(nb, j2);
+                        let denom = binomial(ma + mb, i1 + i2) * binomial(na + nb, j1 + j2);
+                        if denom == 0.0 {
+                            continue;
+                        }
+                        out[(i1 + i2) * cols + (j1 + j2)] +=
+                            a.at(i1, j1) * b.at(i2, j2) * scale / denom;
+                    }
+                }
+            }
+        }
+        ScalarNet { rows, cols, c: out }
+    }
+
+    /// The pointwise sum of two identically shaped scalar nets.
+    fn scalar_add(a: &ScalarNet, b: &ScalarNet) -> ScalarNet {
+        ScalarNet {
+            rows: a.rows,
+            cols: a.cols,
+            c: a.c.iter().zip(b.c.iter()).map(|(x, y)| x + y).collect(),
+        }
+    }
+
+    /// The pointwise difference of two identically shaped scalar nets.
+    fn scalar_sub(a: &ScalarNet, b: &ScalarNet) -> ScalarNet {
+        ScalarNet {
+            rows: a.rows,
+            cols: a.cols,
+            c: a.c.iter().zip(b.c.iter()).map(|(x, y)| x - y).collect(),
+        }
+    }
+
+    /// The exact u-antiderivative of a scalar net: the Lemma 9.2 cumulative-sum
+    /// coefficient map, degree `r → r+1`, normalized to vanish at `u = 0`.
+    fn scalar_antideriv_u(net: &ScalarNet) -> ScalarNet {
+        let rows = net.rows + 1;
+        let cols = net.cols;
+        let inv = 1.0 / net.rows as f64;
+        let mut c = vec![0.0f64; rows * cols];
+        for j in 0..cols {
+            let mut acc = 0.0f64;
+            for i in 1..rows {
+                acc += net.at(i - 1, j);
+                c[i * cols + j] = acc * inv;
+            }
+        }
+        ScalarNet { rows, cols, c }
+    }
+
+    /// The exact v-antiderivative of a scalar net, vanishing at `v = 0`.
+    fn scalar_antideriv_v(net: &ScalarNet) -> ScalarNet {
+        let rows = net.rows;
+        let cols = net.cols + 1;
+        let inv = 1.0 / net.cols as f64;
+        let mut c = vec![0.0f64; rows * cols];
+        for i in 0..rows {
+            let mut acc = 0.0f64;
+            for j in 1..cols {
+                acc += net.at(i, j - 1);
+                c[i * cols + j] = acc * inv;
+            }
+        }
+        ScalarNet { rows, cols, c }
+    }
+
+    /// The exact polynomial density numerator net `P = A·(A_u×A_v)` of a patch
+    /// (the L3 verified cancellation numerator over the homogeneous control
+    /// net). The flux density is `(1/3) P` for a polynomial patch and
+    /// `(1/3) P/W³` for a rational one.
+    fn density_net(patch: &Patch) -> Option<ScalarNet> {
+        if patch.rows < 2 || patch.cols < 2 {
+            return None;
+        }
+        let axis = |k: usize| ScalarNet {
+            rows: patch.rows,
+            cols: patch.cols,
+            c: patch.data.iter().map(|p| p[k]).collect(),
+        };
+        let ax = axis(0);
+        let ay = axis(1);
+        let az = axis(2);
+        let aux = scalar_deriv_u(&ax);
+        let auy = scalar_deriv_u(&ay);
+        let auz = scalar_deriv_u(&az);
+        let avx = scalar_deriv_v(&ax);
+        let avy = scalar_deriv_v(&ay);
+        let avz = scalar_deriv_v(&az);
+        let cx = scalar_sub(&scalar_mul(&auy, &avz), &scalar_mul(&auz, &avy));
+        let cy = scalar_sub(&scalar_mul(&auz, &avx), &scalar_mul(&aux, &avz));
+        let cz = scalar_sub(&scalar_mul(&aux, &avy), &scalar_mul(&auy, &avx));
+        Some(scalar_add(
+            &scalar_add(&scalar_mul(&ax, &cx), &scalar_mul(&ay, &cy)),
+            &scalar_mul(&az, &cz),
+        ))
+    }
+
+    /// The univariate Bernstein derivative of a coefficient list (degree
+    /// `r → r-1`).
+    fn bernstein_derivative(coeffs: &[f64]) -> Vec<f64> {
+        let r = coeffs.len().saturating_sub(1);
+        if r == 0 {
+            return vec![0.0];
+        }
+        (0..r)
+            .map(|i| (r as f64) * (coeffs[i + 1] - coeffs[i]))
+            .collect()
+    }
+
+    /// Lemma 9.2: the exact univariate Bernstein antiderivative, normalized to
+    /// vanish at `t = 0`. The degree-`r` coefficients map to degree `r+1` by
+    /// the cumulative sum `d_{k+1} = (1/(r+1)) Σ_{j≤k} c_j`.
+    pub fn bernstein_antiderivative(coeffs: &[f64]) -> Vec<f64> {
+        let r = coeffs.len().saturating_sub(1);
+        let inv = 1.0 / (r as f64 + 1.0);
+        let mut out = vec![0.0f64; coeffs.len() + 1];
+        let mut acc = 0.0f64;
+        for k in 0..=r {
+            acc += coeffs[k];
+            out[k + 1] = acc * inv;
+        }
+        out
+    }
+
+    /// The FHC-G9 antiderivative round-trip probe: the degree-`r+1`
+    /// antiderivative coefficients of a degree-`r` integrand (the `k = 0`
+    /// reciprocal-probe arm).
+    pub fn antiderivative_probe(coeffs: &[f64]) -> Result<Vec<f64>, &'static str> {
+        if coeffs.is_empty() || coeffs.iter().any(|c| !c.is_finite()) {
+            return Err("malformed_patch");
+        }
+        Ok(bernstein_antiderivative(coeffs))
+    }
+
+    /// The Bernstein product of two coefficient lists (`bernstein_scalar_product`
+    /// for the `a = [1]` constant case included).
+    fn bernstein_pow(a: &[f64], n: usize) -> Vec<f64> {
+        let mut acc = vec![1.0f64];
+        for _ in 0..n {
+            acc = bernstein_scalar_product(&acc, a);
+        }
+        acc
+    }
+
+    /// The Bernstein coefficients of `B_i^n(base(t))` for `i = 0..=n`, where
+    /// `base` is a Bernstein polynomial in `t` (degree elevation by
+    /// composition).
+    fn bernstein_powers(base: &[f64], n: usize) -> Vec<Vec<f64>> {
+        let one_minus: Vec<f64> = base.iter().map(|c| 1.0 - c).collect();
+        let mut out = Vec::with_capacity(n + 1);
+        for i in 0..=n {
+            let bi = bernstein_pow(base, i);
+            let bmi = bernstein_pow(&one_minus, n - i);
+            let mut term = bernstein_scalar_product(&bi, &bmi);
+            let scale = binomial(n, i);
+            for c in term.iter_mut() {
+                *c *= scale;
+            }
+            out.push(term);
+        }
+        out
+    }
+
+    /// The degree elevation of a Bernstein coefficient list to `target`.
+    fn bernstein_elevate(coeffs: &[f64], target: usize) -> Vec<f64> {
+        let mut c = coeffs.to_vec();
+        let mut d = c.len().saturating_sub(1);
+        while d < target {
+            let nd = d + 1;
+            let mut next = vec![0.0f64; nd + 1];
+            next[0] = c[0];
+            next[nd] = c[d];
+            for i in 1..=d {
+                let alpha = i as f64 / nd as f64;
+                next[i] = alpha * c[i - 1] + (1.0 - alpha) * c[i];
+            }
+            c = next;
+            d = nd;
+        }
+        c
+    }
+
+    /// The float de Casteljau evaluation of a Bernstein coefficient list.
+    fn de_casteljau_scalar(coeffs: &[f64], t: f64) -> f64 {
+        let mut level = coeffs.to_vec();
+        let mt = 1.0 - t;
+        while level.len() > 1 {
+            let mut next = Vec::with_capacity(level.len() - 1);
+            for pair in level.windows(2) {
+                next.push(mt * pair[0] + t * pair[1]);
+            }
+            level = next;
+        }
+        level.first().copied().unwrap_or(0.0)
+    }
+
+    /// The Bernstein coefficients of `net(u(t), v(t))` for a bivariate scalar
+    /// net `net` and univariate Bernstein parameter lists `u`, `v`.
+    fn compose_bivariate(net: &ScalarNet, u: &[f64], v: &[f64]) -> Vec<f64> {
+        let pu = bernstein_powers(u, net.rows - 1);
+        let pv = bernstein_powers(v, net.cols - 1);
+        let du = u.len().saturating_sub(1);
+        let dv = v.len().saturating_sub(1);
+        let target = (net.rows - 1) * du + (net.cols - 1) * dv;
+        let mut acc = vec![0.0f64; target + 1];
+        for i in 0..net.rows {
+            for j in 0..net.cols {
+                let coeff = net.at(i, j);
+                if coeff == 0.0 {
+                    continue;
+                }
+                let prod = bernstein_scalar_product(&pu[i], &pv[j]);
+                let elevated = bernstein_elevate(&prod, target);
+                for (k, value) in elevated.iter().enumerate() {
+                    acc[k] += coeff * value;
+                }
+            }
+        }
+        acc
+    }
+
+    /// The Bernstein coefficients of `base(inner(t))` for univariate Bernstein
+    /// polynomials `base` (in the outer variable) and `inner` (in `t`).
+    fn compose_univariate(base: &[f64], inner: &[f64]) -> Vec<f64> {
+        let n = base.len().saturating_sub(1);
+        let powers = bernstein_powers(inner, n);
+        let di = inner.len().saturating_sub(1);
+        let target = n * di;
+        let mut acc = vec![0.0f64; target + 1];
+        for i in 0..=n {
+            let coeff = base[i];
+            if coeff == 0.0 {
+                continue;
+            }
+            let elevated = bernstein_elevate(&powers[i], target);
+            for (k, value) in elevated.iter().enumerate() {
+                acc[k] += coeff * value;
+            }
+        }
+        acc
+    }
+
+    /// The certified integral `∫_0^1 f(t) W(t)^{-k} dt` for a polynomial
+    /// numerator `f`, a strictly-positive Bernstein weight `W`, and `k >= 1`
+    /// (Theorem 5.2 generalized to a polynomial numerator). Returns
+    /// `(value, error)` with `|integral - value| <= error`; the constant
+    /// numerator case is [`reciprocal_power_integral`].
+    fn weighted_reciprocal_integral(
+        numerator: &[f64],
+        weights: &[f64],
+        k: usize,
+        order: usize,
+    ) -> Result<(f64, f64), &'static str> {
+        if numerator.is_empty() || weights.len() < 2 || k == 0 {
+            return Err("malformed_patch");
+        }
+        if numerator
+            .iter()
+            .chain(weights.iter())
+            .any(|c| !c.is_finite())
+        {
+            return Err("malformed_patch");
+        }
+        // A vanishing numerator contributes nothing whatever the denominator
+        // (a constant-parameter edge has `du = 0`), so the reciprocal hull
+        // precondition is not required for it.
+        if numerator.iter().all(|c| *c == 0.0) {
+            return Ok((0.0, 0.0));
+        }
+        let mut w_lo = f64::INFINITY;
+        let mut w_hi = f64::NEG_INFINITY;
+        for &c in weights {
+            w_lo = w_lo.min(c);
+            w_hi = w_hi.max(c);
+        }
+        if w_lo <= 0.0 || !(w_hi > w_lo) {
+            return Err("rational_flux_inconclusive");
+        }
+        let center = 0.5 * (w_lo + w_hi);
+        let delta = (w_hi - w_lo) / (w_hi + w_lo);
+        if !(delta < 1.0) || !delta.is_finite() {
+            return Err("rational_flux_inconclusive");
+        }
+        let e: Vec<f64> = weights.iter().map(|v| (v - center) / center).collect();
+        let mut e_power = vec![1.0f64];
+        let mut value = 0.0f64;
+        for j in 0..=order {
+            let binom = binomial(j + k - 1, k - 1);
+            let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+            let product = bernstein_scalar_product(numerator, &e_power);
+            let integral = if product.is_empty() {
+                0.0
+            } else {
+                product.iter().sum::<f64>() / (product.len() as f64)
+            };
+            value += sign * binom * integral;
+            if j < order {
+                e_power = bernstein_scalar_product(&e_power, &e);
+            }
+        }
+        let center_inverse = 1.0 / center.powi(k as i32);
+        value *= center_inverse;
+        if !value.is_finite() {
+            return Err("rational_flux_inconclusive");
+        }
+        let one_minus = 1.0 - delta;
+        if one_minus <= 0.0 {
+            return Err("rational_flux_inconclusive");
+        }
+        let exact_sum = one_minus.powf(-(k as f64));
+        let mut series = 0.0f64;
+        for j in 0..=order {
+            series += binomial(j + k - 1, k - 1) * delta.powi(j as i32);
+        }
+        let numerator_max = numerator.iter().fold(0.0f64, |m, c| m.max(c.abs()));
+        let tail = center_inverse * numerator_max * (exact_sum - series);
+        if !tail.is_finite() {
+            return Err("rational_flux_inconclusive");
+        }
+        let guard = 64.0 * value.abs().max(tail) * f64::EPSILON * ((order + 1) as f64);
+        Ok((value, up(tail) + guard))
+    }
+
+    /// One parsed oriented trim boundary segment in parameter space. The curve
+    /// is `(a(t)/w(t), b(t)/w(t))`; a polynomial segment carries `w ≡ 1`.
+    struct GreenSeg {
+        a: Vec<f64>,
+        b: Vec<f64>,
+        w: Vec<f64>,
+        rational: bool,
+    }
+
+    /// Parse one submitted trim segment row (a 1×(d+1) or (d+1)×1 homogeneous
+    /// Bernstein net in parameter space).
+    fn parse_green_seg(row: &crate::facade::SandwichPatchRow) -> Result<GreenSeg, &'static str> {
+        let mut points: Vec<[f64; 3]> = Vec::new();
+        for r in &row.numerator {
+            for p in r {
+                points.push(*p);
+            }
+        }
+        let mut ws: Vec<f64> = Vec::new();
+        for r in &row.weights {
+            for w in r {
+                ws.push(*w);
+            }
+        }
+        if points.len() < 2 || ws.len() != points.len() {
+            return Err("malformed_patch");
+        }
+        if points
+            .iter()
+            .any(|p| !p[0].is_finite() || !p[1].is_finite())
+        {
+            return Err("malformed_patch");
+        }
+        if ws.iter().any(|w| !w.is_finite() || *w <= 0.0) {
+            return Err("unrepresented_trim");
+        }
+        let a: Vec<f64> = points.iter().map(|p| p[0]).collect();
+        let b: Vec<f64> = points.iter().map(|p| p[1]).collect();
+        let rational = ws.iter().any(|w| *w != 1.0);
+        Ok(GreenSeg {
+            a,
+            b,
+            w: ws,
+            rational,
+        })
+    }
+
+    /// The affine parameter-space point of a trim segment at `t`.
+    fn green_seg_point(seg: &GreenSeg, t: f64) -> [f64; 2] {
+        let x = de_casteljau_scalar(&seg.a, t);
+        let y = de_casteljau_scalar(&seg.b, t);
+        if seg.rational {
+            let w = de_casteljau_scalar(&seg.w, t);
+            if w != 0.0 && w.is_finite() {
+                return [x / w, y / w];
+            }
+        }
+        [x, y]
+    }
+
+    /// The shoelace signed area of one loop (sampled per segment).
+    fn green_loop_area(segments: &[&GreenSeg]) -> f64 {
+        let samples = 8usize;
+        let mut area = 0.0f64;
+        let mut prev: Option<[f64; 2]> = None;
+        for seg in segments {
+            for k in 0..=samples {
+                let t = k as f64 / samples as f64;
+                let p = green_seg_point(seg, t);
+                if let Some(q) = prev {
+                    area += q[0] * p[1] - p[0] * q[1];
+                }
+                prev = Some(p);
+            }
+        }
+        if let (Some(last), Some(first)) = (prev, segments.first().map(|s| green_seg_point(s, 0.0)))
+        {
+            area += last[0] * first[1] - first[0] * last[1];
+        }
+        area / 2.0
+    }
+
+    /// The exact polynomial boundary contribution `∮ Q dv` of one trim segment
+    /// to the Green reduction, where `q_net` is the u-antiderivative density
+    /// net. A polynomial segment is exact (`error == 0`); a rational segment
+    /// routes to the 1D reciprocal-power certificate.
+    fn green_poly_segment(
+        q_net: &ScalarNet,
+        seg: &GreenSeg,
+        order: usize,
+    ) -> Result<(f64, f64), &'static str> {
+        if !seg.rational {
+            let q = compose_bivariate(q_net, &seg.a, &seg.b);
+            let dv = bernstein_derivative(&seg.b);
+            let prod = bernstein_scalar_product(&q, &dv);
+            if prod.is_empty() {
+                return Ok((0.0, 0.0));
+            }
+            return Ok((prod.iter().sum::<f64>() / prod.len() as f64, 0.0));
+        }
+        // The rational pullback: Q = Num_Q / w^{r+s} with r, s the antiderivative
+        // degrees; dv = (b'w − b w')/w², so the integrand is Num_Q·dv_num /
+        // w^{r+s+2} and the 1D reciprocal certificate has k = r+s+2.
+        let r = q_net.rows - 1;
+        let s = q_net.cols - 1;
+        let da = seg.a.len() - 1;
+        let db = seg.b.len() - 1;
+        let target = r * da + s * db;
+        let w_minus_a: Vec<f64> = seg.w.iter().zip(&seg.a).map(|(w, a)| w - a).collect();
+        let w_minus_b: Vec<f64> = seg.w.iter().zip(&seg.b).map(|(w, b)| w - b).collect();
+        let mut num = vec![0.0f64; target + 1];
+        for i in 0..=r {
+            for j in 0..=s {
+                let coeff = q_net.at(i, j) * binomial(r, i) * binomial(s, j);
+                if coeff == 0.0 {
+                    continue;
+                }
+                let ai = bernstein_pow(&seg.a, i);
+                let wma = bernstein_pow(&w_minus_a, r - i);
+                let bj = bernstein_pow(&seg.b, j);
+                let wmb = bernstein_pow(&w_minus_b, s - j);
+                let mut term = bernstein_scalar_product(&ai, &wma);
+                term = bernstein_scalar_product(&term, &bj);
+                term = bernstein_scalar_product(&term, &wmb);
+                let elevated = bernstein_elevate(&term, target);
+                for (k, value) in elevated.iter().enumerate() {
+                    num[k] += coeff * value;
+                }
+            }
+        }
+        let db_deriv = bernstein_derivative(&seg.b);
+        let dw = bernstein_derivative(&seg.w);
+        let p1 = bernstein_scalar_product(&db_deriv, &seg.w);
+        let p2 = bernstein_scalar_product(&seg.b, &dw);
+        let len = p1.len().max(p2.len());
+        let mut dv_num = vec![0.0f64; len];
+        for (k, value) in p1.iter().enumerate() {
+            dv_num[k] += value;
+        }
+        for (k, value) in p2.iter().enumerate() {
+            dv_num[k] -= value;
+        }
+        let num2 = bernstein_scalar_product(&num, &dv_num);
+        weighted_reciprocal_integral(&num2, &seg.w, r + s + 2, order)
+    }
+
+    /// The rational-surface boundary contribution `−∮ G du` with
+    /// `G = (∫ P dv)/W(u)³` for a polynomial trim segment. `r_net` is the
+    /// v-antiderivative density numerator and `w_col` the univariate positive
+    /// weight coefficients.
+    fn green_rat_surface_segment(
+        r_net: &ScalarNet,
+        w_col: &[f64],
+        seg: &GreenSeg,
+        order: usize,
+    ) -> Result<(f64, f64), &'static str> {
+        if seg.rational {
+            return Err("rational_flux_inconclusive");
+        }
+        let pull = compose_bivariate(r_net, &seg.a, &seg.b);
+        let du = bernstein_derivative(&seg.a);
+        let num = bernstein_scalar_product(&pull, &du);
+        let denom = compose_univariate(w_col, &seg.a);
+        weighted_reciprocal_integral(&num, &denom, 3, order)
+    }
+
+    /// The FHC-G9 Green-reduction flux of one surface patch over an oriented
+    /// trim boundary. `segments` are the parameter-space trim carriers (each
+    /// row's `orientation` is its loop sign); `loops` are `[start, end, sign,
+    /// _]` descriptors into `segments` (empty means one outer loop over all
+    /// segments). Returns the certified `[lo, hi]` bracket or a typed tag.
+    pub fn green_trim_flux(
+        surface: &VolumeRow,
+        segments: &[crate::facade::SandwichPatchRow],
+        loops: &[[f64; 4]],
+        order: usize,
+    ) -> Result<[f64; 2], &'static str> {
+        let patch = parse_rational_patch(surface).map_err(|_| "malformed_patch")?;
+        if segments.is_empty() {
+            return Err("unrepresented_trim");
+        }
+        let parsed: Vec<GreenSeg> = segments
+            .iter()
+            .map(parse_green_seg)
+            .collect::<Result<Vec<_>, _>>()?;
+        let descriptors: Vec<(usize, usize, f64)> = if loops.is_empty() {
+            vec![(0, parsed.len(), 1.0)]
+        } else {
+            loops
+                .iter()
+                .map(|l| {
+                    let sign = if l[2] < 0.0 { -1.0 } else { 1.0 };
+                    (l[0] as usize, l[1] as usize, sign)
+                })
+                .collect()
+        };
+        let mut outer = 0usize;
+        for (start, end, sign) in &descriptors {
+            if *end > parsed.len() || start >= end {
+                return Err("malformed_patch");
+            }
+            if *sign > 0.0 {
+                outer += 1;
+            }
+        }
+        if outer != 1 {
+            return Err("loop_orientation");
+        }
+        for (start, end, sign) in &descriptors {
+            let segs: Vec<&GreenSeg> = parsed[*start..*end].iter().collect();
+            let area = green_loop_area(&segs);
+            if area == 0.0 || !area.is_finite() {
+                return Err("loop_orientation");
+            }
+            if (*sign > 0.0) != (area > 0.0) {
+                return Err("loop_orientation");
+            }
+        }
+
+        let density = density_net(&patch).ok_or("malformed_patch")?;
+        let mut lo = 0.0f64;
+        let mut hi = 0.0f64;
+        if patch.unit_weight() {
+            let anti = scalar_antideriv_u(&density);
+            for (start, end, _sign) in &descriptors {
+                for seg in &parsed[*start..*end] {
+                    let (value, error) = green_poly_segment(&anti, seg, order)?;
+                    let center = value / 3.0;
+                    let width = error / 3.0;
+                    lo += center - width;
+                    hi += center + width;
+                }
+            }
+        } else {
+            let w_col: Vec<f64> = (0..patch.rows)
+                .map(|i| patch.weights[i * patch.cols])
+                .collect();
+            let univariate = (0..patch.rows)
+                .all(|i| (0..patch.cols).all(|j| patch.weights[i * patch.cols + j] == w_col[i]));
+            if !univariate {
+                return Err("rational_flux_inconclusive");
+            }
+            let r_net = scalar_antideriv_v(&density);
+            for (start, end, _sign) in &descriptors {
+                for seg in &parsed[*start..*end] {
+                    let (value, error) = green_rat_surface_segment(&r_net, &w_col, seg, order)?;
+                    let center = -value / 3.0;
+                    let width = error / 3.0;
+                    lo += center - width;
+                    hi += center + width;
+                }
+            }
+        }
+        if !lo.is_finite() || !hi.is_finite() {
+            return Err("rational_flux_inconclusive");
+        }
+        Ok([lo.min(hi), lo.max(hi)])
+    }
+
     /// The certified rational membership of one point: the same retry contract
     /// as [`classify_point`], but the patch set admits the certified positive
     /// rational weight channel (FHC-G1).
@@ -11823,6 +12501,29 @@ pub fn certify_rational_flux_probe(
 
     match row.kind {
         RationalFluxKind::CellFlux => {
+            // FHC-G9: a non-empty `tool` carries the oriented trim boundary
+            // segments (parameter-space Bernstein carriers) and `cells` the
+            // `[start, end, sign, _]` loop descriptors. The trimmed interior is
+            // never meshed: the flux is Green-reduced to that boundary.
+            if !row.tool.is_empty() {
+                let rows = to_rows(&row.patches);
+                let mut brackets = Vec::new();
+                for patch in &rows {
+                    match membership::green_trim_flux(patch, &row.tool, &row.cells, row.order) {
+                        Ok(bracket) => brackets.push(bracket),
+                        Err(tag) => return refusal(tag.to_string()),
+                    }
+                }
+                return RationalFluxOutcome {
+                    ok: true,
+                    brackets,
+                    value: None,
+                    error: None,
+                    volume: None,
+                    verdict: None,
+                    refusal: None,
+                };
+            }
             let rows = to_rows(&row.patches);
             let mut brackets = Vec::new();
             for patch in &rows {
@@ -11852,6 +12553,23 @@ pub fn certify_rational_flux_probe(
             }
         }
         RationalFluxKind::Reciprocal => {
+            // FHC-G9: `k = 0` is the Lemma 9.2 antiderivative round-trip probe;
+            // the returned bracket list carries the constructed antiderivative
+            // coefficients (each as the degenerate pair `[d_i, d_i]`).
+            if row.k == 0 {
+                return match membership::antiderivative_probe(&row.coeffs) {
+                    Ok(coeffs) => RationalFluxOutcome {
+                        ok: true,
+                        brackets: coeffs.iter().map(|c| [*c, *c]).collect(),
+                        value: None,
+                        error: None,
+                        volume: None,
+                        verdict: None,
+                        refusal: None,
+                    },
+                    Err(tag) => refusal(tag.to_string()),
+                };
+            }
             match membership::reciprocal_power_integral(&row.coeffs, row.k, row.order) {
                 Ok((value, error)) => RationalFluxOutcome {
                     ok: true,
