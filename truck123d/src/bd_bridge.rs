@@ -4802,19 +4802,131 @@ fn placed_box_patches(
 }
 
 /// The patch rows of one boolean operand: a placed canonical box's six faces,
-/// or the typed open-carrier refusal for any other node (a swept/lofted solid,
-/// a nested group, a nested boolean).
+/// a placed canonical z-cylinder's rational cycle, or the typed open-carrier
+/// refusal for any other node (a swept/lofted solid, a nested group, a nested
+/// boolean).
 fn node_box_patches(
     node: &TreeNode,
 ) -> Result<Vec<crate::python::binding::VolumeRow>, BooleanVolumeRefusal> {
     match node {
-        TreeNode::Part { part } => placed_box_patches(part),
+        TreeNode::Part { part } => match &part.solid {
+            SolidSpec::Box { .. } => placed_box_patches(part),
+            SolidSpec::Cylinder { .. } => placed_cylinder_patches(part),
+            _ => Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable),
+        },
         // A fillet as a boolean operand is the recorded open composition cell
         // (FilletNode depth-1 discipline): refuse typed, never recurse.
         TreeNode::Fillet { .. } | TreeNode::Boolean { .. } | TreeNode::Group { .. } => {
             Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable)
         }
     }
+}
+
+/// Whether any consumed row carries a non-unit weight (the rational arm).
+fn rows_have_rational_weights(rows: &[crate::python::binding::VolumeRow]) -> bool {
+    rows.iter()
+        .flat_map(|row| row.weights.iter())
+        .flatten()
+        .any(|w| *w != 1.0)
+}
+
+/// One exact planar sector cap of a z-axis cylinder: the degenerate tensor
+/// patch from the axis center to a 90-degree rational quadratic arc. Both
+/// radial columns carry the arc's own weight, so the weight net is rank-one
+/// and the landed reciprocal-power assembly certifies it exactly.
+fn cylinder_cap_patch(
+    arc: &[[f64; 2]; 3],
+    weights: &[f64; 3],
+    z: f64,
+    orientation: f64,
+) -> crate::python::binding::VolumeRow {
+    let mut numerator = vec![vec![[0.0f64; 3]; 2]; 3];
+    let mut weight_net = vec![vec![0.0f64; 2]; 3];
+    for i in 0..3 {
+        let w = weights[i];
+        numerator[i][0] = [0.0, 0.0, w * z];
+        numerator[i][1] = [w * arc[i][0], w * arc[i][1], w * z];
+        weight_net[i][0] = w;
+        weight_net[i][1] = w;
+    }
+    crate::python::binding::VolumeRow {
+        numerator,
+        weights: weight_net,
+        orientation,
+    }
+}
+
+/// The twelve outward-oriented rational tensor-Bernstein patches of one placed
+/// canonical z-axis cylinder: four 90-degree rational-quadratic side patches
+/// plus two four-sector planar caps. Every arc is the standard exact rational
+/// quadratic (weights `1, sqrt(2)/2, 1`), so the cycle is the exact cylinder
+/// boundary -- never a sampled polygon. A non-z axis or a non-positive extent
+/// refuses typed (the open carrier).
+fn placed_cylinder_patches(
+    part: &PartSpec,
+) -> Result<Vec<crate::python::binding::VolumeRow>, BooleanVolumeRefusal> {
+    let SolidSpec::Cylinder {
+        radius,
+        height,
+        axis,
+    } = &part.solid
+    else {
+        return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable);
+    };
+    if axis != "z" {
+        return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable);
+    }
+    let (r, h) = (*radius, *height);
+    if !(r.is_finite() && h.is_finite()) || r <= 0.0 || h <= 0.0 {
+        return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable);
+    }
+    let sign = if placement_det_sign(part) < 0 {
+        -1.0
+    } else {
+        1.0
+    };
+    let (z0, z1) = (-0.5 * h, 0.5 * h);
+    let mut rows = Vec::with_capacity(12);
+    for quarter in 0..4 {
+        let theta0 = (quarter as f64) * std::f64::consts::FRAC_PI_2;
+        let mut arc = [[0.0f64; 2]; 3];
+        let mut arc_weights = [0.0f64; 3];
+        for i in 0..3 {
+            let angle = theta0 + (i as f64) * std::f64::consts::FRAC_PI_4;
+            let scale = if i == 1 {
+                std::f64::consts::SQRT_2
+            } else {
+                1.0
+            };
+            arc[i] = [r * scale * angle.cos(), r * scale * angle.sin()];
+            arc_weights[i] = if i == 1 {
+                std::f64::consts::FRAC_1_SQRT_2
+            } else {
+                1.0
+            };
+        }
+        // The side patch: u over the arc (degree 2), v over z (degree 1). The
+        // arc controls are affine; the homogeneous numerator is `W * P`.
+        let mut numerator = vec![vec![[0.0f64; 3]; 2]; 3];
+        let mut weight_net = vec![vec![0.0f64; 2]; 3];
+        for i in 0..3 {
+            let w = arc_weights[i];
+            for (j, z) in [z0, z1].into_iter().enumerate() {
+                numerator[i][j] = [w * arc[i][0], w * arc[i][1], w * z];
+                weight_net[i][j] = w;
+            }
+        }
+        rows.push(crate::python::binding::VolumeRow {
+            numerator,
+            weights: weight_net,
+            orientation: sign,
+        });
+        // The +z cap is outward +z with the angular/radial parameterization's
+        // normal -z, so its local orientation is -1; the -z cap is +1.
+        rows.push(cylinder_cap_patch(&arc, &arc_weights, z1, -sign));
+        rows.push(cylinder_cap_patch(&arc, &arc_weights, z0, sign));
+    }
+    Ok(rows.into_iter().map(|row| place_row(&row, part)).collect())
 }
 
 /// The certified product volume of one canonical boolean row: `V(A op B)` from
@@ -4843,8 +4955,40 @@ fn boolean_product_volume_certified(boolean: &BooleanNode) -> Result<f64, Boolea
 fn certified_boolean_product_value(boolean: &BooleanNode) -> Result<f64, BooleanVolumeRefusal> {
     let a = node_box_patches(&boolean.a)?;
     let b = node_box_patches(&boolean.b)?;
-    let certificate =
-        membership::certify_boolean_volume(&a, &b, &membership::BooleanVolumeOptions::default())?;
+    let options = membership::BooleanVolumeOptions::default();
+    let certificate = if rows_have_rational_weights(&a) || rows_have_rational_weights(&b) {
+        match membership::certify_boolean_volume_rational(&a, &b, &options) {
+            Ok(certificate) => certificate,
+            // The rational tangential regime (T6): a pair the transversality
+            // admission refuses (parallel/tangent rotational normals) is
+            // carried by the landed RDEF-M2 sandwich rule, which already
+            // consumes the certified positive rational weight channel. This is
+            // the same fallback `admit_swept_pair` applies to swept pairs.
+            Err(membership::BooleanVolumeRefusal::TransversalityUncertified) => {
+                let scale = a
+                    .iter()
+                    .chain(b.iter())
+                    .flat_map(|row| row.numerator.iter())
+                    .flatten()
+                    .flat_map(|p| p.iter())
+                    .fold(1.0f64, |acc, c| acc.max(c.abs()));
+                let sandwich_options = membership::SandwichOptions {
+                    tolerance: options.relative_tolerance * scale,
+                    max_cells: options.max_cells,
+                    shared_carrier: false,
+                    bernstein_chart: true,
+                    rational_positive_weights: true,
+                };
+                match membership::certify_sandwich(&a, &b, boolean.mode, &sandwich_options) {
+                    Ok(certificate) => sandwich_to_boolean_certificate(&certificate, &a, &b),
+                    Err(_) => return Err(BooleanVolumeRefusal::BooleanProductVolumeUnavailable),
+                }
+            }
+            Err(other) => return Err(other),
+        }
+    } else {
+        membership::certify_boolean_volume(&a, &b, &options)?
+    };
     let intersection = 0.5 * (certificate.intersection_lo + certificate.intersection_hi);
     let value = match boolean.mode {
         crate::facade::ModeValue::Subtract => certificate.value,
@@ -4884,6 +5028,13 @@ fn boolean_volume_refusal_to_refusal(refusal: BooleanVolumeRefusal) -> Refusal {
         | BooleanVolumeRefusal::BooleanProductVolumeUnavailable => {
             Refusal::UnsupportedEnvelope(EnvelopeCase::NonCanonicalCarrier)
         }
+        // FHC-G1: the rational flux could not close. This is a numerical
+        // indeterminacy, never an envelope/carrier refusal -- the packet's
+        // `rational_flux_inconclusive` typed refusal.
+        BooleanVolumeRefusal::RationalFluxInconclusive => Refusal::NumericallyUnresolved {
+            spent: Budget::new(0, 0, 0),
+            witness: UnresolvedWitness::DeviationUncertified,
+        },
     }
 }
 
@@ -5164,20 +5315,44 @@ fn placement_det_sign(part: &PartSpec) -> i8 {
     mirror * frame
 }
 
-/// Places one local patch row: the placement's affine map applies to every
-/// control point (exact, weights unchanged). The orientation field is left at
-/// its intrinsic value; the caller composes the placement sign.
+/// Places one local patch row. A unit-weight row maps each control point
+/// affinely (the landed polynomial path). A rational row places the exact
+/// rational control point `A/W` and re-homogenizes (`A' = W * (R (A/W) + o)`),
+/// i.e. the placement operates homogeneously on `(X, Y, Z, W)`; the weight
+/// channel is unchanged. The orientation field is left at its intrinsic value;
+/// the caller composes the placement sign.
 fn place_row(row: &Patch, part: &PartSpec) -> Patch {
-    let numerator = row
-        .numerator
-        .iter()
-        .map(|control_row| {
-            control_row
-                .iter()
-                .map(|point| place_local_point(part, *point))
-                .collect()
-        })
-        .collect();
+    let rational = row.weights.iter().flatten().any(|w| *w != 1.0);
+    let numerator = if !rational {
+        row.numerator
+            .iter()
+            .map(|control_row| {
+                control_row
+                    .iter()
+                    .map(|point| place_local_point(part, *point))
+                    .collect()
+            })
+            .collect()
+    } else {
+        row.numerator
+            .iter()
+            .zip(row.weights.iter())
+            .map(|(control_row, weight_row)| {
+                control_row
+                    .iter()
+                    .zip(weight_row.iter())
+                    .map(|(point, w)| {
+                        if *w == 0.0 || !w.is_finite() {
+                            return *point;
+                        }
+                        let affine = [point[0] / w, point[1] / w, point[2] / w];
+                        let placed = place_local_point(part, affine);
+                        [placed[0] * w, placed[1] * w, placed[2] * w]
+                    })
+                    .collect()
+            })
+            .collect()
+    };
     Patch {
         numerator,
         weights: row.weights.clone(),
@@ -7676,6 +7851,27 @@ pub mod membership {
         fn scale(self, s: f64) -> Iv {
             self.mul(Iv::point(s))
         }
+        /// The interval quotient, `None` when the denominator straddles zero
+        /// (the rational patch helpers divide only by a certified positive
+        /// weight hull).
+        fn div(self, o: Iv) -> Option<Iv> {
+            if o.lo <= 0.0 && o.hi >= 0.0 {
+                return None;
+            }
+            let mut lo = f64::INFINITY;
+            let mut hi = f64::NEG_INFINITY;
+            for &x in &[self.lo, self.hi] {
+                for &y in &[o.lo, o.hi] {
+                    let v = x / y;
+                    if !v.is_finite() {
+                        return None;
+                    }
+                    lo = lo.min(down(v));
+                    hi = hi.max(up(v));
+                }
+            }
+            if lo <= hi { Some(Iv { lo, hi }) } else { None }
+        }
         fn contains_zero(self) -> bool {
             self.lo <= 0.0 && self.hi >= 0.0
         }
@@ -7745,14 +7941,36 @@ pub mod membership {
 
     // -- patch data ----------------------------------------------------------
 
-    /// One validated non-rational tensor-Bernstein patch (weights certified
-    /// `== 1`), with its recorded orientation sign.
+    /// One validated tensor-Bernstein patch: the numerator control net plus the
+    /// parallel scalar weight net (both row-major). A unit-weight row (the
+    /// landed polynomial carrier) carries an all-ones weight net and the
+    /// geometry helpers take their exact polynomial fast path; a rational row
+    /// (the certified positive-weight carrier of FHC-G1) carries its weight
+    /// channel and every helper evaluates the homogeneous `A / W` form.
     #[derive(Clone)]
     struct Patch {
         rows: usize,
         cols: usize,
         data: Vec<[f64; 3]>,
+        weights: Vec<f64>,
         orientation: f64,
+    }
+
+    impl Patch {
+        /// Whether every weight is exactly one (the polynomial fast path).
+        fn unit_weight(&self) -> bool {
+            self.weights.iter().all(|w| *w == 1.0)
+        }
+
+        /// The exact rational control point `A_ij / W_ij` at one flat index.
+        fn rational_point(&self, index: usize) -> Option<[f64; 3]> {
+            let a = self.data.get(index)?;
+            let w = self.weights.get(index)?;
+            if *w == 0.0 || !w.is_finite() {
+                return None;
+            }
+            Some([a[0] / w, a[1] / w, a[2] / w])
+        }
     }
 
     fn parse_patch(row: &VolumeRow) -> Result<Patch, MembershipRefusal> {
@@ -7762,6 +7980,7 @@ pub mod membership {
             return Err(MembershipRefusal::MalformedPatch);
         }
         let mut data = Vec::with_capacity(rows.saturating_mul(cols));
+        let mut weights = Vec::with_capacity(rows.saturating_mul(cols));
         for (i, num_row) in row.numerator.iter().enumerate() {
             if num_row.len() != cols {
                 return Err(MembershipRefusal::MalformedPatch);
@@ -7785,6 +8004,7 @@ pub mod membership {
                     return Err(MembershipRefusal::MalformedPatch);
                 }
                 data.push(*a);
+                weights.push(1.0);
             }
         }
         if !row.orientation.is_finite() || row.orientation == 0.0 {
@@ -7794,15 +8014,67 @@ pub mod membership {
             rows,
             cols,
             data,
+            weights,
             orientation: row.orientation,
         })
     }
 
-    /// The coordinate-wise enclosure of the patch over the parameter box
-    /// `u x v` (the interval-Bernstein sum `sum B_i(u) B_j(v) A_ij`; the
-    /// enclosure is outward-rounded and shrinks to the patch point as the box
-    /// shrinks).
-    fn patch_range(patch: &Patch, u: Iv, v: Iv) -> ([f64; 3], [f64; 3]) {
+    /// The FHC-G1 rational admission: the same shape validation as
+    /// [`parse_patch`], but the weight channel is admitted whenever every
+    /// weight is finite and strictly positive (`min w_ij > 0`, the MONO-8 §6.1
+    /// certified positive lower bound on the homogeneous coefficients). A
+    /// non-positive or non-finite weight refuses typed and never reaches the
+    /// reciprocal-power kernel.
+    fn parse_rational_patch(row: &VolumeRow) -> Result<Patch, MembershipRefusal> {
+        let rows = row.numerator.len();
+        let cols = row.numerator.first().map_or(0, Vec::len);
+        if rows < 2 || cols < 2 || row.weights.len() != rows {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        let mut data = Vec::with_capacity(rows.saturating_mul(cols));
+        let mut weights = Vec::with_capacity(rows.saturating_mul(cols));
+        for (i, num_row) in row.numerator.iter().enumerate() {
+            if num_row.len() != cols {
+                return Err(MembershipRefusal::MalformedPatch);
+            }
+            let weight_row = row
+                .weights
+                .get(i)
+                .ok_or(MembershipRefusal::MalformedPatch)?;
+            if weight_row.len() != cols {
+                return Err(MembershipRefusal::MalformedPatch);
+            }
+            for (j, a) in num_row.iter().enumerate() {
+                let w = weight_row
+                    .get(j)
+                    .copied()
+                    .ok_or(MembershipRefusal::MalformedPatch)?;
+                if !w.is_finite() || w <= 0.0 {
+                    return Err(MembershipRefusal::RationalWeights);
+                }
+                if !a.iter().all(|c| c.is_finite()) {
+                    return Err(MembershipRefusal::MalformedPatch);
+                }
+                data.push(*a);
+                weights.push(w);
+            }
+        }
+        if !row.orientation.is_finite() || row.orientation == 0.0 {
+            return Err(MembershipRefusal::MalformedPatch);
+        }
+        Ok(Patch {
+            rows,
+            cols,
+            data,
+            weights,
+            orientation: row.orientation,
+        })
+    }
+
+    /// The coordinate-wise enclosure of the numerator net `A` over the
+    /// parameter box `u x v` (the interval-Bernstein sum `sum B_i(u) B_j(v)
+    /// A_ij`).
+    fn numerator_range(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
         let bu = bernstein_iv(patch.rows - 1, u);
         let bv = bernstein_iv(patch.cols - 1, v);
         let mut sum = [Iv::point(0.0); 3];
@@ -7822,14 +8094,51 @@ pub mod membership {
                 }
             }
         }
-        (
-            [sum[0].lo, sum[1].lo, sum[2].lo],
-            [sum[0].hi, sum[1].hi, sum[2].hi],
-        )
+        sum
     }
 
-    /// The interval enclosure of `dP/du` over the parameter box `u x v`.
-    fn patch_derivative_u(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+    /// The scalar interval enclosure of the weight net `W` over the box.
+    fn weight_interval(patch: &Patch, u: Iv, v: Iv) -> Iv {
+        let bu = bernstein_iv(patch.rows - 1, u);
+        let bv = bernstein_iv(patch.cols - 1, v);
+        let mut sum = Iv::point(0.0);
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = bui.mul(bvj);
+                if let Some(w) = patch.weights.get(i * patch.cols + j).copied() {
+                    sum = sum.add(coeff.scale(w));
+                }
+            }
+        }
+        sum
+    }
+
+    /// The coordinate-wise enclosure of the patch over the parameter box
+    /// `u x v`. A unit-weight patch is the numerator net; a rational patch is
+    /// the homogeneous quotient `A / W` (the certified positive weight hull
+    /// divides outward; a hull straddling zero yields the universal interval
+    /// rather than a guess).
+    fn patch_range(patch: &Patch, u: Iv, v: Iv) -> ([f64; 3], [f64; 3]) {
+        let a = numerator_range(patch, u, v);
+        if patch.unit_weight() {
+            return ([a[0].lo, a[1].lo, a[2].lo], [a[0].hi, a[1].hi, a[2].hi]);
+        }
+        let w = weight_interval(patch, u, v);
+        let mut lo = [f64::NEG_INFINITY; 3];
+        let mut hi = [f64::INFINITY; 3];
+        for (axis, value) in a.iter().enumerate() {
+            if let Some(q) = value.div(w) {
+                lo[axis] = q.lo;
+                hi[axis] = q.hi;
+            }
+        }
+        (lo, hi)
+    }
+
+    /// The interval enclosure of the numerator `dA/du` over `u x v`.
+    fn numerator_derivative_u(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
         let mut acc = [Iv::point(0.0); 3];
         if patch.rows < 2 {
             return acc;
@@ -7863,8 +8172,64 @@ pub mod membership {
         acc
     }
 
-    /// The interval enclosure of `dP/dv` over the parameter box `u x v`.
-    fn patch_derivative_v(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+    /// The scalar interval enclosure of `dW/du` over `u x v`.
+    fn weight_derivative_u(patch: &Patch, u: Iv, v: Iv) -> Iv {
+        let mut acc = Iv::point(0.0);
+        if patch.rows < 2 {
+            return acc;
+        }
+        let bu = bernstein_iv(patch.rows - 2, u);
+        let bv = bernstein_iv(patch.cols - 1, v);
+        let factor = (patch.rows - 1) as f64;
+        for i in 0..(patch.rows - 1) {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = Iv::point(factor).mul(bui).mul(bvj);
+                let a = patch
+                    .weights
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                let b = patch
+                    .weights
+                    .get((i + 1) * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                acc = acc.add(coeff.scale(b - a));
+            }
+        }
+        acc
+    }
+
+    /// The interval enclosure of `dP/du` over `u x v`. A unit-weight patch is
+    /// the numerator derivative; a rational patch is the quotient-rule form
+    /// `(A_u - P W_u) / W`.
+    fn patch_derivative_u(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+        let au = numerator_derivative_u(patch, u, v);
+        if patch.unit_weight() {
+            return au;
+        }
+        let p = patch_range(patch, u, v);
+        let w = weight_interval(patch, u, v);
+        let wu = weight_derivative_u(patch, u, v);
+        let mut out = [Iv::point(0.0); 3];
+        for axis in 0..3 {
+            let p_iv = Iv::point(p.0[axis]);
+            if let Some(q) = au[axis].sub(p_iv.mul(wu)).div(w) {
+                out[axis] = q;
+            } else {
+                out[axis] = Iv {
+                    lo: f64::NEG_INFINITY,
+                    hi: f64::INFINITY,
+                };
+            }
+        }
+        out
+    }
+
+    /// The interval enclosure of the numerator `dA/dv` over `u x v`.
+    fn numerator_derivative_v(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
         let mut acc = [Iv::point(0.0); 3];
         if patch.cols < 2 {
             return acc;
@@ -7898,6 +8263,61 @@ pub mod membership {
         acc
     }
 
+    /// The scalar interval enclosure of `dW/dv` over `u x v`.
+    fn weight_derivative_v(patch: &Patch, u: Iv, v: Iv) -> Iv {
+        let mut acc = Iv::point(0.0);
+        if patch.cols < 2 {
+            return acc;
+        }
+        let bu = bernstein_iv(patch.rows - 1, u);
+        let bv = bernstein_iv(patch.cols - 2, v);
+        let factor = (patch.cols - 1) as f64;
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or_else(|| Iv::point(0.0));
+            for j in 0..(patch.cols - 1) {
+                let bvj = bv.get(j).copied().unwrap_or_else(|| Iv::point(0.0));
+                let coeff = Iv::point(factor).mul(bui).mul(bvj);
+                let a = patch
+                    .weights
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                let b = patch
+                    .weights
+                    .get(i * patch.cols + (j + 1))
+                    .copied()
+                    .unwrap_or(0.0);
+                acc = acc.add(coeff.scale(b - a));
+            }
+        }
+        acc
+    }
+
+    /// The interval enclosure of `dP/dv` over `u x v` (the quotient-rule form
+    /// `(A_v - P W_v) / W` on a rational patch).
+    fn patch_derivative_v(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
+        let av = numerator_derivative_v(patch, u, v);
+        if patch.unit_weight() {
+            return av;
+        }
+        let p = patch_range(patch, u, v);
+        let w = weight_interval(patch, u, v);
+        let wv = weight_derivative_v(patch, u, v);
+        let mut out = [Iv::point(0.0); 3];
+        for axis in 0..3 {
+            let p_iv = Iv::point(p.0[axis]);
+            if let Some(q) = av[axis].sub(p_iv.mul(wv)).div(w) {
+                out[axis] = q;
+            } else {
+                out[axis] = Iv {
+                    lo: f64::NEG_INFINITY,
+                    hi: f64::INFINITY,
+                };
+            }
+        }
+        out
+    }
+
     /// The interval enclosure of the patch normal `P_u x P_v`.
     fn normal_interval(patch: &Patch, u: Iv, v: Iv) -> [Iv; 3] {
         let du = patch_derivative_u(patch, u, v);
@@ -7917,9 +8337,8 @@ pub mod membership {
             .add(normal[2].scale(direction[2]))
     }
 
-    /// The pointwise derivative `dP/du` at `(u, v)` (used only for the
-    /// subdivision-direction heuristic, never for a verdict).
-    fn derivative_point_u(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+    /// The pointwise numerator derivative `dA/du` at `(u, v)`.
+    fn numerator_derivative_point_u(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
         let mut acc = [0.0f64; 3];
         if patch.rows < 2 {
             return acc;
@@ -7950,8 +8369,59 @@ pub mod membership {
         acc
     }
 
-    /// The pointwise derivative `dP/dv` at `(u, v)` (split heuristic only).
-    fn derivative_point_v(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+    /// The scalar pointwise `dW/du` at `(u, v)`.
+    fn weight_derivative_point_u(patch: &Patch, u: f64, v: f64) -> f64 {
+        let mut acc = 0.0f64;
+        if patch.rows < 2 {
+            return acc;
+        }
+        let bu = bernstein_f64(patch.rows - 2, u);
+        let bv = bernstein_f64(patch.cols - 1, v);
+        let factor = (patch.rows - 1) as f64;
+        for i in 0..(patch.rows - 1) {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                let coeff = factor * bui * bvj;
+                let a = patch
+                    .weights
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                let b = patch
+                    .weights
+                    .get((i + 1) * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                acc += coeff * (b - a);
+            }
+        }
+        acc
+    }
+
+    /// The pointwise derivative `dP/du` at `(u, v)` (used only for the
+    /// subdivision-direction heuristic, never for a verdict). A rational patch
+    /// evaluates the quotient-rule form `(A_u - P W_u) / W`.
+    fn derivative_point_u(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let au = numerator_derivative_point_u(patch, u, v);
+        if patch.unit_weight() {
+            return au;
+        }
+        let p = patch_eval(patch, u, v);
+        let w = patch_weight_eval(patch, u, v);
+        if w == 0.0 || !w.is_finite() {
+            return [0.0; 3];
+        }
+        let wu = weight_derivative_point_u(patch, u, v);
+        let mut out = [0.0f64; 3];
+        for axis in 0..3 {
+            out[axis] = (au[axis] - p[axis] * wu) / w;
+        }
+        out
+    }
+
+    /// The pointwise numerator derivative `dA/dv` at `(u, v)`.
+    fn numerator_derivative_point_v(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
         let mut acc = [0.0f64; 3];
         if patch.cols < 2 {
             return acc;
@@ -7980,6 +8450,55 @@ pub mod membership {
             }
         }
         acc
+    }
+
+    /// The scalar pointwise `dW/dv` at `(u, v)`.
+    fn weight_derivative_point_v(patch: &Patch, u: f64, v: f64) -> f64 {
+        let mut acc = 0.0f64;
+        if patch.cols < 2 {
+            return acc;
+        }
+        let bu = bernstein_f64(patch.rows - 1, u);
+        let bv = bernstein_f64(patch.cols - 2, v);
+        let factor = (patch.cols - 1) as f64;
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..(patch.cols - 1) {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                let coeff = factor * bui * bvj;
+                let a = patch
+                    .weights
+                    .get(i * patch.cols + j)
+                    .copied()
+                    .unwrap_or(0.0);
+                let b = patch
+                    .weights
+                    .get(i * patch.cols + (j + 1))
+                    .copied()
+                    .unwrap_or(0.0);
+                acc += coeff * (b - a);
+            }
+        }
+        acc
+    }
+
+    /// The pointwise derivative `dP/dv` at `(u, v)` (split heuristic only).
+    fn derivative_point_v(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let av = numerator_derivative_point_v(patch, u, v);
+        if patch.unit_weight() {
+            return av;
+        }
+        let p = patch_eval(patch, u, v);
+        let w = patch_weight_eval(patch, u, v);
+        if w == 0.0 || !w.is_finite() {
+            return [0.0; 3];
+        }
+        let wv = weight_derivative_point_v(patch, u, v);
+        let mut out = [0.0f64; 3];
+        for axis in 0..3 {
+            out[axis] = (av[axis] - p[axis] * wv) / w;
+        }
+        out
     }
 
     fn norm3(value: [f64; 3]) -> f64 {
@@ -8177,12 +8696,22 @@ pub mod membership {
 
     // -- ray cast and verdict ------------------------------------------------
 
+    /// The control-hull bounding box of a patch set. A rational patch
+    /// contributes its exact rational control points `A_ij / W_ij` (the
+    /// convex-hull generators of the surface); a unit-weight patch its
+    /// numerator controls.
     fn solid_bounds(patches: &[Patch]) -> Option<([f64; 3], [f64; 3])> {
         let mut lo = [f64::INFINITY; 3];
         let mut hi = [f64::NEG_INFINITY; 3];
         let mut any = false;
         for patch in patches {
-            for control in &patch.data {
+            for index in 0..patch.data.len() {
+                let control = if patch.unit_weight() {
+                    patch.data.get(index).copied()
+                } else {
+                    patch.rational_point(index)
+                };
+                let Some(control) = control else { continue };
                 any = true;
                 for (axis, value) in control.iter().enumerate() {
                     if let Some(slot) = lo.get_mut(axis) {
@@ -8506,6 +9035,11 @@ pub mod membership {
         /// verdict (the MONO-8 certified bracket is the open carrier), never the
         /// base operand's volume.
         BooleanProductVolumeUnavailable,
+        /// FHC-G1: the rational reciprocal-power flux could not be certified
+        /// within its budget (a degenerate weight hull, a vanishing relative
+        /// radius, or a tail that did not close). This is the typed
+        /// `rational_flux_inconclusive` refusal -- never `unsupported_envelope`.
+        RationalFluxInconclusive,
     }
 
     impl From<MembershipRefusal> for BooleanVolumeRefusal {
@@ -8736,6 +9270,33 @@ pub mod membership {
         out
     }
 
+    /// The exact child weight control net of `patch` over `cell`: the same de
+    /// Casteljau subdivision applied to the scalar weight channel (the
+    /// homogeneous placement/subdivision the FHC-G1 rational arm requires).
+    fn sub_weight_net(patch: &Patch, cell: &ParamCell) -> Vec<f64> {
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let data: Vec<[f64; 3]> = patch.weights.iter().map(|&w| [w, 0.0, 0.0]).collect();
+        let carrier = Patch {
+            rows,
+            cols,
+            data,
+            weights: vec![1.0; rows * cols],
+            orientation: 1.0,
+        };
+        sub_net(&carrier, cell).into_iter().map(|v| v[0]).collect()
+    }
+
+    /// The exact child weight control net over `cell` (the parent net for the
+    /// unit cell).
+    fn child_weight_net(patch: &Patch, cell: &ParamCell) -> Vec<f64> {
+        if cell.u_lo == 0.0 && cell.u_hi == 1.0 && cell.v_lo == 0.0 && cell.v_hi == 1.0 {
+            patch.weights.clone()
+        } else {
+            sub_weight_net(patch, cell)
+        }
+    }
+
     /// The unit-square domain every child patch is re-parameterized onto.
     fn unit_ibox2() -> IBox2 {
         IBox2 {
@@ -8779,6 +9340,230 @@ pub mod membership {
         Ok((fact.bracket.lo, fact.bracket.hi))
     }
 
+    /// The certified flux of `patch` over the parameter `cell` (FHC-G1
+    /// deliverable 3). A unit-weight patch is the exact polynomial fast path
+    /// (`cell_flux_exact`); a rational patch is subdivided homogeneously
+    /// (numerator and weight channel together) and the certified face form is
+    /// read from the landed reciprocal-power assembly, which returns a genuine
+    /// two-sided enclosure. No dehomogenization and no approximation enters
+    /// the rational path.
+    fn cell_flux_certified(
+        patch: &Patch,
+        cell: &ParamCell,
+    ) -> Result<crate::facade::FluxCert, BooleanVolumeRefusal> {
+        if patch.orientation != 1.0 && patch.orientation != -1.0 {
+            return Err(BooleanVolumeRefusal::NonRegularPatch);
+        }
+        if patch.unit_weight() {
+            let (lo, hi) = cell_flux_exact(patch, cell)?;
+            return Ok(if lo == hi {
+                crate::facade::FluxCert::Exact(lo)
+            } else {
+                crate::facade::FluxCert::Enclosure { lo, hi }
+            });
+        }
+        let rows = patch.rows;
+        let cols = patch.cols;
+        let net = sub_net(patch, cell);
+        let wnet = sub_weight_net(patch, cell);
+        let mut numerator: Vec<Vec<[f64; 3]>> = Vec::with_capacity(rows);
+        let mut weights: Vec<Vec<f64>> = Vec::with_capacity(rows);
+        for i in 0..rows {
+            let mut num_row = Vec::with_capacity(cols);
+            let mut w_row = Vec::with_capacity(cols);
+            for j in 0..cols {
+                num_row.push(net.get(i * cols + j).copied().unwrap_or([0.0; 3]));
+                w_row.push(wnet.get(i * cols + j).copied().unwrap_or(1.0));
+            }
+            numerator.push(num_row);
+            weights.push(w_row);
+        }
+        let sub = TensorBernsteinPatch::try_new(
+            numerator,
+            weights,
+            unit_ibox2(),
+            PatchParent::new(0, None),
+        )
+        .map_err(|_| BooleanVolumeRefusal::NonRegularPatch)?;
+        let fact = certify_patch_form(&sub, patch.orientation, &VolumeOptions::default())
+            .map_err(|_| BooleanVolumeRefusal::NonRegularPatch)?;
+        Ok(crate::facade::FluxCert::Enclosure {
+            lo: fact.bracket.lo,
+            hi: fact.bracket.hi,
+        })
+    }
+
+    /// The certified flux bracket of one recorded row over one cell (the
+    /// FHC-G1 rational surface arm entry). `W = const` takes the exact
+    /// polynomial fast path; a certified positive rational weight takes the
+    /// reciprocal-power enclosure.
+    pub fn cell_flux_bracket(
+        row: &VolumeRow,
+        cell: &ParamCell,
+    ) -> Result<[f64; 2], BooleanVolumeRefusal> {
+        let patch = parse_rational_patch(row)?;
+        let cert = cell_flux_certified(&patch, cell)?;
+        let (lo, hi) = cert.bracket();
+        Ok([lo, hi])
+    }
+
+    /// The exact polynomial flux bracket of one recorded row over one cell
+    /// (the `cell_flux_exact` contract, unit-weight only).
+    pub fn exact_cell_flux_bracket(
+        row: &VolumeRow,
+        cell: &ParamCell,
+    ) -> Result<[f64; 2], BooleanVolumeRefusal> {
+        let patch = parse_patch(row)?;
+        let (lo, hi) = cell_flux_exact(&patch, cell)?;
+        Ok([lo, hi])
+    }
+
+    /// The exact scalar Bernstein product of two univariate coefficient lists
+    /// (the degree-grown tensor identity on the coefficient grids).
+    fn bernstein_scalar_product(a: &[f64], b: &[f64]) -> Vec<f64> {
+        let ma = a.len().saturating_sub(1);
+        let mb = b.len().saturating_sub(1);
+        let degree = ma + mb;
+        let mut out = vec![0.0f64; degree + 1];
+        for i in 0..=ma {
+            for j in 0..=mb {
+                let scale = binomial(ma, i) * binomial(mb, j);
+                let k = i + j;
+                let denom = binomial(degree, k);
+                if denom == 0.0 {
+                    continue;
+                }
+                out[k] += a[i] * b[j] * scale / denom;
+            }
+        }
+        out
+    }
+
+    /// The certified reciprocal-power integral of `W^{-k}` over `[0, 1]`
+    /// (Theorem 5.2), for a strictly-positive univariate Bernstein weight
+    /// polynomial `W` of degree `n`. Returns `(value, error)` with the
+    /// guarantee `|integral - value| <= error`.
+    ///
+    /// The optimal center is `c = (L + U) / 2` and the relative radius is
+    /// `delta = (U - L) / (U + L)`; with `e = W / c - 1` (the expansion stays at
+    /// `W`'s own degree, never `W^3`), the truncated geometric series
+    /// `Q = c^{-k} * sum_{j<=r} (-1)^j C(j+k-1, k-1) e^j` integrates exactly and
+    /// the certified tail `R_{k,r}(delta)` bounds the remainder. `order` is the
+    /// truncation order `r`; increasing it strictly shrinks the tail for
+    /// `delta < 1`.
+    pub fn reciprocal_power_integral(
+        coeffs: &[f64],
+        k: usize,
+        order: usize,
+    ) -> Result<(f64, f64), BooleanVolumeRefusal> {
+        if coeffs.len() < 2 || k == 0 {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        if coeffs.iter().any(|c| !c.is_finite()) {
+            return Err(BooleanVolumeRefusal::MalformedPatch);
+        }
+        let mut w_lo = f64::INFINITY;
+        let mut w_hi = f64::NEG_INFINITY;
+        for &c in coeffs {
+            w_lo = w_lo.min(c);
+            w_hi = w_hi.max(c);
+        }
+        if w_lo <= 0.0 || !(w_hi > w_lo) {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let c = 0.5 * (w_lo + w_hi);
+        let delta = (w_hi - w_lo) / (w_hi + w_lo);
+        if !(delta < 1.0) || !delta.is_finite() {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let e: Vec<f64> = coeffs.iter().map(|v| (v - c) / c).collect();
+        let mut e_pow = vec![1.0f64];
+        let mut value = 0.0f64;
+        for j in 0..=order {
+            let binom = binomial(j + k - 1, k - 1);
+            let sign = if j % 2 == 0 { 1.0 } else { -1.0 };
+            let integral = e_pow.iter().sum::<f64>() / (e_pow.len() as f64);
+            value += sign * binom * integral;
+            if j < order {
+                e_pow = bernstein_scalar_product(&e_pow, &e);
+            }
+        }
+        let c_inv_k = 1.0 / c.powi(k as i32);
+        value *= c_inv_k;
+        if !value.is_finite() {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        // The certified tail R_{k,r}(delta) = c^{-k} [ (1-delta)^{-k} -
+        // sum_{j<=r} C(j+k-1, k-1) delta^j ], outward-rounded.
+        let one_minus = 1.0 - delta;
+        if one_minus <= 0.0 {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let exact_sum = one_minus.powf(-(k as f64));
+        let mut series = 0.0f64;
+        for j in 0..=order {
+            series += binomial(j + k - 1, k - 1) * delta.powi(j as i32);
+        }
+        let tail = c_inv_k * (exact_sum - series);
+        if !tail.is_finite() {
+            return Err(BooleanVolumeRefusal::RationalFluxInconclusive);
+        }
+        let guard = 64.0 * value.abs().max(tail) * f64::EPSILON * ((order + 1) as f64);
+        Ok((value, up(tail) + guard))
+    }
+
+    /// The certified rational membership of one point: the same retry contract
+    /// as [`classify_point`], but the patch set admits the certified positive
+    /// rational weight channel (FHC-G1).
+    pub fn classify_point_rational(
+        point: [f64; 3],
+        direction: [f64; 3],
+        patches: &[VolumeRow],
+        seed: u64,
+    ) -> MembershipCertificate {
+        let mut last_refusal = MembershipRefusal::MembershipIndeterminate;
+        for attempt in 0..=RETRY_BOUND {
+            let candidate = if attempt == 0 {
+                direction
+            } else {
+                retry_direction(seed, attempt - 1)
+            };
+            let parsed = patches
+                .iter()
+                .map(parse_rational_patch)
+                .collect::<Result<Vec<_>, _>>();
+            let Ok(parsed) = parsed else {
+                return MembershipCertificate {
+                    verdict: MembershipVerdict::Indeterminate,
+                    attempts: attempt,
+                    direction: normalize(candidate).unwrap_or(candidate),
+                    crossings: Vec::new(),
+                    refusal: Some(MembershipRefusal::MalformedPatch),
+                };
+            };
+            match cast_ray(point, candidate, &parsed) {
+                Ok(crossings) => {
+                    let verdict = verdict_of(&crossings);
+                    return MembershipCertificate {
+                        verdict,
+                        attempts: attempt,
+                        direction: normalize(candidate).unwrap_or(candidate),
+                        crossings,
+                        refusal: None,
+                    };
+                }
+                Err(refusal) => last_refusal = refusal,
+            }
+        }
+        MembershipCertificate {
+            verdict: MembershipVerdict::Indeterminate,
+            attempts: RETRY_BOUND,
+            direction: normalize(direction).unwrap_or(direction),
+            crossings: Vec::new(),
+            refusal: Some(last_refusal),
+        }
+    }
+
     /// The exact child control net of `patch` over `cell` (the parent net for
     /// the unit cell). The Bernstein convex-hull property makes its component
     /// hull the tight certified enclosure of the patch image over the cell.
@@ -8804,9 +9589,31 @@ pub mod membership {
     }
 
     /// The tight control-hull enclosure of `patch` over `cell` (theory eq. 11:
-    /// the control-hull min/max bracket).
+    /// the control-hull min/max bracket). A rational patch uses its exact
+    /// rational control points `A_ij / W_ij`, the convex-hull generators of the
+    /// surface (the certified positive weight makes the division exact).
     fn control_range(patch: &Patch, cell: &ParamCell) -> ([f64; 3], [f64; 3]) {
-        hull_of(&child_net(patch, cell))
+        if patch.unit_weight() {
+            return hull_of(&child_net(patch, cell));
+        }
+        let num = child_net(patch, cell);
+        let w = child_weight_net(patch, cell);
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        for (index, p) in num.iter().enumerate() {
+            let Some(wi) = w.get(index).copied() else {
+                continue;
+            };
+            if wi == 0.0 || !wi.is_finite() {
+                continue;
+            }
+            for axis in 0..3 {
+                let value = p[axis] / wi;
+                lo[axis] = lo[axis].min(value);
+                hi[axis] = hi[axis].max(value);
+            }
+        }
+        (lo, hi)
     }
 
     /// The tight control-hull enclosure of `P_u` over `cell` (the derivative
@@ -8853,10 +9660,16 @@ pub mod membership {
     }
 
     /// The interval enclosure of the oriented density `g = (1/3) P . (P_u x P_v)`
-    /// over the parameter `cell`, from the tight child control hulls. The
-    /// derivatives are taken with respect to the child's own unit parameters.
+    /// over the parameter `cell`, from the tight child control hulls. A
+    /// unit-weight patch uses `P = A`; a rational patch uses the verified
+    /// exponent-3 reduction `P . (P_u x P_v) = A . (A_u x A_v) / W^3` (the
+    /// `A . (A x ...)` terms vanish as scalar triple products with a repeated
+    /// vector), so the numerator hulls divide by the certified positive weight
+    /// cube. The derivatives are taken with respect to the child's own unit
+    /// parameters.
     fn density_interval(patch: &Patch, cell: &ParamCell) -> Iv {
-        let (plo, phi) = control_range(patch, cell);
+        let net = child_net(patch, cell);
+        let (plo, phi) = hull_of(&net);
         let (dulo, duhi) = derivative_range_u(patch, cell);
         let (dvlo, dvhi) = derivative_range_v(patch, cell);
         let p = [
@@ -8901,7 +9714,32 @@ pub mod membership {
                 hi: dvhi[2],
             },
         ];
-        dot_iv(p, cross_iv(du, dv)).scale(1.0 / 3.0)
+        let base = dot_iv(p, cross_iv(du, dv)).scale(1.0 / 3.0);
+        if patch.unit_weight() {
+            return base;
+        }
+        let w = child_weight_net(patch, cell);
+        let mut w_lo = f64::INFINITY;
+        let mut w_hi = f64::NEG_INFINITY;
+        for &value in &w {
+            w_lo = w_lo.min(value);
+            w_hi = w_hi.max(value);
+        }
+        if w_lo <= 0.0 {
+            return Iv {
+                lo: f64::NEG_INFINITY,
+                hi: f64::INFINITY,
+            };
+        }
+        let w_iv = Iv {
+            lo: down(w_lo),
+            hi: up(w_hi),
+        };
+        let w3 = w_iv.mul(w_iv).mul(w_iv);
+        base.div(w3).unwrap_or(Iv {
+            lo: f64::NEG_INFINITY,
+            hi: f64::INFINITY,
+        })
     }
 
     /// The interval cross product.
@@ -8918,8 +9756,9 @@ pub mod membership {
         a[0].mul(b[0]).add(a[1].mul(b[1])).add(a[2].mul(b[2]))
     }
 
-    /// Evaluates the patch at `(u, v)` (used for the clear-cell witness).
-    fn patch_eval(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+    /// The pointwise numerator `A(u, v)` (used for the clear-cell witness and
+    /// the rational quotient rule).
+    fn patch_numerator_eval(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
         let bu = bernstein_f64(patch.rows - 1, u);
         let bv = bernstein_f64(patch.cols - 1, v);
         let mut out = [0.0f64; 3];
@@ -8936,6 +9775,38 @@ pub mod membership {
             }
         }
         out
+    }
+
+    /// The pointwise weight `W(u, v)`.
+    fn patch_weight_eval(patch: &Patch, u: f64, v: f64) -> f64 {
+        let bu = bernstein_f64(patch.rows - 1, u);
+        let bv = bernstein_f64(patch.cols - 1, v);
+        let mut out = 0.0f64;
+        for i in 0..patch.rows {
+            let bui = bu.get(i).copied().unwrap_or(0.0);
+            for j in 0..patch.cols {
+                let bvj = bv.get(j).copied().unwrap_or(0.0);
+                if let Some(w) = patch.weights.get(i * patch.cols + j) {
+                    out += bui * bvj * w;
+                }
+            }
+        }
+        out
+    }
+
+    /// Evaluates the patch at `(u, v)` (used for the clear-cell witness). A
+    /// rational patch evaluates `A / W` (the certified positive weight makes
+    /// the quotient finite on the admitted domain).
+    fn patch_eval(patch: &Patch, u: f64, v: f64) -> [f64; 3] {
+        let a = patch_numerator_eval(patch, u, v);
+        if patch.unit_weight() {
+            return a;
+        }
+        let w = patch_weight_eval(patch, u, v);
+        if w == 0.0 || !w.is_finite() {
+            return [0.0; 3];
+        }
+        [a[0] / w, a[1] / w, a[2] / w]
     }
 
     /// The pointwise normal `P_u x P_v` at `(u, v)`.
@@ -9082,24 +9953,39 @@ pub mod membership {
 
     /// The exact flux of a clear cell, fixed by ONE membership witness
     /// (method item 4). A clear cell is connected and disjoint from the
-    /// boundary, so the witness verdict applies to the whole cell.
+    /// boundary, so the witness verdict applies to the whole cell. In the
+    /// rational arm the witness is the certified rational membership
+    /// ([`classify_point_rational`]).
     fn clear_flux(
         p: &Patch,
         cell: &ParamCell,
         others_rows: &[VolumeRow],
         options: &BooleanVolumeOptions,
+        admit_rational: bool,
     ) -> Result<(f64, f64), BooleanVolumeRefusal> {
         let u = 0.5 * (cell.u_lo + cell.u_hi);
         let v = 0.5 * (cell.v_lo + cell.v_hi);
         let point = patch_eval(p, u, v);
-        let certificate = classify_point(
-            point,
-            [0.37, 0.61, 0.70],
-            others_rows,
-            options.classify_seed,
-        );
+        let certificate = if admit_rational {
+            classify_point_rational(
+                point,
+                [0.37, 0.61, 0.70],
+                others_rows,
+                options.classify_seed,
+            )
+        } else {
+            classify_point(
+                point,
+                [0.37, 0.61, 0.70],
+                others_rows,
+                options.classify_seed,
+            )
+        };
         match certificate.verdict {
-            MembershipVerdict::Inside => cell_flux_exact(p, cell),
+            MembershipVerdict::Inside => {
+                let cert = cell_flux_certified(p, cell)?;
+                Ok(cert.bracket())
+            }
             MembershipVerdict::Outside => Ok((0.0, 0.0)),
             MembershipVerdict::Indeterminate => Err(BooleanVolumeRefusal::MembershipIndeterminate),
         }
@@ -9108,6 +9994,7 @@ pub mod membership {
     /// Integrates `1_B(P) g_P` over one patch's unit square against the
     /// `others` solid, returning the certified bracket of the patch's
     /// contribution to `V(A n B)`.
+    #[allow(clippy::too_many_arguments)]
     fn integrate_patch(
         p: &Patch,
         others_rows: &[VolumeRow],
@@ -9115,6 +10002,7 @@ pub mod membership {
         budget: f64,
         options: &BooleanVolumeOptions,
         stats: &mut PhaseStats,
+        admit_rational: bool,
     ) -> Result<(f64, f64), BooleanVolumeRefusal> {
         let cover = cover_boxes(p, others, options.cover_depth);
         stats.cover_cells += cover.len();
@@ -9128,7 +10016,7 @@ pub mod membership {
         if !cover.iter().any(|c| c.intersects(&seed))
             || is_clear(p, &seed, others, options.separation_depth)
         {
-            let (lo, hi) = clear_flux(p, &seed, others_rows, options)?;
+            let (lo, hi) = clear_flux(p, &seed, others_rows, options, admit_rational)?;
             exact_lo += lo;
             exact_hi += hi;
             stats.clear_cells += 1;
@@ -9177,7 +10065,7 @@ pub mod membership {
                 if !cover.iter().any(|c| c.intersects(&child))
                     || is_clear(p, &child, others, options.separation_depth)
                 {
-                    let (clo, chi) = clear_flux(p, &child, others_rows, options)?;
+                    let (clo, chi) = clear_flux(p, &child, others_rows, options, admit_rational)?;
                     exact_lo += clo;
                     exact_hi += chi;
                     stats.clear_cells += 1;
@@ -9253,24 +10141,53 @@ pub mod membership {
 
     /// The certified boolean volume of `A \ B` by contact covers (method
     /// items 1-9). `A` and `B` are closed oriented tensor-Bernstein patch
-    /// 2-cycles with unit weights (Amendment 4); `V(A)` and `V(B)` come from
-    /// the landed per-patch flux certificate.
+    /// 2-cycles; the strict entry admits unit weights only (Amendment 4), the
+    /// rational entry admits the certified positive weight channel of FHC-G1.
     pub fn certify_boolean_volume(
         a: &[VolumeRow],
         b: &[VolumeRow],
         options: &BooleanVolumeOptions,
     ) -> Result<BooleanVolumeCertificate, BooleanVolumeRefusal> {
+        certify_boolean_volume_impl(a, b, options, false)
+    }
+
+    /// The FHC-G1 rational entry: the same certified contact-cover solver, but
+    /// the patch set admits the certified positive rational weight channel
+    /// (`min w_ij > 0`). A unit-weight row takes the exact polynomial fast
+    /// path unchanged, so the polynomial inputs answer bit-identically to
+    /// [`certify_boolean_volume`].
+    pub fn certify_boolean_volume_rational(
+        a: &[VolumeRow],
+        b: &[VolumeRow],
+        options: &BooleanVolumeOptions,
+    ) -> Result<BooleanVolumeCertificate, BooleanVolumeRefusal> {
+        certify_boolean_volume_impl(a, b, options, true)
+    }
+
+    fn certify_boolean_volume_impl(
+        a: &[VolumeRow],
+        b: &[VolumeRow],
+        options: &BooleanVolumeOptions,
+        admit_rational: bool,
+    ) -> Result<BooleanVolumeCertificate, BooleanVolumeRefusal> {
         if a.is_empty() || b.is_empty() {
             return Err(BooleanVolumeRefusal::MalformedPatch);
         }
+        let parse = |row: &VolumeRow| {
+            if admit_rational {
+                parse_rational_patch(row)
+            } else {
+                parse_patch(row)
+            }
+        };
         let a_parsed = a
             .iter()
-            .map(parse_patch)
+            .map(parse)
             .collect::<Result<Vec<_>, _>>()
             .map_err(BooleanVolumeRefusal::from)?;
         let b_parsed = b
             .iter()
-            .map(parse_patch)
+            .map(parse)
             .collect::<Result<Vec<_>, _>>()
             .map_err(BooleanVolumeRefusal::from)?;
 
@@ -9280,7 +10197,7 @@ pub mod membership {
         let mut va_lo = 0.0f64;
         let mut va_hi = 0.0f64;
         for p in &a_parsed {
-            let (lo, hi) = cell_flux_exact(p, &ParamCell::unit())?;
+            let (lo, hi) = cell_flux_certified(p, &ParamCell::unit())?.bracket();
             va_lo += lo;
             va_hi += hi;
         }
@@ -9288,7 +10205,7 @@ pub mod membership {
         let mut vb_lo = 0.0f64;
         let mut vb_hi = 0.0f64;
         for q in &b_parsed {
-            let (lo, hi) = cell_flux_exact(q, &ParamCell::unit())?;
+            let (lo, hi) = cell_flux_certified(q, &ParamCell::unit())?.bracket();
             vb_lo += lo;
             vb_hi += hi;
         }
@@ -9335,12 +10252,14 @@ pub mod membership {
         let mut inter_lo = 0.0f64;
         let mut inter_hi = 0.0f64;
         for p in &a_parsed {
-            let (lo, hi) = integrate_patch(p, b, &b_parsed, budget, options, &mut stats)?;
+            let (lo, hi) =
+                integrate_patch(p, b, &b_parsed, budget, options, &mut stats, admit_rational)?;
             inter_lo += lo;
             inter_hi += hi;
         }
         for q in &b_parsed {
-            let (lo, hi) = integrate_patch(q, a, &a_parsed, budget, options, &mut stats)?;
+            let (lo, hi) =
+                integrate_patch(q, a, &a_parsed, budget, options, &mut stats, admit_rational)?;
             inter_lo += lo;
             inter_hi += hi;
         }
@@ -10061,6 +10980,7 @@ pub mod membership {
             rows: patch.rows,
             cols: patch.cols,
             data: patch.num.clone(),
+            weights: vec![1.0; patch.rows * patch.cols],
             orientation: 1.0,
         };
         sub_net(&p, cell)
@@ -10072,6 +10992,7 @@ pub mod membership {
             rows: patch.rows,
             cols: patch.cols,
             data,
+            weights: vec![1.0; patch.rows * patch.cols],
             orientation: 1.0,
         };
         sub_net(&p, cell).into_iter().map(|v| v[0]).collect()
@@ -10268,12 +11189,14 @@ pub mod membership {
             rows: raw.rows,
             cols: raw.cols,
             data: raw.num.clone(),
+            weights: vec![1.0; raw.rows * raw.cols],
             orientation: 1.0,
         };
         let wp = Patch {
             rows: raw.rows,
             cols: raw.cols,
             data: raw.weights.iter().map(|&w| [w, 0.0, 0.0]).collect(),
+            weights: vec![1.0; raw.rows * raw.cols],
             orientation: 1.0,
         };
         let (alo, ahi) = control_range(&p, &cell);
@@ -10826,6 +11749,228 @@ pub fn certify_sandwich_probe(
                 refined_cells: 0,
                 refusal: Some(tag),
                 floor,
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FHC-G1-RATIONAL-FLUX -- the door-facing rational-flux probe.
+// ---------------------------------------------------------------------------
+
+/// The typed tag of one certified boolean-volume refusal (the probe's
+/// machine-readable refusal vocabulary; the packet's
+/// `rational_flux_inconclusive` is the rational tail's tag).
+fn boolean_volume_refusal_tag(refusal: membership::BooleanVolumeRefusal) -> String {
+    match refusal {
+        membership::BooleanVolumeRefusal::NonRegularPatch => "non_regular_patch".to_string(),
+        membership::BooleanVolumeRefusal::TransversalityUncertified => {
+            "transversality_uncertified".to_string()
+        }
+        membership::BooleanVolumeRefusal::MembershipIndeterminate => {
+            "membership_indeterminate".to_string()
+        }
+        membership::BooleanVolumeRefusal::BudgetExceeded => "budget_exceeded".to_string(),
+        membership::BooleanVolumeRefusal::ExtremeSlabContaminated => {
+            "extreme_slab_contaminated".to_string()
+        }
+        membership::BooleanVolumeRefusal::MalformedPatch => "malformed_patch".to_string(),
+        membership::BooleanVolumeRefusal::RationalWeights => "rational_weights".to_string(),
+        membership::BooleanVolumeRefusal::BooleanProductVolumeUnavailable => {
+            "boolean_product_volume_unavailable".to_string()
+        }
+        membership::BooleanVolumeRefusal::RationalFluxInconclusive => {
+            "rational_flux_inconclusive".to_string()
+        }
+    }
+}
+
+/// The FHC-G1 rational-flux door probe (the CHK-9 reachability surface): run
+/// the requested certified kernel entry over the submitted patch data and
+/// report the certified outcome or the typed refusal tag. A refusal is always
+/// reported as a named tag, never a panic and never a silent zero.
+pub fn certify_rational_flux_probe(
+    row: &crate::facade::RationalFluxProbeRow,
+) -> crate::facade::RationalFluxOutcome {
+    use crate::facade::{FluxCert, RationalFluxKind, RationalFluxOutcome};
+
+    let to_rows = |patches: &[crate::facade::SandwichPatchRow]| {
+        patches
+            .iter()
+            .map(|p| crate::python::binding::VolumeRow {
+                numerator: p.numerator.clone(),
+                weights: p.weights.clone(),
+                orientation: p.orientation,
+            })
+            .collect::<Vec<_>>()
+    };
+    let refusal = |tag: String| RationalFluxOutcome {
+        ok: false,
+        brackets: Vec::new(),
+        value: None,
+        error: None,
+        volume: None,
+        verdict: None,
+        refusal: Some(tag),
+    };
+    let cells = |row: &crate::facade::RationalFluxProbeRow| {
+        if row.cells.is_empty() {
+            vec![[0.0, 1.0, 0.0, 1.0]]
+        } else {
+            row.cells.clone()
+        }
+    };
+
+    match row.kind {
+        RationalFluxKind::CellFlux => {
+            let rows = to_rows(&row.patches);
+            let mut brackets = Vec::new();
+            for patch in &rows {
+                for c in cells(row) {
+                    let cell = membership::ParamCell {
+                        u_lo: c[0],
+                        u_hi: c[1],
+                        v_lo: c[2],
+                        v_hi: c[3],
+                    };
+                    match membership::cell_flux_bracket(patch, &cell) {
+                        Ok(bracket) => brackets.push(bracket),
+                        Err(refusal_value) => {
+                            return refusal(boolean_volume_refusal_tag(refusal_value));
+                        }
+                    }
+                }
+            }
+            RationalFluxOutcome {
+                ok: true,
+                brackets,
+                value: None,
+                error: None,
+                volume: None,
+                verdict: None,
+                refusal: None,
+            }
+        }
+        RationalFluxKind::Reciprocal => {
+            match membership::reciprocal_power_integral(&row.coeffs, row.k, row.order) {
+                Ok((value, error)) => RationalFluxOutcome {
+                    ok: true,
+                    brackets: Vec::new(),
+                    value: Some(value),
+                    error: Some(error),
+                    volume: None,
+                    verdict: None,
+                    refusal: None,
+                },
+                Err(refusal_value) => refusal(boolean_volume_refusal_tag(refusal_value)),
+            }
+        }
+        RationalFluxKind::BooleanVolume => {
+            let a = to_rows(&row.patches);
+            let b = to_rows(&row.tool);
+            let mode = row.mode.unwrap_or(crate::facade::ModeValue::Subtract);
+            let options = membership::BooleanVolumeOptions::default();
+            match membership::certify_boolean_volume_rational(&a, &b, &options) {
+                Ok(cert) => {
+                    let intersection = 0.5 * (cert.intersection_lo + cert.intersection_hi);
+                    let volume = match mode {
+                        crate::facade::ModeValue::Subtract => cert.value,
+                        crate::facade::ModeValue::Add => {
+                            cert.volume_a + cert.volume_b - intersection
+                        }
+                        crate::facade::ModeValue::Intersect => intersection,
+                    };
+                    RationalFluxOutcome {
+                        ok: true,
+                        brackets: vec![[cert.bracket_lo, cert.bracket_hi]],
+                        value: None,
+                        error: None,
+                        volume: Some(volume),
+                        verdict: None,
+                        refusal: None,
+                    }
+                }
+                Err(refusal_value) => refusal(boolean_volume_refusal_tag(refusal_value)),
+            }
+        }
+        RationalFluxKind::Classify => {
+            let rows = to_rows(&row.patches);
+            let point = row.point.unwrap_or([0.0; 3]);
+            let direction = row.direction.unwrap_or([0.37, 0.61, 0.70]);
+            let certificate =
+                membership::classify_point_rational(point, direction, &rows, 0x0000_4D4F_4E4F_3601);
+            let verdict = match certificate.verdict {
+                membership::MembershipVerdict::Inside => "inside",
+                membership::MembershipVerdict::Outside => "outside",
+                membership::MembershipVerdict::Indeterminate => "indeterminate",
+            };
+            RationalFluxOutcome {
+                ok: true,
+                brackets: Vec::new(),
+                value: None,
+                error: None,
+                volume: None,
+                verdict: Some(verdict.to_string()),
+                refusal: certificate
+                    .refusal
+                    .map(|_| "membership_indeterminate".to_string()),
+            }
+        }
+        RationalFluxKind::Fold => {
+            let rows = to_rows(&row.patches);
+            // The orientation anchor must be uniform within one closed cell: a
+            // mixed-anchor fold is refused typed rather than summed.
+            let mut anchor = 0i8;
+            for patch in &rows {
+                let sign = if patch.orientation < 0.0 {
+                    -1i8
+                } else if patch.orientation > 0.0 {
+                    1i8
+                } else {
+                    0i8
+                };
+                if anchor == 0 {
+                    anchor = sign;
+                } else if anchor != sign {
+                    return refusal("anchor_mismatch".to_string());
+                }
+            }
+            let mut certificates: Vec<FluxCert> = Vec::with_capacity(rows.len());
+            for patch in &rows {
+                let unit = membership::ParamCell {
+                    u_lo: 0.0,
+                    u_hi: 1.0,
+                    v_lo: 0.0,
+                    v_hi: 1.0,
+                };
+                match membership::cell_flux_bracket(patch, &unit) {
+                    Ok([lo, hi]) => {
+                        certificates.push(if lo == hi {
+                            FluxCert::Exact(lo)
+                        } else {
+                            FluxCert::Enclosure { lo, hi }
+                        });
+                    }
+                    Err(refusal_value) => {
+                        return refusal(boolean_volume_refusal_tag(refusal_value));
+                    }
+                }
+            }
+            match crate::facade::fold_flux_certificates(&certificates) {
+                Some(cert) => {
+                    let (lo, hi) = cert.bracket();
+                    let two_channel = crate::facade::fold_two_channel_certificates(&certificates);
+                    RationalFluxOutcome {
+                        ok: true,
+                        brackets: vec![[lo, hi]],
+                        value: Some(cert.value()),
+                        error: Some(two_channel.total_width()),
+                        volume: None,
+                        verdict: None,
+                        refusal: None,
+                    }
+                }
+                None => refusal("malformed_patch".to_string()),
             }
         }
     }
