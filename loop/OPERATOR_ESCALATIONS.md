@@ -2989,3 +2989,23 @@ uncommitted - left for the orchestrator, no dispatch impact.
   (`extremes_survive`); `loop/results/FHC-G10-PLACEMENT-COVARIANCE-CACHE.json` (the prerequisite gap).
 - Carried unchanged: FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale READY row (line 356);
   RG-23/RG-9 packet files absent; dead substrate stack; disk below the 15 GB goal.
+
+## [operator 2026-09-14T11:31Z] schedule.py over-reports dispatchable work (harness trap, not a stall)
+
+- WHAT: `python loop/schedule.py` prints `eligible now: 32  dispatchable in parallel: 19` while the dispatch
+  authority, `dispatch_ready.py`, dispatches 0 with 8 free slots and 0 running. The disagreement is real and
+  the authority is right: 78 of the 80 READY rows carry a `landed <hex>` note (landed but status not
+  flipped), and `schedule.py` does not honor the landed-note marker that `dispatch_ready.landed()` uses.
+- WHY HUMAN/ORCHESTRATOR: this is not a stall and needs no unblock - it is a misleading count. A future
+  operator (or the heartbeat) reading schedule.py's "19" could run a manual live dispatch to "fill" idle
+  slots, colliding with the heartbeat. `schedule.py` is already documented as a demoted query/debug
+  primitive in ORCHESTRATOR.md; the fix (teach it the landed-note predicate, or print the note-skips) is a
+  harness change, which the operator charter does not permit.
+- OPERATOR ACTION: did NOT run live dispatch; did NOT edit schedule.py or PACKETS.jsonl. Reported only.
+- START FROM: `loop/schedule.py` (the `eligible now` / `dispatchable in parallel` computation) vs
+  `loop/dispatch_ready.py:99-109` (`LANDED_RE` / `landed()`); `loop/PACKETS.jsonl` (78 READY rows with a
+  landed-note).
+- ALSO: the machine has been at 0 running for many heartbeat cycles with only 2 genuinely-unlanded READY
+  rows (RG-23/RG-9), whose packet files are ABSENT. The real frontier needs packet authoring (orchestrator
+  work), not dispatch. Carried: slot-0 FHC-G8 SPEC_GAP; FHC-D `000cb11` duplicate; FHC-G1 stale READY row;
+  dead substrate stack.

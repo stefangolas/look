@@ -11407,3 +11407,42 @@ Actions:
   READY row (line 356); RG-23/RG-9 packet files absent; dead substrate stack (watchdog/supervisor/overnight);
   disk below the 15 GB goal.
 - Leaving: HEAD `1d23eeb` + this cycle's STATE/log commit; slots 0-7 all FINISHED (no live workers).
+
+## [operator 2026-09-14T11:31Z] cycle 59 - health sweep, janitor reclaim, no landable/unblockable work
+
+- BOARD (re-derived by command): 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
+  FHC-G8 duplicate of the landed slot-1 run) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0
+  registry flips / 0 dispatched-live. HEAD `c738886` (the 11:07Z operator STATE/log commit).
+- HEALTH: heartbeat exactly 1 (27872, alive since 09-09); operator_runner exactly 1 (27876). The `2` counts
+  from a naive `-match` query are this operator's own query shell (pid 38500) - confirmed by pid listing.
+  watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq UP idle (`/ping` = queued 0,
+  running false). Disk 7.95 GB at entry (BELOW the 8 GB floor) -> `janitor ensure --need 8` reclaimed
+  ~5.8 GB -> 13.1 GB free (above floor, below the 15 GB goal). RAM 3.40 GB free (above the 3 GB floor).
+  No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last DIRECT clippy 2026-09-14 03:05:15,
+  carried).
+- LANDABLE (step 2): NONE. `git merge-base --is-ancestor` exit 0 for every worker commit e6553db/3c2109b/
+  ee97499/713f205/5cf4811 (slots 3-7) and for the 11:07Z landings da55a1a (FHC-G8) / f815d36 (FHC-G9).
+  Slot 0 is SPEC_GAP (not landable). FHC-D duplicate `000cb11` is NOT an ancestor but its packet is DONE
+  (carried escalation; do not merge). No RESULT was filed this cycle because nothing new finished.
+- UNBLOCK (step 3): NONE. 0 RUNNING and no live workers. Slot 0's SPEC_GAP residue is the SAME packet
+  (FHC-G8) whose DONE implementation already landed on slot 1 -> did NOT reset/redispatch (would duplicate).
+  No QUESTION.md anywhere in slots 0-7.
+- REGISTRY (step 4): re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY / 10 BLOCKED / 2
+  SUPERSEDED. 78 of the 80 READY rows carry a `landed <hex>` note (landed, status not flipped - the known
+  convention) and dispatch_ready correctly skips them; the only two without a landed note are RG-23 and
+  RG-9, whose packet files are ABSENT. All 10 BLOCKED parked: 6 needs=[], DEF-TESS-ANALYTIC-SEAM needs
+  DEF-VENDOR-FIXTURES (READY), DEF-SEEDRAY-B needs DEF-SEEDRAY-A (READY), TOR-C needs ADM-001-ADAPTER/
+  ADM-002-CERTIFICATES (READY), BG-CK-SPLINE-CENSUS needs BG-CK-P0-PREVALENCE (DONE but owner-cancelled).
+  No mechanical flip. Stale FHC-G1 READY row (line 356) carried - did NOT re-measure its anchors (would arm
+  a duplicate dispatch). PACKETS.jsonl NOT edited (outside the operator's three-file limit).
+- DISPATCH (step 5): did NOT run live - the heartbeat (27872) owns dispatch and manual + heartbeat is the
+  documented double-dispatch race. `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8
+  free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent);
+  FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle. NOTE: `schedule.py` prints `dispatchable in
+  parallel: 19`, which is misleading - it does not honor the landed-note marker; dispatch_ready is the
+  dispatch authority and its `dispatched 0` is correct.
+- ESCALATIONS: 1 new (schedule.py's "19 dispatchable" vs dispatch_ready's "dispatched 0" - do not act on
+  schedule.py; the 78 landed-note READY rows are registry bookkeeping debt). Carried: slot-0 FHC-G8
+  SPEC_GAP (exactness vs placed f64 nets); FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale
+  READY row; RG-23/RG-9 packet files absent; dead substrate stack; disk below the 15 GB goal.
+- Leaving: HEAD `c738886` + this cycle's STATE/log commit; 0 live workers; PACKETS.jsonl untouched.

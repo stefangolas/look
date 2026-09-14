@@ -75,6 +75,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T11:31Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
+> residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0 registry
+> flips / 0 dispatched-live. HEAD `c738886` (the 11:07Z operator STATE/log commit). Board re-derived by command.
+> **LANDABLE: NONE.** Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and the 11:07Z
+> landings da55a1a (FHC-G8) / f815d36 (FHC-G9) are all ancestors of HEAD (`git merge-base --is-ancestor`
+> exit 0 each); slot 0 SPEC_GAP not landable. FHC-D duplicate `000cb11` NOT an ancestor but its packet is
+> DONE - do NOT merge (carried).
+> **UNBLOCK: NONE.** 0 RUNNING, no live workers; slot 0 is the SPEC_GAP residue of a packet whose DONE
+> implementation already landed (slot 1) -> did NOT reset/redispatch (would duplicate). No QUESTION.md.
+> **REGISTRY (step 4):** re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY / 10 BLOCKED /
+> 2 SUPERSEDED. **78 of the 80 READY rows carry a `landed <hex>` note** (landed, status not flipped - the
+> known convention); the only two without one are RG-23/RG-9, whose packet files are ABSENT. Stale FHC-G1
+> READY row carried (do NOT re-measure). No mechanical flip. NOT edited.
+> **DISPATCH (step 5):** did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat = double-dispatch
+> race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned packets:
+> 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7,
+> A5 40->56 = REAL idle. `schedule.py` prints `dispatchable in parallel: 19` but does NOT honor the
+> landed-note marker - dispatch_ready is the authority and is correct.
+> **HEALTH:** heartbeat exactly 1 (27872); operator_runner 1 (27876); watchdog/supervisor/overnight 0
+> (carried dead, not restarted). cargoq UP idle (ping ok, queued 0, running false). **Disk 7.95 GB at entry
+> (BELOW the 8 GB floor) -> janitor `ensure --need 8` reclaimed ~5.8 GB -> 13.1 GB free (above floor, below
+> 15 goal); RAM 3.40 GB free (above 3 floor).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log`
+> quiet (last DIRECT clippy 2026-09-14 03:05:15, carried).
+> **OPERATOR ACTION:** health sweep; janitor disk reclaim; re-derived landability (none); registry
+> read-only (no flip); did NOT run live dispatch; STATE + log written. Leaving: HEAD `c738886` + this
+> cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T11:07Z]: 0 RUNNING / **2 landed-this-cycle (FHC-G9-GREEN-TRIM-INTEGRATION
 > + FHC-G8-PLANARITY-ROUTER)** / 1 FINISHED SPEC_GAP residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue
 > (slots 3-7) / 0 unblocked / 2 registry flips / 0 dispatched-live. HEAD `1d23eeb` (this cycle's landing commit;
@@ -459,6 +486,25 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T11:31Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
+  FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0 registry flips / 0
+  dispatched-live; HEAD `c738886`. Board re-derived by command.
+- [operator 2026-09-14T11:31Z] landable: NONE. Slots 3-7 commits + the 11:07Z da55a1a/f815d36 all ancestors
+  of HEAD; slot 0 SPEC_GAP; FHC-D `000cb11` not an ancestor but packet DONE (carried, do not merge).
+- [operator 2026-09-14T11:31Z] unblock: NONE. 0 running, no live workers; slot 0 is SPEC_GAP residue of a
+  packet whose DONE implementation already landed (slot 1) -> did NOT reset/redispatch. No QUESTION.md.
+- [operator 2026-09-14T11:31Z] registry re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY /
+  10 BLOCKED / 2 SUPERSEDED. 78/80 READY carry a landed-note (skipped correctly); only RG-23/RG-9 lack one
+  (packet files absent). Stale FHC-G1 READY row carried (do NOT re-measure). No flip. NOT edited.
+- [operator 2026-09-14T11:31Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch). dry-run =
+  `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED
+  (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle. schedule.py's "19" is the
+  demoted query primitive (does not honor the landed-note marker); dispatch_ready is the authority.
+- [operator 2026-09-14T11:31Z] health: heartbeat 1 (27872); operator_runner 1 (27876); watchdog/supervisor/
+  overnight 0 (carried dead). cargoq UP idle. **Disk 7.95 GB at entry (BELOW 8 floor) -> janitor reclaimed
+  ~5.8 GB -> 13.1 GB free; RAM 3.40 GB free (above 3 floor).** No `%TEMP%/look-verify-baseline-*` leaks;
+  fallback.log quiet (2026-09-14 03:05:15 clippy bypass carried).
 
 - [operator 2026-09-14T11:07Z] board: 0 RUNNING / 2 landed-this-cycle (FHC-G9 slot 2, FHC-G8 slot 1) / 1
   FINISHED SPEC_GAP residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked /
