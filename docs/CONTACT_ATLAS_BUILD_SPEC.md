@@ -10,6 +10,15 @@ integration order, and the acceptance battery. Per the kernel program law,
 all kernel changes flow through packet/worker/verify; `vendor/truck/**` and
 the truck123d kernel sources change only via dispatched packets.
 
+**Packet sizing is governed by `docs/PACKET_ECONOMICS.md`** (2026-09-14,
+owner-directed): 1–3 modest proof obligations per packet, ≤ ~800 LOC
+landed, scoped tests under 2 min, budget ≤ 45 turns, bundle only
+homogeneous churn. Wave 4 is re-scoped accordingly (see §2, Wave 4
+sub-splits a/b/c/d) — the three drafted multi-obligation packets become
+eight single-obligation packets. Anchors are floor anchors (`min:`) by
+default (the 2026-09-14 staleness fix in `gen_packet.py`); absolute
+`expect` only where no sibling writes the file.
+
 ## 0. What this program changes, and what it may not
 
 REPLACES (as primary accuracy mechanism): the measure-2 contact-cell

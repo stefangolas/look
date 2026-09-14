@@ -55,6 +55,18 @@ def parse_anchors(yaml_text):
 
     anchors:
       - {id: A1, expect: 4, cmd: "grep -cE '...' vendor/truck/.../circle.rs"}
+
+    Anchor kinds (2026-09-14, the staleness fix):
+      - `expect: N`  absolute count; checked exactly (legacy; use only for
+        counts the packet PROMISES to hold exactly, e.g. files nobody else
+        writes).
+      - `min: M`     floor; `got >= M` passes. Drift-proof against sibling
+        additions, still catches rot (a pattern collapsing below its floor
+        means the described structure is gone -> re-scope). The workhorse
+        for existence claims on files siblings also land on.
+      - `delta: D`   RESERVED (not yet enforced): baseline stamped at
+        dispatch, landing must measure baseline + D. For packets promising
+        an exact structural delta.
     """
     anchors = []
     for line in yaml_text.splitlines():
@@ -65,14 +77,14 @@ def parse_anchors(yaml_text):
         if 'cmd:' not in body:
             continue
         fields = {}
-        for key in ('id', 'expect', 'cmd'):
+        for key in ('id', 'expect', 'min', 'delta', 'cmd'):
             mk = re.search(rf"{key}:\s*(\"(?:[^\"\\]|\\.)*\"|'[^']*'|[^,]+?)\s*(?:,|$)", body)
             if mk:
                 v = mk.group(1).strip()
                 if len(v) >= 2 and v[0] in '"\'' and v[-1] == v[0]:
                     v = v[1:-1]
                 fields[key] = v
-        if 'cmd' in fields and 'expect' in fields:
+        if 'cmd' in fields and ('expect' in fields or 'min' in fields):
             anchors.append(fields)
     return anchors
 
@@ -212,6 +224,23 @@ def check(packet_path, quiet=False):
             print(f"  no runnable `anchors:` block -- {Path(packet_path).name} is unchecked, not checked")
     for a in anchors:
         got, err = run_anchor(a['cmd'])
+        if 'min' in a:
+            # Floor anchor: drift-proof against sibling additions, catches
+            # rot below the floor. See parse_anchors' kind table.
+            if err:
+                problems.append(f"{a.get('id','?')}: {err}")
+                continue
+            if got is None:
+                problems.append(f"{a.get('id','?')}: anchor produced no count  [{a['cmd'][:70]}]")
+                continue
+            floor = int(a['min'])
+            if got < floor:
+                problems.append(
+                    f"{a.get('id','?')}: floor {floor}, tree has {got}  "
+                    f"[{a['cmd'][:70]}] -- the described structure is gone; re-scope")
+            elif not quiet:
+                print(f"  {a.get('id','?'):4} {got:>4} >= {floor}  ok")
+            continue
         want = int(a['expect'])
         if err:
             problems.append(f"{a.get('id','?')}: {err}")

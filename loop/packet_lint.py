@@ -430,6 +430,46 @@ def lint_packet(packet_path, known_ids):
     # recurs, the fix is tree-aware (compare prose signatures against source),
     # not a broader pattern.
 
+    # ANCHOR_DRIFT_RISK (2026-09-14, the staleness fix): an absolute
+    # `expect` anchor on a file that ANOTHER packet writes will stale the
+    # moment that sibling lands -- the count moved for a legitimate reason
+    # and the anchor check then blocks dispatch on noise. Floor anchors
+    # (`min:`) are drift-proof against sibling additions. Warn so the
+    # author converts to floors before the round trip is paid.
+    other_writes = set()
+    if PACKETS_JSONL.is_file():
+        me = Path(packet_path).stem
+        for line in PACKETS_JSONL.read_text(encoding='utf-8').splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get('id') == me:
+                continue
+            other_writes.update(row.get('writes', []))
+    for line in yaml_text.splitlines():
+        am = re.match(r"\s*-\s*\{(.+)\}\s*$", line)
+        if not am or 'cmd:' not in am.group(1) or 'expect:' not in am.group(1):
+            continue
+        aid_m = re.search(r"id:\s*([A-Za-z0-9_-]+)", am.group(1))
+        aid = aid_m.group(1) if aid_m else '?'
+        cmd_m = re.search(r'cmd:\s*"([^"]*)"', am.group(1)) or \
+            re.search(r"cmd:\s*'([^']*)'", am.group(1))
+        if not cmd_m:
+            continue
+        target = cmd_m.group(1).split()[-1].strip('"\'')
+        # Normalize both sides to forward slashes: the anchor cmd may use
+        # either separator and PACKETS.jsonl `writes` use forward slashes.
+        target_norm = target.replace('\\', '/')
+        if any(target_norm.endswith(ow.replace('\\', '/')) for ow in other_writes):
+            findings.add('WARN', 'ANCHOR_DRIFT_RISK',
+                         f"anchor {aid} pins an absolute count on {target}, which "
+                         "another packet's write set also touches - sibling landings "
+                         "will stale it. Use a floor anchor (min:) unless the count "
+                         "must hold exactly.")
+
     return findings
 
 
