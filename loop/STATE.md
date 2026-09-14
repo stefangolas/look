@@ -75,30 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T03:36Z]: 2 RUNNING + 1 IDLE residue + 5 FINISHED landed
-> residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live. HEAD
-> `b502a85`. Board re-derived by command.
-> **FHC-G1-RATIONAL-FLUX is RUNNING AGAIN (attempt 2)** - slot 0, branch re-forked from `b502a85`,
-> pid 25588, events fresh (worker re-reading specs); slot 1 RUNNING LOOP-MACH-1 (the machinery-redesign
-> packet), pid 29092, events fresh. Both progressing; do NOT disturb.
-> **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable, both RUNNING workers
-> progressing, no IDLE slot holding resumable work/QUESTION/402, dispatch is REAL idle.
+> LATEST GROUND TRUTH [operator 2026-09-14T04:20Z]: 1 RUNNING + 1 IDLE dead attempt + 1 IDLE residue
+> + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0
+> dispatched-live. HEAD `146620a`. Board re-derived by command.
+> **FHC-G1-RATIONAL-FLUX retry is RUNNING** - slot 1, pid 12764 (alive, cmd), events fresh (<0.5 min),
+> changed 3 (`truck123d/src/bd_bridge.rs`, `truck123d/src/facade.rs`, new `truck123d/tests/rational_flux.rs`);
+> worker iterating: `rational_flux` test 10/11 pass, `end_to_end_cylinder_union` FAILED
+> (`transversality_uncertified`). Progressing; do NOT disturb.
+> **Slot 0 IDLE = FHC-G1 attempt-1 residue** (attempt_id `FHC-G1-RATIONAL-FLUX/0001`, base `b86dd69`,
+> worker pid 37096 DEAD, no RESULT.json/QUESTION); WIP checkpoint commit `b86dd69` "orchestrator recovery
+> - attempt hung on API; work preserved" is NOT an ancestor of HEAD. Did NOT reset/redispatch - would
+> duplicate the live slot-1 retry.
+> **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable (no DONE RESULT),
+> slot-1 worker progressing, slot-0 residue is an intentionally preserved hung attempt, dispatch is REAL idle.
 > **Frontier**: FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1 (now running); RG-23/RG-9 write-set clash with the
 > RUNNING G1 on `truck123d/src/bd_bridge.rs` -> carried.
-> **Registry**: re-derived READ-ONLY (364 unique, last-wins): 267 DONE / 85 READY / 10 BLOCKED / 2
-> SUPERSEDED. NOT edited this cycle - an ACTIVE orchestrator is modifying PACKETS.jsonl (READY 84->85),
-> so editing risks the lost-update race. Only needs-landed BLOCKED row is BG-CK-SPLINE-CENSUS (needs
-> BG-CK-P0-PREVALENCE DONE) but it is OWNER-CANCELLED -> left BLOCKED, not flipped.
-> **SUBSTRATE**: heartbeat exactly 1 (27872); the second `-match` hit is the operator's own query shell.
-> watchdog/supervisor/overnight remain DEAD (carried). cargoq UP (ping ok, queued 0, running false).
-> Disk 12.4 GB free (BELOW the 15 GB goal, above the 8 GB floor); RAM 1.5-2.4 GB free (BELOW the 3 GB
-> floor - two workers + active orchestrator resident). No `%TEMP%/look-verify-baseline-*` leaks;
-> `fallback.log` quiet since 2026-09-11.
-> **Observation**: active orchestrator opencode 37844 (old) + 23480/7484/7424 (since 09-13 23:34) present
-> (do not disturb); tracked dirty set still `truck123d/tests/rdef_m2_sandwich.rs` + `loop/cargoq/server.log`
-> (outside operator scope; not touched).
-> Leaving: HEAD `b502a85` + this cycle's STATE/log commit; 2 workers running; registry untouched pending
-> orchestrator quiescence.
+> **Registry**: re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10 BLOCKED / 2
+> SUPERSEDED. NOT edited this cycle - an ACTIVE orchestrator is modifying PACKETS.jsonl (mtime 00:08
+> local), so editing risks the lost-update race. All 10 BLOCKED owner/semantic parked.
+> **SUBSTRATE**: heartbeat exactly 1 (27872; last cycle 00:15:43 "dispatched 0; workers now ~1/3"); the
+> second `-match` hit is the operator's own query shell. watchdog/supervisor/overnight remain DEAD
+> (carried, not restarted). cargoq UP (ping ok, queued 0, running false). Disk 10.67 GB free (BELOW the
+> 15 GB goal, above the 8 GB floor); RAM 1.16 GB free (BELOW the 3 GB floor - 1 worker + active
+> orchestrator + language servers). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since
+> 2026-09-11.
+> **Observation**: active orchestrator opencode 37844 (since 09-12) + 2132/30436 (since 00:05/00:18 local)
+> present (do not disturb); tracked dirty set still `truck123d/tests/rdef_m2_sandwich.rs` +
+> `loop/cargoq/server.log` (outside operator scope; not touched).
+> Leaving: HEAD `146620a` + this cycle's STATE/log commit; slot-1 worker running; registry untouched
+> pending orchestrator quiescence.
 
 
 ## Pick up here
@@ -143,6 +148,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T04:20Z] board: 1 RUNNING (slot 1 FHC-G1-RATIONAL-FLUX retry, pid 12764 alive,
+  events fresh, changed 3; iterating on `rational_flux` 10/11, `end_to_end_cylinder_union` FAILED
+  `transversality_uncertified`) + 1 IDLE dead attempt (slot 0 FHC-G1 attempt-1 `/0001`, pid 37096 dead,
+  no RESULT/QUESTION, WIP checkpoint `b86dd69` not an ancestor) + 1 IDLE residue (slot 2
+  TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed / 0 unblocked / 0
+  flipped / 0 dispatched-live; HEAD `146620a` (LOOP-MACH-1 landed: 76baf0d/c9477f5/d2d14d4 + CI pin).
+  Board re-derived by command.
+- [operator 2026-09-14T04:20Z] landable: NONE. Slot 1 RUNNING (no RESULT.json). Slot 0 has no
+  RESULT.json (WIP checkpoint only). Slots 3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 all
+  ancestors of HEAD (`git merge-base --is-ancestor` TRUE); slots 1/2 fd40760/f0ae3ab ancestors too.
+- [operator 2026-09-14T04:20Z] unblock: NONE. Slot 1 progressing; slot 0 residue is an intentionally
+  preserved hung-on-API attempt whose retry is slot 1 (do NOT reset/redispatch - would duplicate); slot
+  2 landed residue, no QUESTION/402.
+- [operator 2026-09-14T04:20Z] registry re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED. NOT edited - ACTIVE orchestrator modifying PACKETS.jsonl (00:08
+  local), lost-update risk. All 10 BLOCKED owner/semantic parked; none mechanically flippable.
+- [operator 2026-09-14T04:20Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; last cycle
+  00:15:43 "dispatched 0; workers now ~1/3"). `dispatch_ready --dry-run --max-workers=4` = "slots: 8
+  (1 running, 7 free); slot-assigned packets: 5"; RG-23/RG-9 write-set clash with RUNNING G1 on
+  `truck123d/src/bd_bridge.rs`; FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- [operator 2026-09-14T04:20Z] health: heartbeat exactly 1 (27872; second `-match` = operator query
+  shell). watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq UP (ping ok, queued 0,
+  running false). Disk 10.67 GB free (BELOW 15 goal, above 8 floor); RAM 1.16 GB free (BELOW 3 floor -
+  1 worker + active orchestrator + language servers). Janitor status: slot0 wt/target 2.0 GB, slot1
+  wt/target 2.4 GB; no reclaim run (active orchestrator owns the machine; reclaiming target frees disk
+  not RAM). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T04:20Z] Observation: active orchestrator opencode 37844 (since 09-12) + 2132 +
+  30436 (since 00:05/00:18 local) present - do not disturb; tracked dirty set
+  `truck123d/tests/rdef_m2_sandwich.rs` + `loop/cargoq/server.log` (outside operator scope; not touched).
 - [operator 2026-09-14T03:36Z] board: 2 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX attempt-2, pid 25588,
   branch re-forked from `b502a85`, events fresh; slot 1 LOOP-MACH-1, pid 29092, events fresh) + 1 IDLE
   residue (slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
