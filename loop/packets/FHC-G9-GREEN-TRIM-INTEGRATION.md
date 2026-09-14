@@ -29,7 +29,7 @@ read_allow:
 tests_required: [truck123d/tests/green_trims.rs]
 anchors:
   - {id: A1, expect: 3, cmd: "grep -c 'binding_volume_facts' truck123d/src/bd_bridge.rs"}
-  - {id: A2, expect: 6, cmd: "grep -c 'cell_flux_exact' truck123d/src/bd_bridge.rs"}
+  - {id: A2, expect: 7, cmd: "grep -c 'cell_flux_exact' truck123d/src/bd_bridge.rs"}
   - {id: A3, expect: 11, cmd: "grep -c 'spline_loop_area_vector' truck123d/src/bd_bridge.rs"}
 budget:      {turns: 65, ctx_tokens: 240000}
 ```
