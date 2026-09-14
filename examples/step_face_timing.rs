@@ -29,6 +29,17 @@ use look::step::torus_deck;
 
 type Cshell = CompressedShell<Point3, Curve3D, Surface>;
 
+type FaceTiming = (
+    f64,
+    String,
+    usize,
+    &'static str,
+    usize,
+    Option<(f64, f64, f64, f64, f64, f64)>,
+);
+
+type FaceRecord = (u64, usize, usize, f64, String, usize, &'static str, usize);
+
 const EDGE_SAMPLES: u32 = 4;
 const MINIMUM_TOLERANCE: f64 = 1.0e-6;
 const DEGENERATE_TOLERANCE: f64 = 1.0e-3;
@@ -161,14 +172,7 @@ fn time_face_extent(
     tolerance: f64,
     policy: MeshingPolicy,
     closure_map: &HashMap<u64, look::step::lattice::SplineAxisClosure>,
-) -> (
-    f64,
-    String,
-    usize,
-    &'static str,
-    usize,
-    Option<(f64, f64, f64, f64, f64, f64)>,
-) {
+) -> FaceTiming {
     let one = single_face_shell(shell, index);
     let kind = surface_kind(&shell.faces[index].surface);
     let bounds = shell.faces[index].boundaries.len();
@@ -342,7 +346,7 @@ fn trace_edges(face_id: u64, shell: &Cshell, index: usize, tolerance: f64) {
                     let t1 = Instant::now();
                     let poly = PolylineCurve::from_curve(curve, *range, tolerance);
                     (
-                        poly.len() as usize,
+                        poly.len(),
                         t1.elapsed().as_secs_f64() * 1000.0,
                         "eval_range",
                     )
@@ -567,7 +571,7 @@ fn main() -> anyhow::Result<()> {
                         PlaceHolder::Ref(Name::Entity(idx)) => Some(*idx),
                         _ => None,
                     })
-                    .map(|surface_entity| surface_kind_of(surface_entity))
+                    .map(surface_kind_of)
                     .unwrap_or("UNRESOLVED");
                 lost += 1;
                 let surface_entity = face_def
@@ -664,7 +668,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let pass_started = Instant::now();
-    let mut records: Vec<(u64, usize, usize, f64, String, usize, &'static str, usize)> = Vec::new();
+    let mut records: Vec<FaceRecord> = Vec::new();
     let mut exhausted = false;
     let mut faced = 0usize;
 
@@ -728,10 +732,10 @@ fn main() -> anyhow::Result<()> {
                     break 'outer;
                 }
                 let id = face.provenance.best_id().map(|v| v.get());
-                if let Some(id) = id {
-                    if skip_ids.contains(&id) {
-                        continue;
-                    }
+                if let Some(id) = id
+                    && skip_ids.contains(&id)
+                {
+                    continue;
                 }
                 eprintln!(
                     "BEGIN\tface={id:?}\tshell={s}\tidx={f}\tt_ms={:.1}",
