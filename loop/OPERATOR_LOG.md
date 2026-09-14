@@ -10793,3 +10793,46 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   cannot reclaim live slot targets and killing language servers would disturb the orchestrator).
 - Leaving: HEAD `146620a` + this cycle's STATE/log commit; slot-1 worker running; registry untouched
   pending orchestrator quiescence.
+
+## 2026-09-14T04:47Z - operator cycle: 1 worker RUNNING in a long direct cargo test; HEAD advanced by the active orchestrator (vendor clippy); nothing landable/unblockable/flippable
+
+- Health (step 1): `slot_status` = 1 RUNNING (slot 1 FHC-G1-RATIONAL-FLUX retry, pid 12764 alive;
+  events stale ~11 min, but NOT stalled: the worker is blocked in a long direct
+  `cargo test -p truck123d --tests --locked --no-fail-fast` (powershell 31896 -> cargo 37812, created
+  00:36:53 local), which is the documented DLL workaround - run scoped tests with the interpreter dir on
+  PATH; do NOT disturb) + slot 0 IDLE dead attempt (`FHC-G1-RATIONAL-FLUX/0001`, base `b86dd69` WIP
+  checkpoint NOT an ancestor, no RESULT/QUESTION) + slot 2 IDLE residue (TTC-RECENSUS-F1-R3 row DONE) +
+  slots 3-7 FINISHED landed residue. Heartbeat exactly 1 (27872). watchdog/supervisor/overnight 0
+  (carried dead; did NOT restart). cargoq UP (ping ok, queued 0, running=true = the active
+  orchestrator's `cargo clippy --workspace --lib --locked`, START 00:41:48 local). Disk 6.2-6.8 GB free
+  (BELOW the 8 GB floor); RAM 1.14 GB free (BELOW the 3 GB floor). No `%TEMP%/look-verify-baseline-*`
+  leaks; `fallback.log` quiet since 2026-09-11.
+- **NEW substrate evidence:** `loop/cargoq/server.log` shows `cargo test -p truck123d --locked` and
+  `--lib` exiting 3221225781 = 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) at 00:29:52/00:29:57/00:30:02
+  local on slot-1's worktree - the RAM-zone signature. A non-queued worker test and the queued
+  orchestrator clippy are currently overlapping. ESCALATED (substrate).
+- **NEW: HEAD advanced** `146620a` -> `89ffb75` via two vendor commits (`74c23f5`, `89ffb75`,
+  clippy-1.97 allow-list work) by the ACTIVE orchestrator; 12 `vendor/truck/*/src/lib.rs` dirty in the
+  main worktree (orchestrator WIP, outside operator scope, not touched).
+- Landable (step 2): NONE. Slot 1 RUNNING (no RESULT.json); slot 0 no RESULT.json (WIP checkpoint only);
+  slots 3-7 commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors
+  of HEAD `89ffb75`; `b86dd69` NOT an ancestor. Nothing landed.
+- Unblock (step 3): NONE. Slot 1 alive/progressing; slot 0 is an intentionally preserved hung-on-API
+  attempt whose retry IS slot 1 - did NOT reset/redispatch; slot 2 landed residue. Only QUESTION.md on
+  disk is slot 5 (2026-09-05, landed residue). No action.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique, last-wins): 268 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED - UNCHANGED since 04:20Z (`PACKETS.jsonl` mtime 04:08:38Z, before the last
+  cycle). All 10 BLOCKED owner/semantic parked; none mechanically flippable. Did NOT edit.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 5"; RG-23/RG-9 write-set
+  clash with the RUNNING G1 on `truck123d/src/bd_bridge.rs`; FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1;
+  `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T04:47Z] block and
+  prepended the labeled [operator 2026-09-14T04:47Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): NEW substrate line (0xC0000409 cargo-test crashes + disk below the 8 GB floor +
+  RAM below the 3 GB floor). Carried unchanged: FHC-G1 prior SPEC_GAP (now retrying on slot 1);
+  RG-23/RG-9 packet files absent + write-set clash; FHC-D/G8/G9 blocked on FHC-G1; dead substrate stack
+  (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator opencode 37844.
+- Leaving: HEAD `89ffb75` + this cycle's STATE/log commit; slot-1 worker running; registry untouched
+  pending orchestrator quiescence.

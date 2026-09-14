@@ -2839,3 +2839,19 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: RG-23/RG-9 packet files absent (anchor check fails); FHC-G10 SPEC_GAP (00:25Z);
   active orchestrator opencode 37844 - do not disturb; substrate stack (watchdog/supervisor/overnight)
   down - do not blindly restart.
+
+## 2026-09-14T04:47Z - substrate: 0xC0000409 cargo-test crashes + disk below the 8 GB floor (RAM-zone)
+
+- What/why: `loop/cargoq/server.log` shows `cargo test -p truck123d --locked` and `--lib` exiting
+  3221225781 (0xC0000409, STATUS_STACK_BUFFER_OVERRUN) three times at 00:29:52/00:29:57/00:30:02 local on
+  slot-1's worktree. Disk is 6.2-6.8 GB free (BELOW the 8 GB floor) and RAM 1.14 GB free (BELOW the 3 GB
+  floor). A non-queued worker test (direct cargo, the documented DLL workaround) and the orchestrator's
+  queued `cargo clippy --workspace --lib --locked` are currently overlapping - the spike-overlap regime
+  the queue cannot serialize. This is the RAM inequality being violated, per ORCHESTRATOR.md.
+- Why human/orchestrator: the operator may not kill a live progressing worker nor the orchestrator's job,
+  and reclaiming slot targets would disturb the active orchestrator.
+- Start from: `loop/cargoq/server.log`; `python loop/janitor.py status` (slot 1 wt/target = 3.7 GB,
+  slot 0 wt/target = 2.0 GB); `Get-PSDrive C`.
+- Carried unchanged: FHC-G1 prior SPEC_GAP (now retrying on slot 1); RG-23/RG-9 packet files absent +
+  write-set clash; FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; dead substrate stack
+  (watchdog/supervisor/overnight); active orchestrator opencode 37844 - do not disturb.
