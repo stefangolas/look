@@ -1,0 +1,8 @@
+{
+ "id": "LOOP-MACH-1",
+ "status": "DONE",
+ "contracts": [
+  "LOOP-MACH-1"
+ ],
+ "notes": "RECOVERY COPY (orchestrator): original RESULT.json destroyed by a slot-worktree branch switch during adjudication; content captured verbatim pre-loss. Harness redesign shipped; vendor/truck untouched. Acceptance suite loop/tests_loop_mach1.py: 9/9 green (items 1-7 plus ledger attempt_id and shadow-equivalence checks). VERDICTS: claim_is_atomic PASS (SQLite CAS works on Windows); adjudicating_blocks_dispatch PASS; attempt evidence immutable; writeset violation rejected; transactional landing crash-safe; outcome separation verified; ci_gate exec-bit check verified. Independent orchestrator verification: 9/9 re-run at merged HEAD c9477f5."
+}
