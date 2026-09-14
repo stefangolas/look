@@ -68,6 +68,20 @@ fn fingerprint(name: &str) -> Fingerprint {
 /// epsilon is either meaningless on one or vacuous on the other. That is the
 /// same scale-relative argument BG-TOL-001 is about, and it applies to the
 /// tests too.
+///
+/// Golden-refresh history, per the rule above: 2026-09-07 (cafa70d) pinned
+/// 1860/5580 and 9518/28554. On 2026-09-08, DEF-TESS-ANALYTIC-SEAM-R2
+/// (bc96e82) changed `interval_endpoint_vertex` so a grid line reaching a
+/// real source trim snaps to the trim's existing vertices instead of
+/// inventing one; fewer seam vertices means fewer triangles (bracket -156,
+/// washer -138). The moved counts went unnoticed because the release matrix
+/// could not compile the STEP stack off-Windows until the 2026-09-14
+/// un-gate, and the local loop's scoped checks never run this file. The
+/// 2026-09-14 refresh (1704/5112, 9380/28140) was verified identical on all
+/// seven CI targets and locally under the pinned rustc 1.97.1, and cafa70d
+/// was verified to still reproduce its own goldens under the same toolchain
+/// -- so the drift is attributable to bc96e82 alone and is a single
+/// cross-platform truth, not a per-platform split.
 fn assert_bounds_near(f: &Fingerprint, min: [f32; 3], max: [f32; 3], what: &str) {
     let mut diag = 0.0f32;
     for a in 0..3 {
@@ -88,19 +102,19 @@ fn assert_bounds_near(f: &Fingerprint, min: [f32; 3], max: [f32; 3], what: &str)
 #[test]
 fn bracket_tessellates_to_a_known_mesh() {
     let f = fingerprint("bracket.step");
-    assert_eq!(f.triangles, 1860, "bracket triangle count moved");
-    assert_eq!(f.vertices, 5580, "bracket vertex count moved");
+    assert_eq!(f.triangles, 1704, "bracket triangle count moved");
+    assert_eq!(f.vertices, 5112, "bracket vertex count moved");
     assert_bounds_near(&f, [-9.0, -9.0, 0.0], [60.0, 40.0, 22.0], "bracket");
 }
 
 #[test]
 fn washer_with_circular_edges_tessellates_to_a_known_mesh() {
     // The fixture that BG-CE-006's circle work is about, and modelled in
-    // metres -- 9,518 triangles over a part 10mm across, which is why its
+    // metres -- 9,380 triangles over a part 10mm across, which is why its
     // triangle count is a sharp instrument for a tolerance change.
     let f = fingerprint("washer_circular_edges.step");
-    assert_eq!(f.triangles, 9518, "washer triangle count moved");
-    assert_eq!(f.vertices, 28554, "washer vertex count moved");
+    assert_eq!(f.triangles, 9380, "washer triangle count moved");
+    assert_eq!(f.vertices, 28140, "washer vertex count moved");
     assert_bounds_near(
         &f,
         [-0.016, -0.004_999_012, -0.02],
