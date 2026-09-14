@@ -75,6 +75,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T08:18Z]: 1 STALLED + 1 RUNNING, BOTH FHC-D-SURFACE-RESIDUE
+> (DUPLICATE DISPATCH) / 0 landed-this-cycle / 5 FINISHED landed residue (slots 3-7) / 1 IDLE residue
+> (slot 2) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `46e8f5e` (the 07:55Z operator
+> commit). Board re-derived by command.
+> **DUPLICATE FHC-D**: slot 0 (pid 13680, cmd -> opencode 6916, session `ses_f61257855ffe...`,
+> dispatched ~03:38 local) is STALLED - events frozen 03:47:06 (~29 min), changed=0, no work, no RESULT;
+> its worker is blocked on a HUNG cargoq job `cargo test -p truck123d --locked --test
+> data_row_attributes --test probe_queries --test named_carrier_admission` (cargo.exe 11272/34920, CPU
+> ~0 s over 29 min; cargoq running=true, 40-min timeout ~04:27 local). Slot 1 (pid 6968, cmd ->
+> opencode 11448, session `ses_f61099526ffe...`, dispatched 04:08:47 local, base `46e8f5e`) is the
+> heartbeat's REPLACEMENT, RUNNING fresh (events 0.0 min, changed=1, branch
+> `packet/FHC-D-SURFACE-RESIDUE@46e8f5e`). Both are the same packet -> duplicate; the heartbeat counted
+> slot 0 as "0 running" at 04:08 (slot_status STALLED) and re-dispatched. Operator did NOT kill/reset
+> either (slot 0 worker alive; slot 1 progressing) -> ESCALATED.
+> **LANDABLE**: NONE. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of
+> HEAD (`git merge-base --is-ancestor` TRUE); slots 0/1/2 no RESULT.
+> **FRONTIER**: RG-23/RG-9/FHC-G8/FHC-G9 all write-set clash with the RUNNING FHC-D on
+> `truck123d/src/bd_bridge.rs`; FHC-G1 stale READY row (line 356) would DEAD-dispatch a LANDED packet
+> but is blocked only by its now-stale anchors (A1 6->7, A5 40->55) - ESCALATED (carried).
+> **HEALTH**: heartbeat exactly 1 (27872); operator runner 1 (27876); watchdog/supervisor/overnight 0
+> (carried dead); cargoq UP with slot-0's hung job running; disk 9.63 GB free (above 8 floor, below 15
+> goal); RAM 3.13 GB free (above 3 floor, low with 2 workers). No `%TEMP%/look-verify-baseline-*`
+> leaks; `fallback.log` one DIRECT clippy at 2026-09-14 03:05:15.
+> **OPERATOR ACTION**: none mechanical - nothing landable; dispatch real idle (dry-run 0); did NOT run
+> live dispatch (heartbeat owns it); did NOT reset/kill the duplicate pair. STATE + log + escalation
+> written. Leaving: HEAD `46e8f5e` + this cycle's commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T07:55Z]: 1 RUNNING (slot 0, FHC-D-SURFACE-RESIDUE) / 0
 > landed-this-cycle / 2 IDLE residue (slots 1-2) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked /
 > 0 registry flips / 0 dispatched-live. HEAD `3ff538d` (the 07:40Z operator commit). Board re-derived by
@@ -198,6 +225,39 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T08:18Z] board: 1 STALLED + 1 RUNNING (BOTH FHC-D-SURFACE-RESIDUE - duplicate) + 1
+  IDLE residue (slot 2, TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
+  landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live; HEAD `46e8f5e` (the 07:55Z operator
+  commit). Board re-derived by command.
+- [operator 2026-09-14T08:18Z] landable: NONE. Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD (`git merge-base --is-ancestor` TRUE);
+  slots 0/1/2 no RESULT.json. Nothing landed.
+- [operator 2026-09-14T08:18Z] unblock: NONE mechanical. Slot 0 STALLED (pid 13680 alive, events frozen
+  03:47:06 ~29 min, changed=0, no work/RESULT) - its worker is blocked on a hung cargoq job (cargo.exe
+  CPU ~0 since 03:47:09, `test -p truck123d --locked --test data_row_attributes --test probe_queries
+  --test named_carrier_admission`; 40-min timeout ~04:27 local, should self-clear). Slot 1 RUNNING fresh
+  (pid 6968, events 0.0 min, changed=1, base `46e8f5e`) - the heartbeat's 04:08:47 re-dispatch of the
+  SAME packet. Operator did NOT reset/kill either (slot 0 worker alive; slot 1 progressing); duplicate
+  ESCALATED. Slot 2 IDLE residue left as-is. Only QUESTION.md on disk is slot 5 (2026-09-05 residue).
+- [operator 2026-09-14T08:18Z] registry re-derived READ-ONLY (367 lines / 364 unique, last-wins): 269
+  DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED. 3 duplicate ids: MONO-9-FUSE-FOLD x2 DONE,
+  RDEF-M1-LATTICE-V2 x2 DONE, FHC-G1-RATIONAL-FLUX x2 = stale READY (line 356) + DONE. NOT edited
+  (outside operator's three-file scope; FHC-G1 duplicate is the carried escalation). All 10 BLOCKED
+  owner/semantic parked; none mechanically flippable.
+- [operator 2026-09-14T08:18Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; manual +
+  heartbeat is the known double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8
+  (1 running, 6 free); slot-assigned packets: 5"; RG-23/RG-9/FHC-G1/FHC-G8/FHC-G9 all write-set clash
+  with the RUNNING FHC-D on `truck123d/src/bd_bridge.rs`; `dispatched 0` = REAL idle.
+- [operator 2026-09-14T08:18Z] health: heartbeat exactly 1 (27872; second `-match` = operator's own
+  query shell); operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead, not
+  restarted); cargoq UP (ping ok, queued 0, running=true = slot-0's hung job). **Disk 9.63 GB free
+  (above 8 floor, below 15 goal); RAM 3.13 GB free (above 3 floor, low with 2 workers).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` one DIRECT clippy at 2026-09-14 03:05:15.
+  janitor status: disk 9.0 GB / RAM 3.0 GB; slot-0 wt/target 3.6 GB.
+- [operator 2026-09-14T08:18Z] Observation: main worktree dirty tracked set `loop/cargoq/server.log` +
+  `truck123d/tests/rdef_m2_sandwich.rs` (outside operator scope; not touched). slot-0 wt dirty
+  `corpus/ttc/door.py` + untracked `truck123d/tests/surface_residue.rs`; slot-1 progressing.
 
 - [operator 2026-09-14T07:55Z] board: 1 RUNNING (slot 0 FHC-D-SURFACE-RESIDUE, pid 13680 alive, events
   6.2 min old, changed=2, branch @3ff538d = base, no RESULT) + 2 IDLE residue (slot 1 FHC-G1 stale

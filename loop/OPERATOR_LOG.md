@@ -11163,3 +11163,43 @@ Actions:
   0xC0000409/RAM-zone line (RAM above floor); dead substrate stack.
 - Leaving: HEAD `3ff538d` + this cycle's STATE/log/escalation commit; slot-0 FHC-D worker running;
   registry untouched.
+
+## [operator 2026-09-14T08:18Z]
+
+- Board (re-derived by command): 1 STALLED + 1 RUNNING, **BOTH `FHC-D-SURFACE-RESIDUE` (duplicate
+  dispatch)** / 0 landed-this-cycle / 1 IDLE residue (slot 2) / 5 FINISHED landed residue (slots 3-7).
+  HEAD `46e8f5e` (the 07:55Z operator commit). Re-derived by `slot_status.py`.
+- LAND (step 2): NONE. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of
+  HEAD (`git merge-base --is-ancestor` TRUE); slots 0/1/2 no RESULT.json. Nothing to merge.
+- UNBLOCK (step 3): NONE mechanical; **NEW duplicate-dispatch condition ESCALATED.** Slot 0 FHC-D
+  (pid 13680, cmd -> opencode 6916) is STALLED: events frozen 03:47:06 (~29 min), changed=0, branch
+  detached @3ff538d = base, no RESULT; its worker is blocked on a HUNG cargoq job `cargo test -p
+  truck123d --locked --test data_row_attributes --test probe_queries --test named_carrier_admission`
+  (cargo.exe 11272/34920 created 03:47:09, CPU ~0 s over 29 min; cargoq running=true, 40-min timeout
+  ~04:27 local). Slot 1 (pid 6968, cmd -> opencode 11448) is the heartbeat's 04:08:47 REPLACEMENT of the
+  SAME packet, RUNNING fresh (events 0.0 min, changed=1, base `46e8f5e`, branch
+  `packet/FHC-D-SURFACE-RESIDUE`). Operator did NOT kill/reset either (slot 0 worker alive; slot 1
+  progressing). Slot 2 IDLE residue (TTC-RECENSUS-F1-R3 row DONE) left as-is. Only QUESTION.md on disk
+  is slot 5 (2026-09-05 landed residue).
+- REGISTRY (step 4): re-derived READ-ONLY (367 lines / 364 unique, last-wins): **269 DONE / 83 READY /
+  10 BLOCKED / 2 SUPERSEDED.** 3 duplicate ids (MONO-9-FUSE-FOLD x2 DONE, RDEF-M1-LATTICE-V2 x2 DONE,
+  FHC-G1-RATIONAL-FLUX x2 = stale READY line 356 + DONE). NOT edited (outside the operator's three-file
+  scope); FHC-G1 duplicate is the carried escalation. All 10 BLOCKED owner/semantic parked; none
+  mechanically flippable.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 6 free);
+  slot-assigned packets: 5"; RG-23/RG-9/FHC-G1/FHC-G8/FHC-G9 all write-set clash with the RUNNING FHC-D
+  on `truck123d/src/bd_bridge.rs`; `dispatched 0` = REAL idle.
+- HEALTH (step 1): heartbeat exactly 1 (27872; the second `-match` is this operator's own query shell);
+  operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead, not restarted); cargoq UP
+  (ping ok, queued 0, running=true = slot-0's hung job). **Disk 9.63 GB free (above the 8 GB floor, below
+  the 15 GB goal); RAM 3.13 GB free (above the 3 GB floor, low with 2 workers).** No
+  `%TEMP%/look-verify-baseline-*` leaks. `fallback.log` shows one DIRECT `cargo clippy` bypass at
+  2026-09-14 03:05:15 (server up now; no action). janitor status: disk 9.0 GB / RAM 3.0 GB; slot-0
+  wt/target 3.6 GB.
+- ESCALATION (step 7): one NEW item - duplicate `FHC-D-SURFACE-RESIDUE` dispatch (slot 0 stalled on a
+  hung cargoq job + slot 1 heartbeat re-dispatch). See OPERATOR_ESCALATIONS.md. Carried unchanged: the
+  FHC-G1 stale duplicate READY row; RG-23/RG-9 packet files absent + write-set clash; the
+  0xC0000409/RAM-zone line; dead substrate stack.
+- Leaving: HEAD `46e8f5e` + this cycle's STATE/log/escalation commit; both FHC-D workers left running;
+  registry untouched.

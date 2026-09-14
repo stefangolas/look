@@ -2874,3 +2874,34 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Start from: `Select-String -Path loop/PACKETS.jsonl -Pattern 'FHC-G1-RATIONAL-FLUX'`;
   `loop/dispatch_ready.py:88` (`rows()`), `:102` (`landed()`), `:610` (dead-dispatch branch);
   `git log --oneline -3 -- loop/PACKETS.jsonl`.
+
+## 2026-09-14T08:18Z - duplicate `FHC-D-SURFACE-RESIDUE` dispatch (slot 0 stalled + slot 1 replacement)
+
+- What/why: two workers are running the SAME packet `FHC-D-SURFACE-RESIDUE` concurrently.
+  Slot 0 (pid 13680, cmd -> opencode 6916, session `ses_f61257855ffeX8M0K4PYoJsNGU`) was dispatched
+  ~03:38 local; it is STALLED - `events.jsonl` frozen at 03:47:06 (~29 min old), changed=0, detached
+  HEAD @3ff538d (= base, no work), no RESULT/QUESTION. Its worker is blocked on a HUNG cargoq job
+  `cargo test -p truck123d --locked --test data_row_attributes --test probe_queries --test
+  named_carrier_admission` (cargo.exe 11272 + 34920, both created 03:47:09, CPU ~0 s over 29 min;
+  cargoq `/ping` = running true, queued 0; the 40-min timeout should kill it ~04:27 local). Slot 1
+  (pid 6968, cmd -> opencode 11448, session `ses_f61099526ffe3qysLamjlOnvHp`) is the heartbeat's
+  04:08:47 REPLACEMENT of the same packet, RUNNING fresh (events 0.0 min old, changed=1, base
+  `46e8f5e`, branch `packet/FHC-D-SURFACE-RESIDUE`). At 04:08 the heartbeat's `dispatch_ready` counted
+  "0 running, 7 free" because `slot_status` reports slot 0 STALLED, so it re-dispatched FHC-D to slot 1.
+- Why human/orchestrator: the operator charter forbids killing a live worker, and the operator may not
+  edit `loop/PACKETS.jsonl` or the slot registry. Slot 0's worker may recover on its own when the hung
+  cargoq job times out (~04:27 local); if it then writes a second RESULT for FHC-D, two RESULTs for one
+  packet exist at merge time. The heartbeat's "STALLED -> free slot" heuristic is the root cause: a slot
+  whose worker is alive but blocked on a hung cargo job is treated as free and re-dispatched.
+- Start from: `python loop/slot_status.py` (slot 0 STALLED / slot 1 RUNNING, both FHC-D);
+  `Get-Content loop/slots/0/events.jsonl -Tail 1` (frozen 03:47:06); `curl 127.0.0.1:8231/ping`;
+  `loop/cargoq/server.log` (the hung `test -p truck123d ... data_row_attributes ...` job);
+  `loop/dispatch_heartbeat.log` (04:08:47 cycle: "0 running, 7 free ... FHC-D -> slot 1").
+- NOTE - the FHC-G1 stale-row hazard (2026-09-14T07:55Z above) has SHIFTED: slot 1 no longer holds a
+  dead FHC-G1 dispatch (it now runs FHC-D), and `dispatch_ready --dry-run` reports FHC-G1 as a
+  write-set clash with the RUNNING FHC-D, not a dead dispatch. The stale READY row (line 356) is still
+  present and still a latent hazard once slot 1 frees; do not re-measure its anchors without also
+  resolving the stale row.
+- Carried unchanged: RG-23/RG-9 packet files absent + write-set clash on `bd_bridge.rs`; the
+  0xC0000409/RAM-zone line (RAM 3.13 GB free, above the floor but low with 2 workers); dead substrate
+  stack (watchdog/supervisor/overnight).
