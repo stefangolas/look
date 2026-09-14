@@ -57,8 +57,11 @@ jobs:
       - name: Install Rust
         shell: bash
         run: |
-          rustup toolchain install stable --profile minimal --target "${{ matrix.target }}"
-          rustup default stable
+          # Pinned to the same toolchain the local verification battery runs
+          # (see cross-platform.yml note). Bump deliberately with the
+          # allow-list review.
+          rustup toolchain install 1.97.1 --profile minimal --target "${{ matrix.target }}"
+          rustup override set 1.97.1
       - name: Test
         run: cargo test --locked --all-targets --target ${{ matrix.target }}
       - name: Build release executable
