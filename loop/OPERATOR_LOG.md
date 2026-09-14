@@ -11812,3 +11812,51 @@ Actions:
   "State of the machine, as left" bullets. Traps/history untouched.
 - Leaving: HEAD `af74ea6` + this cycle's STATE/log/escalation commit; 0 live workers; PACKETS.jsonl
   untouched.
+
+## [operator 2026-09-14T15:49Z] cycle 68 - quiet re-confirmation; nothing landable/unblockable/flippable; real idle; door.py dirt RESOLVED by owner
+
+- HEALTH (step 1): `slot_status.py` = all 8 slots FINISHED, 0 RUNNING (slots 0-7, pids all `-`). cargoq UP
+  idle (`/ping` ok, queued 0, running false). heartbeat exactly 1 (27872; the second match is this
+  operator's own query shell), its log mtime 15:45:31Z (fresh, cycling). operator_runner 1 (27876).
+  watchdog/supervisor/overnight 0 (carried dead, not restarted). Disk 9.93 GB free per `Get-PSDrive C`
+  (above the 8 GB floor, below the 15 GB goal); RAM 0.83 GB free (BELOW the 3 GB floor, 0 workers; chrome 29
+  procs + resident opencode pids). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last
+  DIRECT clippy 2026-09-14 03:05:15, carried).
+- BOARD: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0, FHC-G8 duplicate) / 7
+  FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `7e77c33`
+  (owner R4 slow-solver-diagnostics docs commit; parent `c3fc0bd` = the 15:21Z operator commit). Board
+  re-derived by command.
+- LANDABLE (step 2): NONE. `git merge-base --is-ancestor` exit 0 for all 8 worker commits
+  c707639/da55a1a/f815d36/e6553db/3c2109b/ee97499/713f205/5cf4811. Slot 0 is SPEC_GAP (not landable).
+  FHC-D duplicate `000cb11` is NOT an ancestor (exit 1) but its packet is DONE (carried; do not merge). No
+  RESULT filed because nothing new finished.
+- UNBLOCK (step 3): NONE. 0 RUNNING, all `worker.pid` files dead. Slot 0's SPEC_GAP residue is the SAME
+  packet (FHC-G8) whose DONE implementation already landed on slot 1 -> did NOT reset/redispatch. Only
+  QUESTION.md is slot 5 (2026-09-05 residue); no new QUESTION.
+- REGISTRY (step 4): re-derived READ-ONLY (367 lines / 364 unique, last-wins): 272 DONE / 80 READY / 10
+  BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked (BG-AUD-FIX-004 OWNER_BLOCKED;
+  SEM-PCURVE-MASTER-001-FIX note forbids dispatch; 6 needs=[]/None; DEF-TESS-ANALYTIC-SEAM needs
+  DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 READY;
+  BG-CK-SPLINE-CENSUS needs BG-CK-P0-PREVALENCE DONE but the packet is owner-cancelled) -> no mechanical
+  flip. Stale FHC-G1 READY row carried - did NOT re-measure (would arm a duplicate; FHC-G1 IS landed: a DONE
+  row + `loop/results/FHC-G1-RATIONAL-FLUX.json`). RG-23/RG-9 packet files absent. PACKETS.jsonl NOT edited
+  (outside the operator's three-file limit).
+- DISPATCH (step 5): did NOT run live - the heartbeat (27872) owns dispatch and manual + heartbeat is the
+  documented double-dispatch race (its log mtime 15:45:31Z, cycling). `dispatch_ready --dry-run
+  --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9
+  ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle. Did NOT
+  reclaim disk (9.93 GB is above the 8 GB floor; no emergency).
+- DIRT RESOLVED: the 15:21Z-escalated `corpus/ttc/door.py` instrumentation (+24 lines) was committed by the
+  owner in `7e77c33` (the R4 diagnostics commit, which also added `docs/SLOW_SOLVER_DIAGNOSTICS_R4.md` + 3
+  `loop/nightly_ops/r4_*.py`); `git status` no longer shows it. Carried: the
+  `truck123d/tests/rdef_m2_sandwich.rs` `enumerate` refactor + dirty `loop/cargoq/server.log`.
+- RESIDENT opencode pids: 17560 (up since 01:11 local, 903 MB, parent 14864) AND 14640 (up since 11:44
+  local, 546 MB, parent 13668) - neither a slot worker (no `run` args). Did NOT kill; both are material to
+  the below-floor RAM reading. (The 15:21Z-noted pid 33620 is gone; 14640 is its current replacement.)
+- ESCALATIONS: 0 new this cycle (the door.py item is now resolved). Carried: slot-0 FHC-G8 SPEC_GAP;
+  FHC-D `000cb11` duplicate (do not merge); FHC-G1 stale READY row; RG-23/RG-9 packet files absent; dead
+  substrate stack; schedule.py over-report; disk below the 15 GB goal; dirty main-worktree test file
+  (14:34Z); resident opencode pids (14:58Z); RAM below the 3 GB floor with 0 workers.
+- STATE (step 6): prepended the [operator 2026-09-14T15:49Z] LATEST GROUND TRUTH block and the
+  "State of the machine, as left" bullets. Traps/history untouched.
+- Leaving: HEAD `7e77c33` + this cycle's STATE/log commit; 0 live workers; PACKETS.jsonl untouched.

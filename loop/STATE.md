@@ -75,6 +75,41 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T15:49Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
+> residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry
+> flips / 0 dispatched-live. HEAD `7e77c33` (owner R4 slow-solver-diagnostics docs commit; parent `c3fc0bd`
+> = the 15:21Z operator commit). Board re-derived by command.
+> **LANDABLE: NONE.** All 8 worker commits c707639 (slot 0 SPEC_GAP)/da55a1a (FHC-G8 slot 1)/f815d36
+> (FHC-G9 slot 2)/e6553db/3c2109b/ee97499/713f205/5cf4811 are ancestors of HEAD (`git merge-base
+> --is-ancestor` exit 0 each); slot 0 SPEC_GAP not landable; FHC-D `000cb11` NOT an ancestor (exit 1) but
+> its packet is DONE (carried, do NOT merge).
+> **UNBLOCK: NONE.** 0 RUNNING; all 8 `worker.pid` files dead (slot_status pid=- for all); slot 0 is the
+> SPEC_GAP residue of a packet whose DONE implementation already landed (slot 1) -> did NOT reset/
+> redispatch. Only QUESTION.md is slot 5 (2026-09-05 residue); no new QUESTION.
+> **REGISTRY (step 4):** re-derived READ-ONLY (367 lines / 364 unique, last-wins): 272 DONE / 80 READY /
+> 10 BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked (6 needs=[]/None; DEF-TESS-ANALYTIC-SEAM
+> needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 READY;
+> BG-CK-SPLINE-CENSUS needs BG-CK-P0-PREVALENCE DONE but the packet is owner-cancelled) - NO mechanical
+> flip. Stale FHC-G1 READY row carried - did NOT re-measure (would arm a duplicate; FHC-G1 IS landed: a
+> DONE row + `loop/results/FHC-G1-RATIONAL-FLUX.json`). RG-23/RG-9 packet files ABSENT. NOT edited.
+> **DISPATCH (step 5):** did NOT run live (heartbeat 27872 owns dispatch; its log mtime 15:45:31Z,
+> cycling; manual+heartbeat = the documented double-dispatch race). `dispatch_ready --dry-run
+> --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9
+> ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle.
+> **HEALTH:** heartbeat exactly 1 (27872; log mtime 15:45:31Z, cycling); operator_runner 1 (27876);
+> watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq UP idle (ping ok, queued 0,
+> running false). Disk 9.93 GB free per `Get-PSDrive` (above 8 floor, below 15 goal); RAM 0.83 GB free
+> (BELOW the 3 GB floor, 0 workers; chrome 29 procs + 2 resident opencode pids 17560/14640). No
+> `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet (last DIRECT clippy 2026-09-14 03:05:15,
+> carried).
+> **DIRT RESOLVED:** the 15:21Z-escalated `corpus/ttc/door.py` instrumentation (+24 lines) was committed
+> by the owner in `7e77c33` (the R4 diagnostics commit; also docs/SLOW_SOLVER_DIAGNOSTICS_R4.md + 3
+> loop/nightly_ops/r4_*.py). Carried: the `truck123d/tests/rdef_m2_sandwich.rs` `enumerate` refactor +
+> always-dirty `loop/cargoq/server.log`.
+> **OPERATOR ACTION:** health sweep; re-derived landability (none); registry read-only (no flip); did NOT
+> run live dispatch; did NOT touch the dirty test file or the resident opencode pids; STATE + log written.
+> Leaving: HEAD `7e77c33` + this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T15:21Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
 > residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry
 > flips / 0 dispatched-live. HEAD `af74ea6` (the 14:58Z operator STATE/log commit; unchanged this cycle).
@@ -764,6 +799,36 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T15:49Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
+  FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0
+  dispatched-live; HEAD `7e77c33` (owner R4 docs commit; parent `c3fc0bd` = the 15:21Z operator commit).
+  Board re-derived by command.
+- [operator 2026-09-14T15:49Z] landable: NONE. All 8 worker commits c707639/da55a1a/f815d36/e6553db/
+  3c2109b/ee97499/713f205/5cf4811 ancestors of HEAD (`git merge-base --is-ancestor` exit 0 each); slot 0
+  SPEC_GAP; FHC-D `000cb11` not an ancestor (exit 1) but packet DONE (carried, do not merge).
+- [operator 2026-09-14T15:49Z] unblock: NONE. 0 running, all 8 worker.pid dead; slot 0 is SPEC_GAP residue
+  of a packet whose DONE implementation already landed (slot 1) -> did NOT reset/redispatch. Only
+  QUESTION.md is slot 5 (2026-09-05 residue).
+- [operator 2026-09-14T15:49Z] registry re-derived READ-ONLY (367 lines / 364 unique, last-wins): 272 DONE
+  / 80 READY / 10 BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked (BG-CK-SPLINE-CENSUS's dep
+  BG-CK-P0-PREVALENCE IS DONE but the packet is owner-cancelled; SEM-PCURVE-MASTER-001-FIX note forbids
+  dispatch) -> no flip. Stale FHC-G1 READY row carried (do NOT re-measure; FHC-G1 IS landed). RG-23/RG-9
+  packet files absent. NOT edited.
+- [operator 2026-09-14T15:49Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; its log mtime
+  15:45:31Z, cycling). dry-run = `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`;
+  RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle.
+- [operator 2026-09-14T15:49Z] health: heartbeat 1 (27872, log mtime 15:45:31Z); operator_runner 1 (27876);
+  watchdog/supervisor/overnight 0 (carried dead). cargoq UP idle (queued 0, running false). Disk 9.93 GB
+  free per Get-PSDrive (above 8 floor, below 15 goal); RAM 0.83 GB free (BELOW 3 GB floor, 0 workers; chrome
+  29 procs + resident opencode pids 17560/14640). No `%TEMP%/look-verify-baseline-*` leaks; fallback.log
+  quiet (2026-09-14 03:05:15 clippy bypass carried).
+- [operator 2026-09-14T15:49Z] DIRT RESOLVED: the 15:21Z-escalated `corpus/ttc/door.py` instrumentation was
+  committed by the owner in `7e77c33` (R4 diagnostics commit). Carried: the
+  `truck123d/tests/rdef_m2_sandwich.rs` `enumerate` refactor + dirty `loop/cargoq/server.log`.
+- [operator 2026-09-14T15:49Z] resident opencode pids: 17560 (up since 01:11 local, 903 MB, parent 14864)
+  AND 14640 (up since 11:44 local, 546 MB, parent 13668) - neither a slot worker (no `run` args); did NOT
+  kill; both material to the below-floor RAM reading.
 
 - [operator 2026-09-14T15:21Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
   FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0
