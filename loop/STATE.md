@@ -75,6 +75,29 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T07:40Z]: 0 RUNNING / 1 landed-this-cycle (FHC-G1-RATIONAL-FLUX)
+> / 2 IDLE residue (slots 1-2) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 1 registry flip / 0
+> dispatched-live. HEAD `aa1c044` (this cycle's anchor-ritual commit; parents `5af6e85` <- `c40dfd9` merge <-
+> `e234a65`). Board re-derived by command.
+> **FHC-G1-RATIONAL-FLUX LANDED** - the retry solved the 01:35Z SPEC_GAP. Slot-0 worker wrote RESULT DONE
+> (11/11 rational_flux) and committed `f105af4` at 03:27 local; operator scoped checks green (`cargo check -p
+> truck123d --tests --locked` 30s + `cargo test -p truck123d --test rational_flux --locked` 11/11); merged
+> `--no-ff` (`c40dfd9`), RESULT filed to loop/results/, ledger row + registry flip DONE (`5af6e85`).
+> Rational-weight patch flux (two-channel certificate + reciprocal-power kernel + rational surface arm +
+> MONO-9 fold) is in integration/kernel-bg. Supersedes the 01:35Z SPEC_GAP escalation.
+> **FRONTIER NOW DISPATCHABLE**: FHC-D-SURFACE-RESIDUE, FHC-G8-PLANARITY-ROUTER, FHC-G9-GREEN-TRIM-INTEGRATION
+> all `needs FHC-G1` (now DONE). Anchor ritual re-measured their A2 (`cell_flux_exact` 6->7, drifted by the
+> FHC-G1 landing) and committed (`aa1c044`). `dispatch_ready --dry-run` = FHC-D -> slot 0, FHC-G8 -> slot 1,
+> FHC-G9 -> slot 2 (dispatched 3). **WATCH**: all three list `truck123d/src/bd_bridge.rs` in `writes` - a
+> same-file concurrent batch; inspect the merges for a same-file collision. Live dispatch left to the heartbeat.
+> **HEALTH**: heartbeat exactly 1 (27872); operator runner 1 (27876); watchdog/supervisor/overnight 0 (carried
+> dead, not restarted); cargoq UP idle; disk 9.55 GB free (above 8 floor, below 15 goal); RAM 3.63 GB free
+> (above 3 floor). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet.
+> **REGISTRY**: 269 DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED (364 unique, last-wins); all 10 BLOCKED
+> owner/semantic parked, none mechanically flippable.
+> **OPERATOR ACTION**: landed FHC-G1 + anchor ritual; did NOT run live dispatch (heartbeat owns it); slots 1-2
+> IDLE residue left as-is. Leaving: HEAD `aa1c044` + this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T07:04Z]: 1 RUNNING (slot 0, blocked on cargoq) + 2 IDLE
 > residue (slots 1-2) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0
 > flipped / 0 dispatched-live. HEAD `8872c6c` (the 06:42Z operator STATE/log commit; parent `6246f00`).
@@ -151,6 +174,14 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T07:40Z] board: 0 RUNNING + 1 landed-this-cycle (FHC-G1-RATIONAL-FLUX) + 2 IDLE residue
+  (slots 1-2) + 5 FINISHED landed residue (slots 3-7) / 1 registry flip / 0 dispatched-live; HEAD `aa1c044`.
+  Landed FHC-G1 (`f105af4` -> merge `c40dfd9` -> ledger/registry `5af6e85`); anchor ritual FHC-G8/FHC-G9
+  (`aa1c044`). Health: heartbeat 27872 (1), runner 27876 (1), watchdog 0; cargoq idle; disk 9.55 GB; RAM
+  3.63 GB. Dispatch dry-run: FHC-D/FHC-G8/FHC-G9 dispatchable (live left to the heartbeat).
+- [operator 2026-09-14T07:40Z] landable: NONE remaining. Slots 3-7 worker commits are ancestors of HEAD;
+  slot 0's `f105af4` merged. Registry: 269 DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED.
 
 - [operator 2026-09-14T07:04Z] board: 1 RUNNING (slot 0 FHC-G1-RATIONAL-FLUX, pid 39724 alive, blocked on
   cargoq `test --profile quick -p truck123d --lib -j 1 boolean_volume` START 02:27:35 local, within the

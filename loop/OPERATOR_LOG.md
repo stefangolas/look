@@ -11096,3 +11096,36 @@ Actions:
   0); RG-23/RG-9 packet files absent; FHC-D/G8/G9 blocked on FHC-G1; dead substrate stack
   (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator (`63c1272`/`cba1c30`).
 - Leaving: HEAD `8872c6c` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
+
+## [operator 2026-09-14T07:40Z] - FHC-G1-RATIONAL-FLUX LANDED (frontier unblocked)
+
+- Board (re-derived by command): 0 RUNNING / 1 landed-this-cycle / 2 IDLE residue (slots 1-2) / 5 FINISHED
+  landed residue (slots 3-7). HEAD `aa1c044`.
+- LAND (step 2): **FHC-G1-RATIONAL-FLUX landed.** Slot-0 worker wrote `RESULT.json` status DONE (11/11
+  rational_flux tests) and committed `f105af4` at 03:27 local (it was alive when this cycle began; polled
+  until the commit appeared). Operator scoped checks in the slot worktree: `cargo check -p truck123d --tests
+  --locked` green (30.24s); `cargo test -p truck123d --test rational_flux --locked` **11/11 green** (1.26s).
+  Merged `--no-ff` into integration/kernel-bg (`c40dfd9`); filed `loop/results/FHC-G1-RATIONAL-FLUX.json`;
+  deleted the worktree-root RESULT.json; ledger row + registry flip DONE (`5af6e85`). This **supersedes the
+  01:35Z SPEC_GAP escalation** - the retry (adjudication note in the packet rejected the premature
+  stop-condition-2) solved it: two-channel certificate + reciprocal-power kernel + rational surface arm +
+  MONO-9 fold are now in integration/kernel-bg.
+- ANCHOR RITUAL (step 4): the FHC-G1 landing drifted `cell_flux_exact` 6->7 in bd_bridge.rs, staling
+  FHC-G8/FHC-G9 anchor A2. Re-measured and updated both expects to 7 (`aa1c044`); `gen_packet --check` now
+  passes and dry-run dispatches both.
+- UNBLOCK (step 3): NONE. Slot 1 IDLE residue = stale duplicate branch of the now-landed FHC-G1 (no
+  RESULT); left as-is (dispatch_ready would reset+delete it harmlessly - the commit is merged). Slot 2 IDLE
+  residue = TTC-RECENSUS-F1-R3 landed. No QUESTION.md.
+- REGISTRY: re-derived READ-ONLY then flipped FHC-G1: **269 DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED**
+  (364 unique, last-wins). 10 BLOCKED all owner/semantic parked; none mechanically flippable.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = **FHC-D-SURFACE-RESIDUE -> slot 0,
+  FHC-G8-PLANARITY-ROUTER -> slot 1, FHC-G9-GREEN-TRIM-INTEGRATION -> slot 2** (dispatched 3). **WATCH:** all
+  three list `truck123d/src/bd_bridge.rs` in `writes` - the dispatcher allowed the concurrent batch; inspect
+  the merges for a same-file collision.
+- HEALTH (step 1): heartbeat exactly 1 (27872); operator runner 1 (27876); watchdog/supervisor/overnight 0
+  (carried dead, not restarted); cargoq UP, idle (ping ok); disk 9.55 GB free (above 8 floor, below 15 goal);
+  RAM 3.63 GB free (above 3 floor). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet.
+- ESCALATION (step 7): the 01:35Z FHC-G1 SPEC_GAP escalation is RESOLVED by this landing. No NEW escalation;
+  the 0xC0000409/RAM-zone line and dead substrate stack are carried (RAM above floor).
+- Leaving: HEAD `aa1c044` + this cycle's STATE/log commit; FHC-G1 landed; frontier dispatchable.
