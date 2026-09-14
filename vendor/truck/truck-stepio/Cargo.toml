@@ -38,11 +38,3 @@ serde_json = "1.0.151"
 truck-meshalgo = { version = "0.4.0", path = "../truck-meshalgo" }
 truck-shapeops = { path = "../truck-shapeops" }
 proptest = { version = "1.11.0", features = ["attr-macro"] }
-
-[lints.clippy]
-# Clippy 1.97 cross-platform baseline hygiene (vendored upstream code; the
-# unix-branch surface only lints on non-Windows hosts - recorded in
-# loop/STATE.md traps). Semantics-preserving.
-type_complexity = "allow"
-unnecessary_map_or = "allow"
-unnecessary_filter_map = "allow"

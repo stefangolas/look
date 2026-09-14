@@ -8,6 +8,15 @@
 
 #![cfg_attr(not(debug_assertions), deny(warnings))]
 #![deny(clippy::all, rust_2018_idioms)]
+// Clippy 1.97 cross-platform baseline hygiene (vendored upstream code; the
+// unix-branch surface only lints on non-Windows hosts — recorded in
+// loop/STATE.md traps). Semantics-preserving; the unix-branch sites fire
+// only on non-Windows hosts so they cannot be verified locally.
+#![allow(
+    clippy::type_complexity,
+    clippy::unnecessary_map_or,
+    clippy::unnecessary_filter_map
+)]
 #![warn(
     missing_docs,
     missing_debug_implementations,
