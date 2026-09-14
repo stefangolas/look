@@ -1,0 +1,45 @@
+{
+  "id": "FHC-G1-RATIONAL-FLUX",
+  "status": "SPEC_GAP",
+  "contracts": [
+    "FHC-G1-RATIONAL-FLUX"
+  ],
+  "anchors_verified": {
+    "A1": 6,
+    "A2": 4,
+    "A3": 2,
+    "A4": 3,
+    "A5": 40
+  },
+  "rows_flipped": [],
+  "rows_still_refused": [
+    "f1/nose",
+    "f1/sidepod_left",
+    "f1/sidepod_right",
+    "f1/airbox",
+    "f1/details",
+    "f1/drivetrain",
+    "f1/suspension_front"
+  ],
+  "spec_gap": {
+    "stop_condition": "an admission widening exposes a pair the contact-cover hypotheses do not cover -> typed refusal naming the pair class + SPEC_GAP (PACKET.md Stop conditions, item 2)",
+    "pair_class": "Canonical(Cylinder) x Canonical(Cylinder) -- equivalently any boolean operand whose boundary is a rational rotational patch (cylinder / cone / sphere / revolve), the exact category-1 class this packet targets",
+    "primary_gap": "The packet's deliverable 3 (rational surface arm) plus acceptance tests 5 (`positive_cylinder_admitted`) and 9 (`end_to_end_cylinder_union`) require the certified boolean funnel to consume rational (X,Y,Z,W) patches for a canonical CYLINDER operand and to run MONO-8 admission -> flux -> MONO-5 membership -> MONO-9 fold end to end. The landed funnel is unit-weight and box-only: it has no rational patch representation, no rational patch extraction, and no rational membership. None of those three is among the packet's five deliverables, and the packet's own integration map declares extraction unchanged. The admission widening therefore exposes the CYLINDER x CYLINDER pair class to a contact-cover layer whose hypotheses (unit-weight `Patch`, box-only `placed_box_patches`) it does not cover.",
+    "evidence": [
+      "bd_bridge.rs:7751 `struct Patch` carries only `rows`, `cols`, `data: Vec<[f64;3]>` and `orientation`; there is no weight channel.",
+      "bd_bridge.rs:7758 `parse_patch` returns `MembershipRefusal::RationalWeights` for any `w != 1.0` (bd_bridge.rs:7781-7783). Every MONO-5 membership and flux routine consumes `&Patch`: `patch_range` (7805), `patch_derivative_u` (7832), `patch_derivative_v` (7867), `normal_interval` (7902), `classify_ray` (8327), `cell_flux_exact` (8751). Deliverable 3's 'no dehomogenization, no approximation anywhere in the new path' therefore requires a rational `Patch` and rational membership that the five deliverables do not include.",
+      "bd_bridge.rs:4734 `placed_box_patches` matches only `SolidSpec::Box` and returns `BooleanVolumeRefusal::BooleanProductVolumeUnavailable` for every other carrier, including `SolidSpec::Cylinder` (bd_bridge.rs:4743); bd_bridge.rs:4807 `node_box_patches` inherits this for `TreeNode::Part`. `boolean_product_volume_certified` (bd_bridge.rs:4831) calls `node_box_patches` first, so a canonical cylinder operand refuses before any flux runs.",
+      "No rational `VolumeRow` is ever produced anywhere in the repository: every `VolumeRow` constructor writes `weights: 1.0` (bd_bridge.rs:2405, 4723, 5367). The only weight-carrying path is the separate RDEF-M2 sandwich probe (`SandwichPatchRow` -> `certify_sandwich_probe`, bd_bridge.rs:10749), which computes a tangential sandwich *bound*, not the certified flux integral `cell_flux_certified` this packet requires.",
+      "docs/CERTIFIED_FLUX_CALCULUS_INTEGRATION_MAP.md:18 records 'Patch extraction (`node_box_patches` x3, `placed_box_patches` x2) ... the router's input; unchanged', yet acceptance tests 5 and 9 require exactly the extraction it declares unchanged. The packet's scope list (items 1-5) names no rational extraction and no rational membership.",
+      "The normative theory is absent: no file in the repository contains the owner's Certified Flux Calculus proposal. docs/CERTIFIED_FLUX_CALCULUS_INTEGRATION_MAP.md and PACKET.md reference its sections 5 (Theorem 5.2 reciprocal-power kernel), 6/6.1 (exponent-3 reduction, sign admission), 8 and 13, but the packet states neither the bivariate certified tail `R_{k,r}(delta)` nor the section-6.1 sign-admission rule nor the section-13 routing order. The only landed reciprocal-power object is the univariate `certified_reciprocal_power` (vendor/truck/truck-evidence/src/num/reciprocal.rs:338), which takes a 1-D Bernstein coefficient slice, returns a 1-D `ReciprocalPower`, and is not consumed by truck123d (grep 'reciprocal' in truck123d/src returns nothing). The predecessor T1-T6 statement (docs/BOOLEAN_MACHINERY_THEORY_GAP.md) is explicitly superseded by the absent proposal, so implementing it would relitigate the theory the packet says not to relitigate."
+    ],
+    "why_not_unsupported_envelope": "The current cylinder refusal is not at admission but at extraction: `boolean_volume_refusal_to_refusal` (bd_bridge.rs:4873) maps `BooleanProductVolumeUnavailable` to `Refusal::UnsupportedEnvelope(NonCanonicalCarrier)`, which is the `unsupported_envelope` the packet observes. Widening admission per section 6.1 without a rational `Patch`/membership/extraction would either keep refusing (no test 5/9 progress) or, if `parse_patch` alone were relaxed, silently drop the weight field -- exactly the dehomogenization/approximation the packet forbids.",
+    "what_would_unblock": [
+      "Amend the scope to add the rational patch representation and its consumers: a weight channel on `Patch`, a rational `parse_patch`, and rational `patch_range` / derivative / `normal_interval` / `classify_ray` (interval division by the certified positive W bracket).",
+      "Amend the scope to add exact rational rotational-patch extraction for `SolidSpec::Cylinder` (and the cone/sphere/lathe carriers) in `placed_box_patches` / `node_box_patches`, with a positive certified weight bracket.",
+      "Supply the normative Certified Flux Calculus document (or inline its sections 5, 6/6.1, 8, 13): the bivariate reciprocal-power kernel with its certified tail `R_{k,r}(delta)`, the exponent-3 reduction `det[B,B_u,B_v]/W^3`, the sign-admission rule, and the routing order.",
+      "Alternatively, re-scope tests 5 and 9 to synthetic rational `VolumeRow` inputs fed directly to `certify_boolean_volume` / `cell_flux_certified` (a synthetic quarter-cylinder rational Bezier patch pair), so the end-to-end claim does not require `SolidSpec::Cylinder` extraction or the door route."
+    ]
+  },
+  "notes": "Anchors re-measured at dispatch (Select-String line counts) and match the packet: A1=6, A2=4, A3=2, A4=3, A5=40. No source file was changed; no test file was created; the worktree carries only this RESULT.json. The acceptance suite 1-11 was therefore not run, and the `corpus/ttc/door.py --engine truck` spot-check was not run because the route under test (a canonical cylinder operand reaching `boolean_product_volume_certified`) refuses at `node_box_patches` before any new code could execute. Row verdicts before/after are unchanged: the six confirmed category-1 rows (f1/nose, f1/sidepod_left, f1/sidepod_right, f1/airbox, f1/details, f1/drivetrain) and the presumptive f1/suspension_front still refuse `unsupported_envelope` (NonCanonicalCarrier) at extraction; zero rows flipped. The gap is not a solver-numerics defect (the register's classification axiom holds) -- it is a missing representation/extraction/membership layer plus an absent normative theory, i.e. a scope-and-specification gap, not an implementation the packet's write_allow could contain."
+}

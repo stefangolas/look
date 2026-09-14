@@ -283,8 +283,13 @@ def lint_packet(packet_path, known_ids):
     # CRATES_NONEMPTY (session 46, BG-CK-P0-PREVALENCE r1): verify.py exits
     # before any gate when `crates:` is falsy, and a packet writing
     # root-crate files needs `look` in crates for cargo -p to have a target.
-    # Survey packets write no Rust and are exempt.
-    if packet_class != 'survey':
+    # Survey packets write no Rust and are exempt. So are harness packets
+    # whose write set is entirely under loop/ (2026-09-14, LOOP-MACH-1):
+    # their gate is the python acceptance suite, not cargo -p, and
+    # inventing a crate name to satisfy the lint would be dishonest.
+    loop_only_writes = bool(write_allow) and all(
+        p.startswith('loop/') for p in write_allow)
+    if packet_class != 'survey' and not loop_only_writes:
         if not crates:
             findings.add('FAIL', 'CRATES_NONEMPTY',
                             '`crates:` is empty - verify.py exits before any gate '
