@@ -11369,3 +11369,41 @@ Actions:
   ARMS mvac-pin amendment (slot 4 residue, row DONE); disk below 15 GB goal / RAM below 3 GB floor
   with 3 workers. No new entry added to OPERATOR_ESCALATIONS.md this cycle.
 - Leaving: HEAD `5ffc091` + this cycle's STATE/log commit.
+
+## 2026-09-14T11:07Z operator cycle
+
+- HEALTH (step 1): heartbeat exactly 1 (27872; its own log cycle 11:01Z is 6 min old - alive); operator_runner
+  1 (27876); watchdog/supervisor/overnight 0 (carried dead, not restarted - the only `watchdog` matches are
+  Teams' `--gpu-watchdog-timeout` msedgewebview2 procs). cargoq UP idle (ping ok, queued 0, running false).
+  **Disk 9.62 GB free (above the 8 GB floor, below the 15 GB goal); RAM 3.73 GB free (above the 3 GB
+  floor).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (carried).
+- BOARD (steps 2-3): 0 RUNNING / **2 landed-this-cycle** (slot 2 FHC-G9-GREEN-TRIM-INTEGRATION RESULT DONE;
+  slot 1 FHC-G8-PLANARITY-ROUTER RESULT DONE) / 1 FINISHED SPEC_GAP residue (slot 0 FHC-G8 duplicate,
+  RESULT SPEC_GAP) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 2 registry flips / 0
+  dispatched-live. HEAD `1d23eeb` (this cycle's landing commit). Board re-derived by command.
+- LANDED (step 2): (a) FHC-G9-GREEN-TRIM-INTEGRATION, slot 2, worker `f815d36` - scoped check
+  `cargo check -p truck123d --tests --locked` exit 0 + `cargo test -p truck123d --test green_trims --locked`
+  7/7; merged `--no-ff` `9a74625`. (b) FHC-G8-PLANARITY-ROUTER, slot 1, worker `da55a1a` - check exit 0 +
+  `cargo test -p truck123d --test planarity_router --locked` 5/5; merged `--no-ff` `ecf2fb1` (auto-merged
+  `bd_bridge.rs`, pure insertions at non-overlapping base regions). Combined merged-HEAD scoped check green:
+  `cargo check -p truck123d --tests --locked` exit 0 + planarity_router 5/5 + green_trims 7/7. RESULTs filed
+  to `loop/results/FHC-G9-GREEN-TRIM-INTEGRATION.json` + `FHC-G8-PLANARITY-ROUTER.json`; 2 ledger rows
+  appended; registry rows (lines 363/364) READY->DONE; landing commit `1d23eeb` (4 files, +22/-2).
+- SPEC_GAP (escalated, NOT landed): slot 0 FHC-G8 (duplicate of the landed slot-1 run). RESULT status
+  SPEC_GAP: the packet's exact coefficient planarity predicate (`nu.A_ij = c w_ij`) is exact on intrinsic
+  control data but the certification site is handed PLACED f64 nets (`place_local_point`, bd_bridge.rs:5281;
+  `extract_patches` :5766), so a non-axis-aligned plane (the `_rocker` cap) loses exact coplanarity and the
+  detector must fall through; a tolerance test is the packet's forbidden approximation. New ESCALATIONS entry.
+- REGISTRY (step 4): re-derived post-flip: 272 DONE / 80 READY / 10 BLOCKED / 2 SUPERSEDED. No further
+  mechanical flip; all 10 BLOCKED owner/semantic parked. FHC-G1 stale READY row (line 356) carried - did
+  NOT re-measure its anchors (would arm a duplicate dispatch; A1 6->7, A5 40->56 are the stale-claim
+  signature). RG-23/RG-9 packet files still absent. NOT edited beyond the two landings.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8 free);
+  slot-assigned packets: 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent);
+  FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle.
+- ESCALATIONS: 1 new (slot-0 FHC-G8 SPEC_GAP - exactness vs placed f64 nets; bears on whether the landed
+  slot-1 machinery should stand). Carried: FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale
+  READY row (line 356); RG-23/RG-9 packet files absent; dead substrate stack (watchdog/supervisor/overnight);
+  disk below the 15 GB goal.
+- Leaving: HEAD `1d23eeb` + this cycle's STATE/log commit; slots 0-7 all FINISHED (no live workers).

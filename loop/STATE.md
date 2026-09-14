@@ -75,6 +75,32 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T11:07Z]: 0 RUNNING / **2 landed-this-cycle (FHC-G9-GREEN-TRIM-INTEGRATION
+> + FHC-G8-PLANARITY-ROUTER)** / 1 FINISHED SPEC_GAP residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue
+> (slots 3-7) / 0 unblocked / 2 registry flips / 0 dispatched-live. HEAD `1d23eeb` (this cycle's landing commit;
+> parents `ecf2fb1` <- `9a74625`). Board re-derived by command.
+> **LANDED:** (a) FHC-G9 (slot 2, worker `f815d36`) merged `9a74625`; (b) FHC-G8 (slot 1, worker `da55a1a`) merged
+> `ecf2fb1` (auto-merged `bd_bridge.rs`; pure insertions at non-overlapping base regions). Combined merged-HEAD
+> scoped check green: `cargo check -p truck123d --tests --locked` exit 0 + planarity_router 5/5 + green_trims 7/7.
+> RESULTs filed to `loop/results/`; ledger rows + registry flips READY->DONE (lines 363/364); landing commit `1d23eeb`.
+> **SLOT 0 = FHC-G8 SPEC_GAP (duplicate of slot 1, NOT landed):** the packet's exact coefficient planarity predicate
+> cannot certify its own row targets because the certification site is handed PLACED f64 nets (`place_local_point`,
+> bd_bridge.rs:5281), destroying exact coplanarity for non-axis-aligned planes (the `_rocker` case); a tolerance test
+> is the packet's forbidden approximation. New ESCALATIONS entry; bears on whether the landed slot-1 machinery stands.
+> **LANDABLE: NONE** remaining (slots 3-7 worker commits ancestors of HEAD). **UNBLOCK: NONE** - 0 running, no live
+> workers; only QUESTION.md is slot 5 (2026-09-05 residue).
+> **REGISTRY:** post-flip 272 DONE / 80 READY / 10 BLOCKED / 2 SUPERSEDED; all 10 BLOCKED parked; FHC-G1 stale READY
+> row (line 356) carried - do NOT re-measure (would arm a duplicate).
+> **DISPATCH (dry-run only):** `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8 free);
+> slot-assigned packets: 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors
+> A1 6->7, A5 40->56. REAL idle. Live dispatch left to the heartbeat (27872).
+> **HEALTH:** heartbeat exactly 1 (27872, its log cycle 11:01Z 6 min old); operator_runner 1 (27876);
+> watchdog/supervisor/overnight 0 (carried dead). cargoq UP idle (queued 0, running false). Disk 9.62 GB free (above
+> 8 floor, below 15 goal); RAM 3.73 GB free (above 3 floor). No `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet.
+> **OPERATOR ACTION:** landed FHC-G9 + FHC-G8 (scoped checks green at merged HEAD); escalated slot-0 SPEC_GAP; did NOT
+> run live dispatch; did NOT re-measure FHC-G1 anchors. STATE + log + escalation written. Leaving: HEAD `1d23eeb` +
+> this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T10:39Z]: 3 RUNNING (slot 0, FHC-G8-PLANARITY-ROUTER,
 > pid 20372, events 11.8 min old, changed=0, @c707639 = base) + (slot 1, FHC-G8-PLANARITY-ROUTER,
 > pid 37052, events 6.9 min old, changed=2, @4b011cd = base) = DUPLICATE PAIR (carried) + (slot 2,
@@ -433,6 +459,20 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T11:07Z] board: 0 RUNNING / 2 landed-this-cycle (FHC-G9 slot 2, FHC-G8 slot 1) / 1
+  FINISHED SPEC_GAP residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked /
+  2 registry flips / 0 dispatched-live; HEAD `1d23eeb`. Board re-derived by command.
+- [operator 2026-09-14T11:07Z] landed: FHC-G9-GREEN-TRIM-INTEGRATION (slot 2, worker `f815d36`, merge `9a74625`)
+  + FHC-G8-PLANARITY-ROUTER (slot 1, worker `da55a1a`, merge `ecf2fb1`); combined `cargo check -p truck123d
+  --tests --locked` green + planarity_router 5/5 + green_trims 7/7; RESULTs filed; ledger rows + registry flips
+  (lines 363/364 READY->DONE); landing commit `1d23eeb`.
+- [operator 2026-09-14T11:07Z] SPEC_GAP: slot 0 FHC-G8 (duplicate) - exact coefficient planarity test cannot
+  certify PLACED f64 nets (`place_local_point` bd_bridge.rs:5281); escalated, NOT landed.
+- [operator 2026-09-14T11:07Z] dispatch: dry-run only = `dispatched 0` (RG-23/RG-9 packet files absent; FHC-G1
+  stale anchors A1 6->7, A5 40->56); live dispatch left to the heartbeat (27872).
+- [operator 2026-09-14T11:07Z] health: heartbeat 1 (27872); operator_runner 1 (27876); watchdog/supervisor/
+  overnight 0 (carried dead); cargoq UP idle; disk 9.62 GB / RAM 3.73 GB. No `%TEMP%/look-verify-baseline-*` leaks.
 
 - [operator 2026-09-14T10:39Z] board: 3 RUNNING (slot 0 FHC-G8 pid 20372 events 11.8 min changed=0
   @c707639; slot 1 FHC-G8 pid 37052 events 6.9 min changed=2 @4b011cd = DUPLICATE PAIR; slot 2

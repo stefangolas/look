@@ -2955,3 +2955,37 @@ uncommitted - left for the orchestrator, no dispatch impact.
   to keep the slot-1 duplicate (pid 37052). Fix dispatch_ready.slot_states(): treat a
   live worker pid + a cargoq job started within the last ~40 min as RUNNING (raise the
   belt-and-suspenders window above the cargoq per-job timeout).
+
+## 2026-09-14 11:07 UTC - slot 0 FHC-G8-PLANARITY-ROUTER SPEC_GAP (duplicate of the LANDED slot-1 run; spec defect)
+
+- WHAT: slot 0's FHC-G8 worker returned RESULT status **SPEC_GAP**. Primary gap: the packet's exact
+  coefficient planarity predicate (`nu.A_ij = c w_ij`, Thm 8.1) is exact on the INTRINSIC (unplaced)
+  control data, but the per-patch certification site is handed PLACED f64 nets - `place_local_point`
+  (`truck123d/src/bd_bridge.rs:5281`) computes every placed coordinate as a per-coordinate f64 affine
+  combination of the recorded orthonormal frame, and `extract_patches` (`:5766`) feeds those to
+  `certify_boolean_volume` / `certify_sandwich`. For a plane that is not axis aligned (the suspension
+  `_rocker` cap, normal `_unit((1.0, 0.06, 0.0))`) that rounding makes the exact 4-D rank 4, so the exact
+  detector must report NON-PLANAR and fall through; the only way to route it is a tolerance test, which is
+  the packet's forbidden approximation. Secondary gap: the packet's test 2 (`planar_polynomial_exact`)
+  demands the boundary-form flux equal the generic polynomial path BIT-FOR-BIT, but the two arithmetic
+  expressions (area-vector + plane offset vs the exact density net) do not round to the same bits - the
+  packet's own stop condition fires structurally. The worker cites the open G10 placement-covariance gap
+  (`loop/results/FHC-G10-PLACEMENT-COVARIANCE-CACHE.json`) as the missing prerequisite, and reports the
+  actual door blocker is the EXTREMES-SURVIVE bbox gate (`:10119 extremes_survive`), not the RDEF-M2
+  sandwich the packet names.
+- WHY HUMAN/ORCHESTRATOR: this is a SPECIFICATION defect, not a worker fault, and the operator is not a
+  design agent (may not adjudicate geometry/semantics). It also bears on whether the just-landed slot-1
+  FHC-G8 (status DONE, `rows_flipped` empty; exact on synthetic inputs, fan cap absorbed, tests 5/5) should
+  stand as-is, or whether the packet must be re-scoped: (a) carry the intrinsic/unplaced control net and its
+  exact plane certificate through placement (the G10 intrinsic-key representation), or (b) re-scope to
+  synthetic exactly-planar `VolumeRow` inputs (drop the suspension-row flip / fan-cap regression), or
+  (c) retarget the actual blocker (the EXTREMES-SURVIVE bbox gate).
+- OPERATOR ACTION: did NOT land slot 0 (status SPEC_GAP). Landed slot 1's DONE implementation per the
+  mechanical landing rule (merge `ecf2fb1`); combined merged-HEAD scoped checks green. No files changed for
+  slot 0.
+- START FROM: `loop/slots/0/wt/RESULT.json` (full `spec_gap` block); `loop/results/FHC-G8-PLANARITY-ROUTER.json`
+  (the landed slot-1 claim); `docs/F1_HYPERCAR_GAP_REGISTER.md`;
+  `truck123d/src/bd_bridge.rs:5281` (`place_local_point`), `:5766` (`extract_patches`), `:10119`
+  (`extremes_survive`); `loop/results/FHC-G10-PLACEMENT-COVARIANCE-CACHE.json` (the prerequisite gap).
+- Carried unchanged: FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale READY row (line 356);
+  RG-23/RG-9 packet files absent; dead substrate stack; disk below the 15 GB goal.
