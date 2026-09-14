@@ -75,6 +75,42 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T17:09Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED
+> SPEC_GAP residue (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW, DONE_WITH_SPEC_GAP) / 7 FINISHED landed
+> residue (slots 1-7) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `13fc85a` (owner
+> commits since 16:38Z: `72dbb2d` packet-economics doctrine + anchor-staleness fix + first atlas
+> packets; `13fc85a` CT-000..CT-103 rows + FHC-G15 false-DONE correction). Board re-derived by command.
+> **LANDABLE: NONE.** All 7 finished worker commits da55a1a/f815d36/e6553db/3c2109b/ee97499/713f205/
+> 5cf4811 are ancestors of HEAD (`git merge-base --is-ancestor` exit 0 each); slot 0 RESULT is
+> DONE_WITH_SPEC_GAP (not plain DONE) -> NOT landed, ESCALATED (silent wrong volume on the canonical
+> fallback; needs the extremes-survive bbox gate wired through `admit_swept_pair`).
+> **UNBLOCK: NONE.** 0 RUNNING; all 8 worker.pid stale/dead (slot_status pid=-). Slot 0 is a finished
+> RESULT awaiting adjudication (DONE_WITH_SPEC_GAP), not a stuck worker -> did NOT reset/redispatch.
+> **REGISTRY (step 4):** re-derived READ-ONLY (last-wins): 275 DONE / 85 READY / 10 BLOCKED / 2
+> SUPERSEDED (372 unique). No safe mechanical flip: the two BLOCKED rows whose deps carry LANDED
+> markers (DEF-SEEDRAY-B needs DEF-SEEDRAY-A; DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES) were
+> declined (DEF-TESS's note describes an r2 rescope the packet may not carry); TOR-C's deps landed but
+> its packet file is ABSENT and its note forbids flipping; the rest are owner/semantic parked. NOT
+> edited. RG-23/RG-9 packet files still absent.
+> **DISPATCH (step 5):** did NOT run live (heartbeat 27872 owns dispatch; its log mtime 12:56:39Z and
+> it is mid-cycle, next run started ~13:06 local; manual+heartbeat = the documented double-dispatch
+> race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned
+> packets: 7`; would dispatch FHC-G17->slot0, FHC-G15->slot1, CT-000->slot2, CT-101->slot3;
+> RG-23/RG-9/CT-100 ANCHOR CHECK FAILED (absent files / stale A3 `\bmod atlas\b` 1 vs 0).
+> **HEALTH:** heartbeat exactly 1 (27872, mid-cycle); operator_runner 1 (27876); watchdog 0 (DEAD since
+> 2026-09-10); supervisor/overnight 0 (carried dead). **cargoq was DOWN at entry (ping refused; server
+> last log 12:52:54Z; fallback.log shows DIRECT cargo 12:53-13:00) -> OPERATOR RESTARTED it directly
+> (`python loop/cargoq/server.py`); now UP idle (`{"ok":true,"queued":0,"running":false}`).** Disk
+> 6.7 GB free (BELOW the 8 GB floor and 15 GB goal; janitor `ensure --need 8` reclaimed ~3.2 GB ->
+> 7.0 GB, still short; no `%TEMP%/look-verify-baseline-*` leaks). RAM 4.9 GB free (above the 3 GB
+> floor, 0 workers).
+> **DIRT carried:** `truck123d/tests/rdef_m2_sandwich.rs` enumerate refactor + always-dirty
+> `loop/cargoq/server.log`.
+> **OPERATOR ACTION:** health sweep; restarted cargoq (was down); re-derived landability (none);
+> registry read-only (no flip); did NOT run live dispatch; did NOT touch slot 0's uncommitted worktree,
+> the dirty test file, or resident processes. STATE + log + escalation written.
+> Leaving: HEAD `13fc85a` + this cycle's STATE/log/escalation commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T16:38Z]: 1 RUNNING (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW,
 > pid 13056; events 4.7 min old but live cargo clippy/rustc children spawned 16:35Z) / 0 landed-this-cycle /
 > 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 5 registry flips / 0 dispatched-live (live dispatch
@@ -834,6 +870,24 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T17:09Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue
+  (slot 0 FHC-G16-ADMISSION-PAIRS-NARROW, DONE_WITH_SPEC_GAP) / 7 FINISHED landed residue (slots 1-7)
+  / 0 unblocked / 0 registry flips / 0 dispatched-live; HEAD `13fc85a`. Board re-derived by command.
+- [operator 2026-09-14T17:09Z] landable: NONE. da55a1a/f815d36/e6553db/3c2109b/ee97499/713f205/5cf4811
+  ancestors of HEAD. slot 0 DONE_WITH_SPEC_GAP -> escalated, not landed.
+- [operator 2026-09-14T17:09Z] unblock: NONE. 0 running; slot 0 is a finished RESULT, not a stuck worker.
+- [operator 2026-09-14T17:09Z] registry: 275 DONE / 85 READY / 10 BLOCKED / 2 SUPERSEDED (372 unique).
+  No flip: DEF-SEEDRAY-B + DEF-TESS-ANALYTIC-SEAM declined (r2 rescope risk); TOR-C packet absent; rest
+  owner/semantic parked. RG-23/RG-9 packet files still absent.
+- [operator 2026-09-14T17:09Z] dispatch: did NOT run live (heartbeat 27872 mid-cycle owns it). dry-run
+  would dispatch FHC-G17/FHC-G15/CT-000/CT-101; RG-23/RG-9/CT-100 anchor-failed.
+- [operator 2026-09-14T17:09Z] health: heartbeat 1 (27872); operator_runner 1 (27876); watchdog/
+  supervisor/overnight 0 (carried dead). **cargoq was DOWN at entry -> OPERATOR RESTARTED it directly;
+  now UP idle.** Disk 6.7 GB free (BELOW the 8 GB floor; janitor `ensure --need 8` reclaimed ~3.2 GB);
+  RAM 4.9 GB free (above the 3 GB floor, 0 workers). No baseline leaks.
+- [operator 2026-09-14T17:09Z] DIRT carried: `truck123d/tests/rdef_m2_sandwich.rs` enumerate refactor +
+  dirty `loop/cargoq/server.log`.
 
 - [operator 2026-09-14T16:38Z] board: 1 RUNNING (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW, pid 13056,
   events 4.7 min old but live cargo clippy/rustc children spawned 16:35Z) / 0 landed-this-cycle / 7 FINISHED

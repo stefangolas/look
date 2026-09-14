@@ -3083,3 +3083,52 @@ uncommitted - left for the orchestrator, no dispatch impact.
   lists only slot 0 targets (0.0 GB `slots/0/target` + 1.5 GB `slots/0/wt/target`), both live.
 - START FROM: `Get-PSDrive C`; `python loop/janitor.py status`; separate large non-loop scratch
   (home-dir PNGs/renders, `benchmarks/`, `scratch/`) from the live slot-0 target before any reclaim.
+
+## [operator 2026-09-14T17:09Z] slot 0 FHC-G16-ADMISSION-PAIRS-NARROW = DONE_WITH_SPEC_GAP (not landable)
+
+- WHAT: slot 0's `RESULT.json` (worker finished ~12:59:46 local; no commit, `changed=2` uncommitted in
+  `loop/slots/0/wt`) reports status `DONE_WITH_SPEC_GAP`. The revolute/cylinder extraction vocabulary it
+  adds is landed and correct (its tests 7/7 green; `lathe_cut_box_far` certifies 16*pi, disjoint cylinder
+  unions 4*pi), but the canonical->funnel routing for the corner-wheel `lathe*cylinder` cut is WITHHELD
+  because the canonical product fallback returned a SILENT WRONG VOLUME on a known fixture (ruled 1x1x5
+  unit loft cut by a 2x2x2 box returned 5 instead of 4). Its own `next_packet` says the fix is to wire
+  the Amendment-1 EXTREMES-SURVIVE bbox gate through the extraction funnel (`admit_swept_pair`), then
+  enable the fallback and re-run the five door rows.
+- WHY HUMAN/ORCHESTRATOR: status is not plain DONE -> the operator charter forbids landing; the
+  adjudication is a correctness/geometry judgment (whether the routing can be enabled and how the gate
+  composes) and the fix is a new packet, both outside the operator's MAY list.
+- OPERATOR ACTION: did NOT land, did NOT reset/redispatch, did NOT touch the uncommitted worktree
+  (`changed=2`; the next `run_packet --reset` will archive it as an abandoned patch). Reported only.
+- START FROM: `loop/slots/0/wt/RESULT.json` (full `spec_gap` + `admission_decision_table`); author the
+  gate-wiring packet from its `next_packet` line.
+
+## [operator 2026-09-14T17:09Z] cargoq was DOWN; supervisor restart guard still dead
+
+- WHAT: at cycle entry `curl http://127.0.0.1:8231/ping` refused. `loop/cargoq/server.log` last line
+  12:52:54 local (`cargo test -p truck123d --test admission_pairs_narrow --locked` exit=101);
+  `loop/cargoq/fallback.log` shows the shim falling back to DIRECT cargo 12:53:23-13:00:36 (slot 0's
+  worker ran its done-when checks bypassing the queue). The `supervisor.py` restart guard that normally
+  restarts cargoq is DEAD (0 python `supervisor` processes), so nothing restored it. Also `watchdog.py`
+  is dead (0 processes; stale `watchdog.lock` pid 29264 dead).
+- WHY HUMAN/ORCHESTRATOR: the supervisor/overnight driver being deliberately left dead is an owner
+  posture carried across sessions; restarting it would also restart `overnight.py`, whose autonomous
+  adjudication/merge behavior is owner territory. Only the cargoq server is safe to restore directly.
+- OPERATOR ACTION: restarted ONLY cargoq (`Start-Process python.exe loop/cargoq/server.py`); `/ping`
+  now `{"ok":true,"queued":0,"running":false}`. Did NOT start the supervisor/watchdog/overnight.
+- START FROM: `loop/supervisor.py` (restart guard) + `loop/supervisor.log`; decide whether to revive
+  the supervisor (and thus overnight) or keep it parked.
+
+## [operator 2026-09-14T17:09Z] disk 6.7 GB free (below the 8 GB floor) with 4 dispatches pending
+
+- WHAT: `Get-PSDrive C` = 6.7 GB free - below the operator's 8 GB floor and the 15 GB goal. `janitor
+  ensure --need 8` reclaimed ~3.2 GB (idle slot targets) -> 7.0 GB, STILL SHORT. No live worker now (0
+  RUNNING), but the heartbeat's imminent live dispatch plans FHC-G17/FHC-G15/CT-000/CT-101 (4 warm
+  builds against `loop/target-shared`), which need disk headroom.
+- WHY HUMAN/ORCHESTRATOR: the only large remaining reclaimables are the shared target tree and the
+  repo-root target (deleting them forces cold warm-builds and re-enters the 0xc0000409 RAM zone), plus
+  non-loop scratch (`scratch/`, `benchmarks/`, home-dir renders) that is not operator-owned. Growing the
+  volume / clearing non-loop scratch is an owner call.
+- OPERATOR ACTION: ran `janitor ensure --need 8` (reclaimed 3.2 GB, still short); did NOT delete the
+  shared target or non-loop scratch; reported only.
+- START FROM: `Get-PSDrive C`; `python loop/janitor.py status`; separate non-loop scratch from
+  `loop/target-shared` before any further reclaim.

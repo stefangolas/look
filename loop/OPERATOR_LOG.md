@@ -11899,3 +11899,51 @@ Actions:
 - STATE (step 6): prepended the [operator 2026-09-14T16:38Z] LATEST GROUND TRUTH block and the
   "State of the machine, as left" bullets. Traps/history untouched.
 - Leaving: HEAD `7662c64` + this cycle's PACKETS/STATE/log commit; 1 live worker (slot 0).
+
+## [operator 2026-09-14T17:09Z] cycle 70 - slot 0 FHC-G16 finished DONE_WITH_SPEC_GAP; cargoq was DOWN (restarted); disk below floor
+
+- HEALTH (step 1): `slot_status.py` = 0 RUNNING / 8 FINISHED. slot 0 FHC-G16-ADMISSION-PAIRS-NARROW
+  finished (events 0.1 min old at entry, now 3.9 min; pid=-, RESULT.json DONE_WITH_SPEC_GAP); slots 1-7
+  FINISHED landed residue. **cargoq was DOWN** (`/ping` connection refused; server.log last line
+  12:52:54Z; fallback.log DIRECT cargo 12:53:23-13:00:36) -> operator restarted it directly
+  (`Start-Process python.exe loop/cargoq/server.py`); now UP idle. heartbeat exactly 1 (27872; log mtime
+  12:56:39Z, mid-cycle - next run started ~13:06 local). operator_runner 1 (27876). watchdog 0 (DEAD
+  since 2026-09-10; lock pid 29264 dead); supervisor/overnight 0 (carried dead). Disk 6.7 GB free (BELOW
+  the 8 GB floor AND the 15 GB goal) - `janitor ensure --need 8` reclaimed ~3.2 GB -> 7.0 GB, STILL
+  SHORT; did NOT delete the shared target. RAM 4.9 GB free (above the 3 GB floor, 0 workers). No
+  `%TEMP%/look-verify-baseline-*` leaks.
+- BOARD: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0) / 7 FINISHED landed
+  residue (slots 1-7) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `13fc85a` (owner
+  commits `72dbb2d` packet-economics doctrine + anchor-staleness fix + first atlas packets; `13fc85a`
+  CT-000..CT-103 rows + FHC-G15 false-DONE correction). Board re-derived by command.
+- LANDABLE (step 2): NONE. `git merge-base --is-ancestor` exit 0 for da55a1a/f815d36/e6553db/3c2109b/
+  ee97499/713f205/5cf4811. slot 0 RESULT status DONE_WITH_SPEC_GAP (not plain DONE) -> do NOT land;
+  escalated (silent wrong volume on the canonical fallback; fix = wire the extremes-survive bbox gate
+  through `admit_swept_pair`). slot 0 worktree has `changed=2` UNCOMMITTED (no commit) - did NOT touch;
+  a later `--reset` archives it.
+- UNBLOCK (step 3): NONE. 0 RUNNING; all 8 `worker.pid` stale (slot_status pid=-). slot 0 is a finished
+  RESULT, not a stuck worker -> did NOT reset/redispatch.
+- REGISTRY (step 4): re-derived READ-ONLY (last-wins): 275 DONE / 85 READY / 10 BLOCKED / 2 SUPERSEDED
+  (372 unique). NO safe mechanical flip: the two BLOCKED rows whose deps carry LANDED markers
+  (DEF-SEEDRAY-B needs DEF-SEEDRAY-A `LANDED 35c7999`; DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES
+  `LANDED d6796fd`) were DECLINED - DEF-TESS's note describes an r2 rescope (EdgeID-keyed index
+  identity) the packet may not carry, and both are named owner/semantic parked in prior cycles; TOR-C's
+  deps (ADM-001/002) landed but its packet file is ABSENT and its note says do-not-flip; the rest
+  (BG-AUD-FIX-004, SEM-PCURVE, MONO-10, RDEF-M4/M5, DEF-SPINEFRAME-GRAZE, BG-CK-SPLINE-CENSUS) are
+  owner/semantic parked. PACKETS.jsonl NOT edited. RG-23/RG-9 packet files still absent.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch and is mid-cycle; manual+heartbeat
+  = the documented double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0
+  running, 8 free); slot-assigned packets: 7`; would dispatch FHC-G17->slot0, FHC-G15->slot1,
+  CT-000->slot2, CT-101->slot3; RG-23/RG-9/CT-100 ANCHOR CHECK FAILED (absent files; CT-100 A3
+  `\bmod atlas\b` floor 1 vs tree 0). The imminent live heartbeat dispatch now has cargoq UP (my
+  restart), so its warm builds queue instead of falling back to direct cargo.
+- DIRT carried: `truck123d/tests/rdef_m2_sandwich.rs` (3-line `enumerate` refactor) + always-dirty
+  `loop/cargoq/server.log`. Did NOT touch either. (The 15:21Z `corpus/ttc/door.py` dirt was committed
+  by the owner in `7e77c33`.)
+- ESCALATIONS: 3 new - (1) slot 0 FHC-G16 DONE_WITH_SPEC_GAP (geometry/correctness judgment, not
+  landable); (2) cargoq was DOWN + the supervisor restart guard still dead (operator restarted cargoq
+  only); (3) disk 6.7 GB free below the 8 GB floor with 4 warm-build dispatches pending.
+- STATE (step 6): prepended the [operator 2026-09-14T17:09Z] LATEST GROUND TRUTH block and the
+  "State of the machine, as left" bullets. Traps/history untouched.
+- Leaving: HEAD `13fc85a` + this cycle's STATE/log/escalation commit; 0 live workers; PACKETS.jsonl
+  untouched.
