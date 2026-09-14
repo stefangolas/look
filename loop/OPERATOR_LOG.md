@@ -11263,3 +11263,36 @@ Actions:
 - ESCALATIONS: none new. Carried: FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale READY
   row (line 356); disk/RAM below floors. No new entry added to OPERATOR_ESCALATIONS.md this cycle.
 - Leaving: HEAD `1b34431` + this cycle's STATE/log commit.
+
+## 2026-09-14T09:31Z operator cycle
+
+- HEALTH (step 1): heartbeat exactly 1 (27872; the 2nd match was this operator's own
+  query shell); operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried
+  dead, not restarted); cargoq UP (running slot-0's `test -p truck123d --profile quick
+  --lib --locked`, queued 0). **Disk 4.83 GB at entry (BELOW the 8 GB floor) ->
+  `janitor ensure --need 5` reclaimed ~5.3 GB -> 9.44 GB free (above floor, below 15
+  goal). RAM 2.54 GB free (BELOW the 3 GB floor, 2 workers).** No
+  `%TEMP%/look-verify-baseline-*` leaks.
+- BOARD (steps 2-3): 1 RUNNING (slot 1, FHC-G8 duplicate pid 37052) + 1 STALLED
+  (slot 0, FHC-G8 orphan pid 25800 alive against a reset worktree) + 1 IDLE residue
+  (slot 2) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0
+  unblocked / 0 registry flips / 0 dispatched-live. HEAD `4b011cd` (a 05:11 golden
+  refresh, not operator work). Nothing landable: slot-1 FHC-D `000cb11` NOT an
+  ancestor (packet DONE, carried escalation); slots 3-7 commits ancestors of HEAD.
+- HAZARD MATERIALIZED (steps 3/5): at 05:29:51 the heartbeat misread slot 0 as STALLED
+  (worker blocked >15 min in the cargoq lib test) and, via dispatch_ready's dead path,
+  archived the LIVE worker's work (`abandoned-20260914-052959.patch`, 18729 B),
+  reset slot 0, and dispatched a duplicate FHC-G8 to slot 1. I did NOT kill/reset
+  either worker. Full writeup appended to OPERATOR_ESCALATIONS.md.
+- REGISTRY (step 4): 364 unique, last-wins = 270 DONE / 82 READY / 10 BLOCKED / 2
+  SUPERSEDED. No mechanical flip (BG-CK-SPLINE-CENSUS owner-cancelled; DEF-TESS/
+  DEF-SEEDRAY-B/TOR-C needs still READY; rest needs=[]/None). FHC-G1 stale READY row
+  (line 356) carried - do NOT re-measure its anchors. NOT edited.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat
+  is the known double-dispatch race). `dispatch_ready --dry-run --max-workers=4` at
+  05:29 showed FHC-G8 flagged DEAD + FHC-G9 -> slot 1 (the misread); the live heartbeat
+  then did exactly that. RG-23/RG-9 anchor check failed (packet files absent); FHC-G1
+  stale anchors A1 6->7, A5 40->55 (carried).
+- ESCALATIONS: 1 new (slot-0 live reset + duplicate FHC-G8, root cause = STALLED
+  heuristic). Carried: FHC-D slot-1 duplicate `000cb11`; FHC-G1 stale READY row.
+- Leaving: HEAD `4b011cd` + this cycle's STATE/log commit.

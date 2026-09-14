@@ -75,6 +75,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T09:31Z]: 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER
+> DUPLICATE pid 37052, fresh) + 1 STALLED (slot 0, FHC-G8 orphan pid 25800 alive against a reset
+> worktree) / 0 landed-this-cycle / 1 IDLE residue (slot 2) / 5 FINISHED landed residue (slots 3-7)
+> / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `4b011cd` (05:11 golden refresh;
+> parent `e3fdac4` = 09:06Z operator commit). Board re-derived by command.
+> **HAZARD MATERIALIZED (escalated)**: at 05:29:51 the heartbeat misread slot 0 as STALLED (FHC-G8
+> worker blocked >15 min in the cargoq `test -p truck123d --profile quick --lib --locked`), and via
+> dispatch_ready's dead path archived the LIVE worker's work to
+> `loop/slots/0/abandoned-20260914-052959.patch` (18729 B), reset slot 0, and dispatched a DUPLICATE
+> FHC-G8 to slot 1 (pid 37052, base 4b011cd). Slot 0 pid 25800 is still alive, writing into a reset
+> worktree. Operator did NOT kill/reset either (charter). Root cause = the STALLED heuristic
+> (dispatch_ready.py:539-545 + the 180 s belt-and-suspenders at :523); same class as the 04:08Z
+> FHC-D duplicate. See OPERATOR_ESCALATIONS 09:31Z.
+> **LANDABLE: NONE.** Slot 1 FHC-D `000cb11` NOT an ancestor of HEAD (packet DONE, carried). Slots
+> 3-7 commits ancestors of HEAD. Slot 2 IDLE residue (TTC-RECENSUS-F1-R3 row DONE).
+> **FRONTIER**: FHC-G9 / RG-23 / RG-9 / FHC-G1 all blocked (FHC-G9 write-set clash with the RUNNING
+> slot-1 FHC-G8 on `truck123d/src/bd_bridge.rs`; RG-23/RG-9 packet files absent; FHC-G1 stale
+> anchors A1 6->7 A5 40->55). `dispatch_ready --dry-run` = REAL idle beyond the duplicate.
+> **HEALTH**: heartbeat exactly 1 (27872; 2nd `-match` = this operator's query shell); operator_runner
+> 1 (27876); watchdog/supervisor/overnight 0 (carried dead). cargoq UP (slot-0 lib test, queued 0).
+> **Disk 4.83 GB at entry -> janitor reclaimed ~5.3 GB -> 9.44 GB free (above 8 floor, below 15
+> goal). RAM 2.54 GB free (BELOW the 3 GB floor, 2 workers).** No `%TEMP%/look-verify-baseline-*`
+> leaks; `fallback.log` quiet.
+> **OPERATOR ACTION**: janitor reclaim; nothing landable; did NOT run live dispatch; did NOT
+> kill/reset the duplicate pair; STATE + log + escalation written. Leaving: HEAD `4b011cd` + this
+> cycle's commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T09:06Z]: 1 RUNNING (slot 0, FHC-G8-PLANARITY-ROUTER, fresh)
 > / 0 landed-this-cycle / 7 FINISHED residue (slots 1, 3-7; slot 1 = FHC-D duplicate `000cb11` NOT
 > landable) / 1 IDLE residue (slot 2, TTC-RECENSUS-F1-R3 row DONE) / 0 unblocked / 0 registry flips / 0
@@ -271,6 +298,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T09:31Z] board: 1 RUNNING (slot 1 FHC-G8 DUPLICATE pid 37052) + 1 STALLED
+  (slot 0 FHC-G8 orphan pid 25800 alive, changed=0 after the heartbeat reset) + 1 IDLE residue
+  (slot 2) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 registry
+  flips / 0 dispatched-live; HEAD `4b011cd`. Board re-derived by command.
+- [operator 2026-09-14T09:31Z] HAZARD: heartbeat 05:29:51 reset LIVE slot 0 (archive
+  `abandoned-20260914-052959.patch` 18729 B) and dispatched duplicate FHC-G8 to slot 1 (pid 37052);
+  root cause STALLED heuristic (dispatch_ready.py:539-545 / :523). Operator did NOT kill/reset
+  either. Escalated (OPERATOR_ESCALATIONS 09:31Z).
+- [operator 2026-09-14T09:31Z] landable: NONE. Slot 1 FHC-D `000cb11` NOT an ancestor (packet DONE);
+  slots 3-7 commits ancestors of HEAD.
+- [operator 2026-09-14T09:31Z] registry re-derived READ-ONLY (364 unique, last-wins): 270 DONE /
+  82 READY / 10 BLOCKED / 2 SUPERSEDED. No mechanical flip. FHC-G1 stale READY row (line 356)
+  carried - do NOT re-measure. NOT edited.
+- [operator 2026-09-14T09:31Z] health: heartbeat exactly 1 (27872); operator_runner 1 (27876);
+  watchdog/supervisor/overnight 0 (carried dead). cargoq UP (slot-0 lib test, queued 0).
+  **Disk 4.83 GB at entry -> janitor `ensure --need 5` reclaimed ~5.3 GB -> 9.44 GB free (above 8
+  floor, below 15 goal); RAM 2.54 GB free (BELOW 3 floor, 2 workers).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet.
+- [operator 2026-09-14T09:31Z] Observation: HEAD `4b011cd` is a non-operator golden refresh
+  (`tests/geometry_fingerprint` goldens, DEF-TESS-ANALYTIC-SEAM-R2, author Stefan Golas 05:11:34).
+  Main worktree dirty set outside operator scope; not touched.
 
 - [operator 2026-09-14T09:06Z] board: 1 RUNNING (slot 0 FHC-G8-PLANARITY-ROUTER, pid 25800 alive, events
   2.5 min old, changed=2, branch @1b34431 = base, no RESULT) + 7 FINISHED residue (slot 1 = FHC-D

@@ -2926,3 +2926,32 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: FHC-G1 stale duplicate READY row (line 356) - do NOT re-measure its anchors without also
   resolving the stale row, or it arms a duplicate dispatch; RG-23/RG-9 packet files absent; the
   0xC0000409/RAM-zone line (no workers now, but disk 7.3 GB below the 8 GB floor); dead substrate stack.
+
+## 2026-09-14 09:31 UTC - slot 0 LIVE worker reset + DUPLICATE FHC-G8 dispatch (STALLED-misread recurs, now destructive)
+
+- WHAT: at 05:29:51 local the heartbeat (`dispatch_ready.py --max-workers=3`) read
+  slot 0 as STALLED and treated FHC-G8 as a DEAD dispatch. Slot 0's worker (pid 25800,
+  cmd worker-cmd.bat) is ALIVE but synchronously blocked ~19 min in a cargoq job
+  `cargo test -p truck123d --profile quick --lib --locked` (START 05:11:10 local; test
+  binary truck123d-01311bf50ba025c6.exe pid 38104 alive). `slot_states()`
+  (dispatch_ready.py:539-545) puts any slot whose slot_status status != RUNNING and
+  whose events are >180 s old into `dead`; the session-54 belt-and-suspenders
+  (dispatch_ready.py:523) only rescues events <180 s. It then ran
+  `run_packet.py --slot 0 --reset-only`, archiving the live worker's uncommitted
+  planarity_router work to `loop/slots/0/abandoned-20260914-052959.patch` (18729 B),
+  hard-reset slot 0, and dispatched a DUPLICATE FHC-G8 to slot 1 (pid 37052, base
+  4b011cd). Slot 0's pid 25800 is still alive, now writing into a reset worktree.
+- WHY A HUMAN: the STALLED heuristic cannot distinguish a dead worker from one blocked
+  on a long cargoq job. Same root cause as the 04:08Z FHC-D duplicate; that entry
+  (above) already names the fix. This is a HARNESS defect, not a worker fault.
+- IMPACT: one wasted worker (duplicate FHC-G8 - the FHC-D pattern); slot-0's
+  planarity_router work survives only in the abandoned patch. Bounded: slot 1 is now
+  genuinely RUNNING, so FHC-G9's bd_bridge.rs clash is correctly blocked again.
+- OPERATOR ACTION: did NOT kill/reset either worker (charter: never restart a live
+  worker; may not kill outside my own predecessor's leftovers). Nothing landable.
+- START FROM: `python loop/slot_status.py` (slot 0 STALLED pid 25800 alive/changed=0;
+  slot 1 RUNNING pid 37052); `loop/slots/0/abandoned-20260914-052959.patch`. Decide
+  whether to kill the orphaned slot-0 worker (pid 25800) + reset slot 0, and whether
+  to keep the slot-1 duplicate (pid 37052). Fix dispatch_ready.slot_states(): treat a
+  live worker pid + a cargoq job started within the last ~40 min as RUNNING (raise the
+  belt-and-suspenders window above the cargoq per-job timeout).
