@@ -2817,3 +2817,25 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: FHC-G6 LANDED with SPEC_GAP evidence (register adjudication human-owned); FHC-G10
   SPEC_GAP filed; active orchestrator (opencode 37844) - do not disturb; substrate stack
   (watchdog/supervisor/overnight) down - do not blindly restart.
+
+## 2026-09-14T01:35Z - NEW: FHC-G1-RATIONAL-FLUX returns SPEC_GAP; flux-calculus frontier stalled
+
+- What/why: slot 0 FINISHED FHC-G1-RATIONAL-FLUX with `RESULT.json` status **SPEC_GAP** and worker commit
+  `f03f378` = base (HEAD), no files landed. The packet's deliverable 3 (rational surface arm) and
+  acceptance tests 5 (`positive_cylinder_admitted`) and 9 (`end_to_end_cylinder_union`) require the
+  certified boolean funnel to consume rational (X,Y,Z,W) patches for a canonical CYLINDER operand; the
+  landed funnel is unit-weight/box-only (`Patch` carries no weight channel; `parse_patch` refuses `w !=
+  1.0`; `placed_box_patches` matches only `SolidSpec::Box`). None of the rational patch representation,
+  rational extraction, or rational membership is among the packet's five deliverables, and the normative
+  Certified Flux Calculus document is absent from the repository. The packet's own integration map declares
+  extraction unchanged. Per charter step 2 (RESULT status anything but DONE -> do NOT land) and step 3, the
+  operator did not land and did not redispatch. This is a scope-and-specification gap, not a worker fault.
+- Consequence: FHC-D-SURFACE-RESIDUE, FHC-G8-PLANARITY-ROUTER and FHC-G9-GREEN-TRIM-INTEGRATION are all
+  `blocked on ['FHC-G1-RATIONAL-FLUX']`; `dispatch_ready --dry-run` dispatches 0. The frontier is parked
+  until a human/orchestrator rescopes FHC-G1 (add rational `Patch`/membership/extraction + supply the
+  normative theory) or re-scopes tests 5/9 to synthetic rational `VolumeRow` inputs.
+- Start from: `loop/slots/0/wt/RESULT.json` (`spec_gap.what_would_unblock`, four listed options);
+  `loop/packets/FHC-G1-RATIONAL-FLUX.md`; `docs/CERTIFIED_FLUX_CALCULUS_INTEGRATION_MAP.md:18`.
+- Carried unchanged: RG-23/RG-9 packet files absent (anchor check fails); FHC-G10 SPEC_GAP (00:25Z);
+  active orchestrator opencode 37844 - do not disturb; substrate stack (watchdog/supervisor/overnight)
+  down - do not blindly restart.

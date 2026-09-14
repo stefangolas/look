@@ -75,33 +75,32 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T01:13Z]: 0 RUNNING + 0 FINISHED-UNLANDED + 3 IDLE residue
-> (slot 0 FHC-G6 branch idle; slot 1 FHC-G10 branch idle; slot 2 TTC-RECENSUS-F1-R3) + 5 FINISHED
-> landed residue (slots 3-7) / 0 landed-this-cycle / 1 unblocked / 0 flipped / 0 dispatched-live.
-> HEAD `b0233a1` (this cycle's operator commit: FHC-G1 anchor ritual; parent `50910da`, the
-> orchestrator's G6-landed + flux-calculus-wave commit). Board re-derived by command.
-> **FHC-G6 LANDED** (orchestrator merge `97aaf27`; worker `f4088c7` now an ancestor of HEAD) with
-> SPEC_GAP evidence filed to the register; **FHC-G10 SPEC_GAP filed** (unlanded, no work). Slots 0/1
-> `RESULT.json` gone (recycled after the G6 landing).
-> **OPERATOR ACTION THIS CYCLE - anchor ritual:** FHC-G1-RATIONAL-FLUX A5 re-measured 41 -> 40
-> (`grep -c 'VolumeRow'` counts LINES = 40; the tree has 41 occurrences on 40 lines). Packet now passes
-> `gen_packet --check`; `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free);
-> FHC-G1-RATIONAL-FLUX -> slot 0; dispatched 1". Live dispatch deferred to heartbeat 27872 (owns it).
-> **Frontier**: FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 chained on FHC-G1. RG-23/RG-9 still fail
-> `gen_packet --check` (ANCHOR CHECK FAILED - packet files absent from `loop/packets/`) -> escalated.
-> **Registry**: carried from 4f4682d (363 rows, last-wins: 265 DONE / 87 READY / 10 BLOCKED / 1
-> SUPERSEDED); no census re-run this cycle; no BLOCKED flippable.
+> LATEST GROUND TRUTH [operator 2026-09-14T01:35Z]: 0 RUNNING + 1 FINISHED-UNLANDED + 2 IDLE residue
+> (slot 1 FHC-G10 branch idle; slot 2 TTC-RECENSUS-F1-R3) + 5 FINISHED landed residue (slots 3-7) / 0
+> landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live.
+> HEAD `f03f378` (the 01:13Z operator commit; no new packet code this cycle). Board re-derived by command.
+> **NEW: FHC-G1-RATIONAL-FLUX returned SPEC_GAP** (slot 0 FINISHED; RESULT status SPEC_GAP; worker commit
+> = base `f03f378`, no files landed). The packet's rational-surface arm + acceptance tests 5/9 require a
+> rational `Patch`/membership/extraction layer and an absent normative Certified Flux Calculus doc, none of
+> which are in its five deliverables or `write_allow`. -> ESCALATED; do NOT land.
+> **Consequence: the flux-calculus frontier is STALLED** - FHC-D, FHC-G8 and FHC-G9 are all blocked on
+> FHC-G1, so `dispatch_ready` dispatches 0 (REAL idle).
+> **OPERATOR ACTION THIS CYCLE:** none required mechanically - nothing landable, no IDLE slot holding
+> resumable work/QUESTION/402, no mechanically flippable BLOCKED row, dispatch is REAL idle pending the
+> FHC-G1 adjudication.
+> **Frontier**: FHC-G1 SPEC_GAP -> adjudicate/rescope (see ESCALATIONS 01:35Z). RG-23/RG-9 still fail
+> `gen_packet --check` (ANCHOR CHECK FAILED - packet files absent from `loop/packets/`) -> carried.
+> **Registry**: re-derived by script (363 unique, last-wins): 267 DONE / 84 READY / 10 BLOCKED / 2
+> SUPERSEDED; no BLOCKED row mechanically flippable (all owner/semantic parked or needs unlanded).
 > **SUBSTRATE**: heartbeat exactly 1 (27872); the second `-match` hit is the operator's own query shell.
-> operator runner 1 (27876). watchdog/supervisor/overnight remain DEAD (carried). cargoq UP (ping ok,
-> queued 0, running false). Disk 17.93 GB free (above 15); RAM 3.87 GB free (above 3). No
-> `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
-> **Observation**: opencode 37844 (active orchestrator) alive; the orchestrator landed G6 + authored the
-> flux-calculus wave at 21:05 local (commit 50910da), ~5 min before this cycle. Main-worktree dirty set
-> now only `truck123d/tests/rdef_m2_sandwich.rs` + `loop/cargoq/server.log` (outside operator scope; not
-> touched). NOTE: this cycle's anchor-ritual commit also carried a staged `scripts/kernel-gates.sh` mode
-> change (100644->100755, +x) that was already in the index.
-> Leaving: HEAD `b0233a1` + this cycle's STATE/log/escalation commit; FHC-G1 READY for the heartbeat to
-> dispatch to slot 0; RG-23/RG-9 authoring gap escalated.
+> watchdog/supervisor/overnight remain DEAD (carried). cargoq UP (ping ok, queued 0, running false).
+> Disk 16.8 GB free (above 15); RAM 4.34 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks;
+> `fallback.log` quiet since 2026-09-11.
+> **Observation**: tracked main-worktree dirty set now only `truck123d/tests/rdef_m2_sandwich.rs` +
+> `loop/cargoq/server.log` (outside operator scope; not touched). opencode 37844 (leftover, idle) + 35424
+> (this operator) alive; no NEW active orchestrator observed this cycle.
+> Leaving: HEAD `f03f378` + this cycle's STATE/log/escalation commit; FHC-G1 SPEC_GAP escalated; the
+> flux-calculus frontier parked pending adjudication.
 
 
 ## Pick up here
@@ -146,6 +145,34 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T01:35Z] board: 0 RUNNING + 1 FINISHED-UNLANDED (slot 0 FHC-G1-RATIONAL-FLUX,
+  `f03f378` = base, no work; RESULT status **SPEC_GAP**) + 2 IDLE residue (slot 1 FHC-G10 branch idle;
+  slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle /
+  0 unblocked / 0 flipped / 0 dispatched-live; HEAD `f03f378` (the 01:13Z operator commit). Board
+  re-derived by command.
+- [operator 2026-09-14T01:35Z] landable: NONE. Slot 0 RESULT status SPEC_GAP (worker commit `f03f378`
+  = HEAD, no files landed) -> do NOT land. Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE). Slot 0 RESULT.json present; slot 1/2 absent (IDLE residue).
+- [operator 2026-09-14T01:35Z] **NEW: FHC-G1-RATIONAL-FLUX SPEC_GAP** - the rational-surface arm +
+  acceptance tests 5/9 require a rational `Patch`/membership/extraction layer plus an absent normative
+  Certified Flux Calculus doc, outside the packet's five deliverables/`write_allow`; the cylinder operand
+  refuses at `node_box_patches` before any new code runs. Frontier (FHC-D, FHC-G8, FHC-G9) is chained on
+  it -> STALLED pending adjudication. ESCALATED (2026-09-14T01:35Z); do NOT land.
+- [operator 2026-09-14T01:35Z] registry re-derived by script (363 unique, last-wins): 267 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked or needs unlanded, none
+  mechanically flippable. Nothing flipped/edited.
+- [operator 2026-09-14T01:35Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; manual +
+  heartbeat is the known double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8
+  (0 running, 8 free); slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent);
+  FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- [operator 2026-09-14T01:35Z] health: heartbeat exactly 1 (27872; the second `-match` hit is the
+  operator's own query shell). watchdog/supervisor/overnight 0 (carried dead). cargoq UP (ping ok,
+  queued 0, running false). Disk 16.8 GB free (above 15); RAM 4.34 GB free (above 3). No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T01:35Z] Observation: tracked main-worktree dirty set now only
+  `truck123d/tests/rdef_m2_sandwich.rs` + `loop/cargoq/server.log` (outside operator scope; not
+  touched). opencode 37844 (leftover, idle) + 35424 (this operator) alive; no NEW active orchestrator.
 - [operator 2026-09-14T00:47Z] board: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE
   `f4088c7` status DONE + top-level `spec_gap`; slot 1 FHC-G10 status **SPEC_GAP**, wt at base `cfaa924`)
   + 1 IDLE residue (slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0

@@ -10590,3 +10590,33 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   was already staged in the index before the operator's `git add` of the packet; harmless.
 - Leaving: HEAD `b0233a1` + this cycle's STATE/log/escalation commit; FHC-G1 READY for heartbeat
   dispatch to slot 0; RG-23/RG-9 authoring gap escalated.
+
+## 2026-09-14T01:35Z - operator cycle: FHC-G1 returned SPEC_GAP; flux-calculus frontier stalled; nothing landable
+
+- Health (step 1): `slot_status` = 0 RUNNING; slot 0 FINISHED (FHC-G1, RESULT status SPEC_GAP, commit
+  `f03f378` = base, no work); slot 1 IDLE (FHC-G10, no work); slot 2 IDLE residue; slots 3-7 FINISHED
+  landed residue. Heartbeat exactly 1 (27872; a second `-match` is this operator's own query shell).
+  watchdog/supervisor/overnight 0 (carried dead; did NOT restart). cargoq UP (ping ok, queued 0, running
+  false). Disk 16.8 GB free (>15); RAM 4.34 GB free (>3). No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet since 2026-09-11.
+- Landable (step 2): NONE. Slot 0 RESULT status **SPEC_GAP** (rational Patch/membership/extraction layer +
+  absent normative theory outside its deliverables/`write_allow`) -> do NOT land; `f03f378` = HEAD, no
+  files. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab
+  all ancestors of HEAD (`git merge-base --is-ancestor` TRUE). Nothing to merge.
+- Unblock (step 3): no RUNNING worker; no IDLE slot holding resumable work / QUESTION / APIError 402.
+  Slot 1 FHC-G10 is a known SPEC_GAP (redispatch inappropriate); slot 2 is landed residue. Nothing to
+  resume or redispatch.
+- Registry hygiene (step 4): re-derived by script (363 unique, last-wins): 267 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked or needs unlanded, none mechanically
+  flippable. Nothing flipped/edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free);
+  slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent from `loop/packets/`);
+  FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T01:35Z] block and
+  prepended the labeled [operator 2026-09-14T01:35Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): NEW entry appended (FHC-G1-RATIONAL-FLUX SPEC_GAP; frontier stalled; rescope or
+  supply the normative theory). RG-23/RG-9 and FHC-G10 dispositions carried.
+- Leaving: HEAD `f03f378` + this cycle's STATE/log/escalation commit; FHC-G1 SPEC_GAP escalated; the
+  flux-calculus frontier parked pending adjudication.
