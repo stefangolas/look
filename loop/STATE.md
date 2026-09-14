@@ -75,6 +75,46 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [owner-session handoff 2026-09-14T~18:4xZ]: **THE
+> CONTACT ATLAS PROGRAM IS FULLY BOOKED through Wave 3** - 13 CT packets
+> authored, registered READY, preflight-clean (gen_packet --check +
+> packet_lint), floor-anchored: CT-000 (contract shim), CT-100 (scheduler
+> wrap), CT-101 (selector semantics), CT-102 (fallback laws), CT-103
+> (decision gates), CT-200/201/202/203 (BVH / retirement / interaction
+> graph / memo cores - disjoint atlas/ write sets, run 4-wide after CT-000),
+> CT-210/220/310 (bd_bridge integrations, serial behind the FHC lane),
+> CT-300 (co-support oracle core - the production unlock). Wave 4 re-scoped
+> in the build spec (8 single-obligation packets) is the NEXT authoring
+> task. Normative theory: docs/CONTACT_ATLAS_SPEC.md + BUILD_SPEC +
+> PACKET_ECONOMICS (sizing law: 1-3 obligations, <=800 LOC, floor anchors).
+> **Board at handoff**: slot 0 FHC-G16 FINISHED DONE_WITH_SPEC_GAP, worker
+> commit = base (no work) - ADJUDICATE FIRST: read its RESULT, then
+> redispatch with the gap sharpened or narrow scope. Slots 1-7 landed
+> residue. **FHC-G15 FALSE-DONE was corrected this session** (16:38Z
+> reconciliation had no merge/RESULT/test file; row back to READY; partial
+> work at loop/slots/0/abandoned-20260914-122611.patch; re-dispatches after
+> G16/G17 clear the bd_bridge lane). **CI GREEN on main** (both push gates,
+> every push since 4b011cd); pre-push hook active (clippy --all-targets +
+> fmt --all; it BLOCKS bad pushes - two toolchain/env traps documented in
+> the hook comments and OPS log). **NEW HARNESS this session**: floor
+> anchors `min:` in gen_packet (drift-proof; the stale-anchor class that
+> ate 3 packets today is dead); packet_lint ANCHOR_DRIFT_RISK; row_run.py
+> per-row diagnostics (120 s owner ceiling, faulthandler stack dump at
+> ceiling, py-spy native profiles); R4 census + adjudication tooling under
+> loop/nightly_ops/. **R4 CENSUS**: 54 rows -> 20 GREEN (9 new F1 flips) /
+> 2 CEILING (power_unit, suspension_rear - single certified-boolean stalls,
+> docs/SLOW_SOLVER_DIAGNOSTICS_R4.md) / 27 TYPED-REFUSAL (26
+> unsupported_envelope; G16/G17 close five pairs; the spline_loft*spline_loft
+> class is Wave 3 CT-300/310's unlock) / 5 DNF (4 = compound volume=0.0
+> facts gap, FHC-G15 fixes; lighting hang now stack-dumpable). **HEALTH**:
+> disk 5.8 GB free (BELOW the 8 GB floor - run `python loop/janitor.py
+> ensure --need 8` before any verify or dispatch); RAM 5.27 GB free
+> (fine); heartbeat + operator runner alive; cargoq UP. **Owner directives
+> in force**: 120 s row ceiling (CEILING verdict books a faster solver);
+> the Contact Atlas program; packet sizing per PACKET_ECONOMICS with
+> telemetry fields (obligations/loc_landed/worker_minutes) in new ledger
+> rows.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T17:09Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED
 > SPEC_GAP residue (slot 0, FHC-G16-ADMISSION-PAIRS-NARROW, DONE_WITH_SPEC_GAP) / 7 FINISHED landed
 > residue (slots 1-7) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `13fc85a` (owner
