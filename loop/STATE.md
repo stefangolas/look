@@ -75,6 +75,35 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T09:53Z]: 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER,
+> pid 37052 fresh, events 1.1 min old, changed=2, branch @4b011cd = base, no work) / 0
+> landed-this-cycle / 2 IDLE residue (slot 0 = FHC-G8 reset residue, no work, 41 min old; slot 2 =
+> TTC-RECENSUS-F1-R3 row DONE) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0 registry
+> flips / 0 dispatched-live. HEAD `26dcfc9` (nightly-owner-session CI-green commit; parent `3c23699`
+> = the 09:31Z operator commit). Board re-derived by command.
+> **LANDABLE: NONE.** Slots 3-7 RESULTs (DONE / LANDED-WITH-FINDINGS / DONE / DONE / LANDED) and
+> their worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 are all ancestors of HEAD
+> (`git merge-base --is-ancestor` TRUE); slot 1 running (no RESULT); slots 0/2 no RESULT.
+> **UNBLOCK: NONE.** Slot 1 alive/progressing (do not disturb). Slot 0 IDLE no-work residue is the
+> SAME packet as the RUNNING slot 1 -> did NOT reset/redispatch (would duplicate). Slot 2 landed
+> residue. No QUESTION.md in slots 0-2.
+> **FRONTIER / DISPATCH:** `dispatch_ready --dry-run --max-workers=4` = `dispatched 0; workers now
+> ~1/4`; RG-23 / RG-9 / FHC-G1 / FHC-G9 all write-set clash with the RUNNING FHC-G8 on
+> `truck123d/src/bd_bridge.rs` = REAL idle. Did NOT run live (heartbeat 27872 owns dispatch;
+> manual+heartbeat is the known double-dispatch race).
+> **REGISTRY (step 4):** re-derived READ-ONLY; all 10 BLOCKED rows parked (6 needs=[];
+> DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY;
+> TOR-C needs ADM-001/002 READY; BG-CK-SPLINE-CENSUS needs DONE but owner-cancelled). No mechanical
+> flip. NOT edited.
+> **HEALTH:** heartbeat exactly 1 (27872); operator_runner 1 (27876); watchdog/supervisor/overnight
+> 0 (carried dead, not restarted). cargoq UP (ping ok, queued 0, running=true = slot-1 `check -p
+> truck123d --tests --locked`). **Disk 6.7 GB at entry (BELOW 8 GB floor) -> `janitor ensure --need
+> 8` reclaimed ~6.1 GB -> ~12.0 GB free (above floor, below 15 goal). RAM 2.85 GB free (BELOW 3 GB
+> floor, 1 worker).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last DIRECT
+> clippy 2026-09-14 03:05:15, carried).
+> **OPERATOR ACTION:** janitor disk reclaim; nothing landable/unblockable/flippable; live dispatch
+> left to the heartbeat. STATE + log written. Leaving: HEAD `26dcfc9` + this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [nightly-owner-session 2026-09-14T09:5xZ]: **CI GREEN - both push-gate
 > workflows SUCCESS on HEAD `4b011cd`** (cross-platform + release-binaries; first green since
 > the STEP-stack un-gate). 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER, fresh) / slot 0 IDLE
@@ -335,6 +364,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T09:53Z] board: 1 RUNNING (slot 1 FHC-G8-PLANARITY-ROUTER pid 37052 fresh,
+  events 1.1 min old, changed=2, @4b011cd = base, no work) + 2 IDLE residue (slot 0 FHC-G8 reset
+  residue no-work 41 min old; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots
+  3-7) / 0 landed-this-cycle / 0 unblocked / 0 registry flips / 0 dispatched-live; HEAD `26dcfc9`.
+  Board re-derived by command.
+- [operator 2026-09-14T09:53Z] landable: NONE. Slots 3-7 worker commits e6553db/3c2109b/ee97499/
+  713f205/5cf4811 all ancestors of HEAD (`git merge-base --is-ancestor` TRUE); slot 1 running (no
+  RESULT); slots 0/2 no RESULT.
+- [operator 2026-09-14T09:53Z] unblock: NONE. Slot 1 alive/progressing; slot 0 IDLE no-work residue
+  is the SAME packet as the RUNNING slot 1 -> did NOT reset/redispatch; slot 2 landed residue. No
+  QUESTION.md in slots 0-2.
+- [operator 2026-09-14T09:53Z] registry re-derived READ-ONLY: all 10 BLOCKED parked (6 needs=[];
+  DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY;
+  TOR-C needs ADM-001/002 READY; BG-CK-SPLINE-CENSUS needs DONE but owner-cancelled). No mechanical
+  flip. NOT edited.
+- [operator 2026-09-14T09:53Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch).
+  `dispatch_ready --dry-run --max-workers=4` = `dispatched 0; workers now ~1/4`; RG-23/RG-9/FHC-G1/
+  FHC-G9 all write-set clash with the RUNNING FHC-G8 on `truck123d/src/bd_bridge.rs` = REAL idle.
+- [operator 2026-09-14T09:53Z] health: heartbeat exactly 1 (27872); operator_runner 1 (27876);
+  watchdog/supervisor/overnight 0 (carried dead, not restarted); cargoq UP (ping ok, queued 0,
+  running=true = slot-1 `check -p truck123d --tests --locked`). **Disk 6.7 GB at entry (BELOW 8 GB
+  floor) -> janitor `ensure --need 8` reclaimed ~6.1 GB -> ~12.0 GB free; RAM 2.85 GB free (BELOW 3
+  GB floor, 1 worker).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last DIRECT
+  clippy 2026-09-14 03:05:15, carried).
+- [operator 2026-09-14T09:53Z] Observation: HEAD `26dcfc9` is the nightly-owner-session commit (CI
+  green); main worktree dirty set outside operator scope; not touched.
 
 - [operator 2026-09-14T09:31Z] board: 1 RUNNING (slot 1 FHC-G8 DUPLICATE pid 37052) + 1 STALLED
   (slot 0 FHC-G8 orphan pid 25800 alive, changed=0 after the heartbeat reset) + 1 IDLE residue

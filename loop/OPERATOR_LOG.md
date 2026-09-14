@@ -11296,3 +11296,37 @@ Actions:
 - ESCALATIONS: 1 new (slot-0 live reset + duplicate FHC-G8, root cause = STALLED
   heuristic). Carried: FHC-D slot-1 duplicate `000cb11`; FHC-G1 stale READY row.
 - Leaving: HEAD `4b011cd` + this cycle's STATE/log commit.
+
+## 2026-09-14T09:53Z operator cycle
+
+- HEALTH (step 1): heartbeat exactly 1 (27872; the 2nd `-match` in the earlier query was this
+  operator's own shell); operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead,
+  not restarted - the `watchdog` regex only matched Teams' `--gpu-watchdog-timeout` webview procs);
+  cargoq UP (ping ok, queued 0, running=true = slot-1 `check -p truck123d --tests --locked`).
+  **Disk 6.7 GB at entry (BELOW the 8 GB floor) -> `janitor ensure --need 8` reclaimed ~6.1 GB ->
+  11.9-12.1 GB free (above floor, below 15 goal). RAM 2.85 GB free (BELOW the 3 GB floor, 1
+  worker).** No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (one carried DIRECT
+  clippy 2026-09-14 03:05:15).
+- BOARD (steps 2-3): 1 RUNNING (slot 1, FHC-G8-PLANARITY-ROUTER, pid 37052 fresh, events 1.1 min
+  old, changed=2, @4b011cd = base, no work) + 2 IDLE residue (slot 0 = the FHC-G8 reset residue,
+  no work, 41.4 min old; slot 2 = TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots
+  3-7) / 0 landed-this-cycle / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `26dcfc9`
+  (nightly-owner-session CI-green commit; parent `3c23699` = the 09:31Z operator commit).
+- LANDABLE: NONE. Slots 3-7 RESULTs DONE / LANDED-WITH-FINDINGS / DONE / DONE / LANDED; their
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 are all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE each). Slot 1 running (no RESULT); slots 0/2 no RESULT.
+- UNBLOCK: NONE. Slot 1 alive/progressing (do NOT disturb). Slot 0 IDLE no-work residue is the SAME
+  packet as the RUNNING slot 1 -> did NOT reset/redispatch (would duplicate). Slot 2 landed residue.
+  No QUESTION.md in slots 0-2.
+- REGISTRY (step 4): re-derived READ-ONLY; all 10 BLOCKED parked (6 needs=[]; DEF-TESS-ANALYTIC-SEAM
+  needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B needs DEF-SEEDRAY-A READY; TOR-C needs
+  ADM-001/002 READY; BG-CK-SPLINE-CENSUS needs DONE but owner-cancelled). No mechanical flip.
+  NOT edited.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (1 running, 7 free);
+  slot-assigned packets: 5`; RG-23/RG-9/FHC-G1/FHC-G9 all write-set clash with the RUNNING FHC-G8
+  on `truck123d/src/bd_bridge.rs`; `dispatched 0` = REAL idle.
+- ESCALATIONS: none new. Carried: slot-0 FHC-G8 live-reset + slot-1 duplicate (STALLED heuristic,
+  09:31Z); FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale READY row (line 356);
+  disk/RAM below floors. No new entry added to OPERATOR_ESCALATIONS.md this cycle.
+- Leaving: HEAD `26dcfc9` + this cycle's STATE/log commit.
