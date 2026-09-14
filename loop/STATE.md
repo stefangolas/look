@@ -75,6 +75,28 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T08:42Z]: 0 RUNNING / 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE)
+> / 0 IDLE residue / 7 FINISHED residue (slots 0-7) / 0 unblocked / 1 registry flip / 0 dispatched-live.
+> HEAD `f6f42b8` (this cycle's landing commit; parents `1611e75` merge <- `628cd12`). Board re-derived by command.
+> **FHC-D-SURFACE-RESIDUE LANDED** - slot 0's worker recovered from the hung cargoq job, wrote RESULT DONE and
+> committed `628cd12`; operator scoped checks green (`cargo fmt -p truck123d -- --check` + `cargo check -p
+> truck123d --tests --locked` + `cargo test -p truck123d --test surface_residue --locked` 10/10); merged
+> `--no-ff` (`1611e75`), RESULT filed to loop/results/, ledger row + registry flip DONE (`f6f42b8`). The
+> admission-surface residual is closed (10 sites: 4 names + 6 OCP-probe methods + vertices).
+> **DUPLICATE (escalated)**: slot 1 (the heartbeat's 04:08Z replacement) ALSO finished, RESULT DONE, commit
+> `000cb11` - a genuinely different second implementation (6 tests vs slot 0's 10). NOT landed (packet already
+> DONE). Do not merge it; see OPERATOR_ESCALATIONS.
+> **FRONTIER NOW DISPATCHABLE**: FHC-G8-PLANARITY-ROUTER -> slot 0, FHC-G9-GREEN-TRIM-INTEGRATION -> slot 1
+> (`dispatch_ready --dry-run`, dep FHC-D now DONE). Live dispatch left to the heartbeat (27872).
+> **HEALTH**: heartbeat exactly 1 (27872); operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried
+> dead, not restarted); cargoq UP idle; **disk 7.3 GB free (BELOW the 8 GB floor, below 15 goal); RAM 2.5 GB
+> free (below 3 floor, no workers)**. No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (one
+> 03:05:15 clippy bypass carried). `janitor ensure --need 5` = OK (no reclaim; slots 0/1 now idle so the
+> heartbeat's re-fork will reclaim their 5.2 GB of targets).
+> **OPERATOR ACTION**: landed FHC-D + scoped checks; did NOT run live dispatch (heartbeat owns it); did NOT
+> kill either worker (both exited on their own); registry flip FHC-D READY->DONE (272 DONE / 83 READY / 10
+> BLOCKED / 2 SUPERSEDED raw). Leaving: HEAD `f6f42b8` + this cycle's STATE/log/escalation commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T08:18Z]: 1 STALLED + 1 RUNNING, BOTH FHC-D-SURFACE-RESIDUE
 > (DUPLICATE DISPATCH) / 0 landed-this-cycle / 5 FINISHED landed residue (slots 3-7) / 1 IDLE residue
 > (slot 2) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `46e8f5e` (the 07:55Z operator
@@ -225,6 +247,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T08:42Z] board: 0 RUNNING + 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE) + 7 FINISHED
+  residue (slots 0-7; slot 0 landed `628cd12`, slot 1 duplicate `000cb11`) / 0 IDLE residue / 0 unblocked /
+  1 registry flip / 0 dispatched-live; HEAD `f6f42b8`. Board re-derived by command.
+- [operator 2026-09-14T08:42Z] landed: FHC-D-SURFACE-RESIDUE. Slot 0 worker (pid 13680) recovered, wrote
+  RESULT DONE, committed `628cd12` (corpus/ttc/door.py + truck123d/tests/surface_residue.rs, 764 insertions);
+  operator scoped checks green (fmt 0 / check --tests 0 / surface_residue 10/10 in 13s); merge `1611e75`
+  --no-ff; RESULT -> loop/results/FHC-D-SURFACE-RESIDUE.json; ledger row; PACKETS.jsonl row 361 READY->DONE;
+  commit `f6f42b8`.
+- [operator 2026-09-14T08:42Z] landable remaining: NONE. Slot 1 duplicate `000cb11` NOT landable (packet
+  already DONE; different 6-test implementation) - ESCALATED. Slots 3-7 commits ancestors of HEAD. Slot 2
+  IDLE residue (TTC-RECENSUS-F1-R3 row DONE).
+- [operator 2026-09-14T08:42Z] unblock: NONE needed - both FHC-D workers exited on their own (slot_status
+  FINISHED, pid=-); did NOT kill/reset either. Only QUESTION.md on disk is slot 5 (2026-09-05 residue).
+- [operator 2026-09-14T08:42Z] registry re-derived READ-ONLY (367 raw lines; 3 duplicate ids: MONO-9-FUSE-FOLD
+  x2 DONE, RDEF-M1-LATTICE-V2 x2 DONE, FHC-G1-RATIONAL-FLUX x2 = stale READY + DONE): 272 DONE / 83 READY /
+  10 BLOCKED / 2 SUPERSEDED (raw). Only edit: FHC-D READY->DONE. All 10 BLOCKED owner/semantic parked; none
+  has FHC-D in `needs`, so the landing flips nothing from BLOCKED. FHC-G1 stale READY row still carried
+  (do NOT re-measure its anchors - that would arm a duplicate dispatch).
+- [operator 2026-09-14T08:42Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat
+  is the known double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8
+  free)"; FHC-G8-PLANARITY-ROUTER -> slot 0, FHC-G9-GREEN-TRIM-INTEGRATION -> slot 1; RG-23/RG-9 ANCHOR CHECK
+  FAILED (packet files absent); FHC-G1 ANCHOR CHECK FAILED (stale A1 6->7, A5 40->55, carried).
+- [operator 2026-09-14T08:42Z] health: heartbeat exactly 1 (27872; second `-match` = this operator's own
+  query shell); operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead, not restarted);
+  cargoq UP idle (ping ok, queued 0, running false). **Disk 7.3 GB free (BELOW the 8 GB floor, below 15
+  goal); RAM 2.5 GB free (below 3 floor, no workers).** No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet (one DIRECT clippy at 2026-09-14 03:05:15 carried). janitor ensure --need 5 = OK;
+  slot-0 wt/target 3.6 GB + slot-1 wt/target 1.6 GB (now idle -> reclaimable by the heartbeat's re-fork).
+- [operator 2026-09-14T08:42Z] Observation: main worktree dirty tracked set `loop/cargoq/server.log` +
+  `tests/geometry_fingerprint.rs` + `truck123d/tests/rdef_m2_sandwich.rs` (outside operator scope; not
+  touched). Landed artifacts committed on `integration/kernel-bg`.
 
 - [operator 2026-09-14T08:18Z] board: 1 STALLED + 1 RUNNING (BOTH FHC-D-SURFACE-RESIDUE - duplicate) + 1
   IDLE residue (slot 2, TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0

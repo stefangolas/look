@@ -2905,3 +2905,24 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: RG-23/RG-9 packet files absent + write-set clash on `bd_bridge.rs`; the
   0xC0000409/RAM-zone line (RAM 3.13 GB free, above the floor but low with 2 workers); dead substrate
   stack (watchdog/supervisor/overnight).
+
+## [operator 2026-09-14T08:42Z] FHC-D-SURFACE-RESIDUE duplicate - slot 1's second implementation (packet already landed; slot 1 redundant)
+
+- WHAT: the heartbeat's 04:08Z re-dispatch of FHC-D to slot 1 (because slot_status read slot 0 as STALLED)
+  ALSO completed. Slot 0 recovered first; this operator landed its commit `628cd12` (merge `1611e75`, registry
+  DONE at `f6f42b8`). Slot 1 then wrote RESULT DONE and committed `000cb11` - a genuinely different second
+  implementation (6 surface_residue tests vs slot 0's 10; different door.py edits).
+- WHY A HUMAN: the packet is already DONE and verified, so slot 1's `000cb11` must NOT be merged - it would
+  either no-op, conflict on door.py/surface_residue.rs, or replace the landed 10-test version with a 6-test
+  one. A future heartbeat/driver pass must not treat slot 1 as landable. The operator cannot mark it discarded
+  without editing the slot registry (outside the operator's scope).
+- START FROM: `python loop/slot_status.py` (slot 1 FINISHED, RESULT DONE, branch
+  `packet/FHC-D-SURFACE-RESIDUE@000cb11`); `git -C loop/slots/1/wt show 000cb11`; `git diff 628cd12 000cb11`;
+  registry row FHC-D-SURFACE-RESIDUE (now DONE, line 361). RECOMMEND: reset slot 1 (FINISHED; packet DONE) so
+  the heartbeat re-forks it for FHC-G9; do not merge `000cb11`.
+- ROOT CAUSE (carried from 08:18Z): slot_status "STALLED -> free slot" makes the heartbeat re-dispatch a
+  packet whose worker is alive but blocked on a hung cargoq job. The fix belongs in the heartbeat's STALLED
+  heuristic (require events-frozen AND no cargo/rustc child before re-dispatch).
+- Carried unchanged: FHC-G1 stale duplicate READY row (line 356) - do NOT re-measure its anchors without also
+  resolving the stale row, or it arms a duplicate dispatch; RG-23/RG-9 packet files absent; the
+  0xC0000409/RAM-zone line (no workers now, but disk 7.3 GB below the 8 GB floor); dead substrate stack.

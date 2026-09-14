@@ -11203,3 +11203,32 @@ Actions:
   0xC0000409/RAM-zone line; dead substrate stack.
 - Leaving: HEAD `46e8f5e` + this cycle's STATE/log/escalation commit; both FHC-D workers left running;
   registry untouched.
+
+## [operator 2026-09-14T08:42Z] cycle report
+
+- BOARD: 0 RUNNING / 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE) / 7 FINISHED residue (slots 0-7) / 0 IDLE
+  residue / 0 unblocked / 1 registry flip / 0 dispatched-live. HEAD `f6f42b8`. Board re-derived by command.
+- LANDED (step 2): FHC-D-SURFACE-RESIDUE. Slot 0's worker (pid 13680) recovered from the hung cargoq job,
+  wrote RESULT DONE and committed `628cd12` (corpus/ttc/door.py + truck123d/tests/surface_residue.rs, 764
+  insertions). Operator scoped checks green: `cargo fmt -p truck123d -- --check` (0); `cargo check -p truck123d
+  --tests --locked` (0); `cargo test -p truck123d --test surface_residue --locked` (10/10, 13s). Merged --no-ff
+  -> `1611e75`; filed RESULT to `loop/results/FHC-D-SURFACE-RESIDUE.json`; ledger row; PACKETS.jsonl row 361
+  READY->DONE; commit `f6f42b8`.
+- DUPLICATE: slot 1 (the heartbeat's 04:08Z replacement) ALSO finished, RESULT DONE, commit `000cb11` - a
+  genuinely different second implementation (6 tests vs slot 0's 10). NOT landed (packet already DONE);
+  ESCALATED.
+- UNBLOCK (step 3): none needed - both FHC-D workers exited on their own (slot_status FINISHED, pid=-); did
+  NOT kill or reset either. Only QUESTION.md on disk is slot 5 (2026-09-05 residue).
+- REGISTRY (step 4): 367 raw lines / 3 duplicate ids (MONO-9-FUSE-FOLD x2, RDEF-M1-LATTICE-V2 x2, FHC-G1 x2 =
+  stale READY + DONE). Raw: 272 DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED. Only edit: FHC-D READY->DONE. No
+  BLOCKED row has FHC-D in `needs` -> no mechanical flip. FHC-G1 stale READY row carried (do NOT re-measure
+  its anchors - that arms a duplicate dispatch).
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free)";
+  FHC-G8-PLANARITY-ROUTER -> slot 0, FHC-G9-GREEN-TRIM-INTEGRATION -> slot 1 (dep FHC-D now DONE); RG-23/RG-9
+  ANCHOR CHECK FAILED (packet files absent); FHC-G1 ANCHOR CHECK FAILED (stale A1 6->7, A5 40->55).
+- HEALTH (step 1): heartbeat exactly 1 (27872; second `-match` = this operator's own query shell);
+  operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead); cargoq UP idle. **Disk 7.3 GB free
+  (BELOW 8 GB floor); RAM 2.5 GB free (below 3 floor, no workers).** No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet (one 03:05:15 clippy bypass carried). `janitor ensure --need 5` = OK.
+- Leaving: HEAD `f6f42b8` + this cycle's STATE/log/escalation commit.
