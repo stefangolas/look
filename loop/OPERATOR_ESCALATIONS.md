@@ -2803,3 +2803,17 @@ uncommitted - left for the orchestrator, no dispatch impact.
   (see 00:25Z entry). RG-23/RG-9 packet files absent (anchor check fails); FHC-G1 -> FHC-D -> FHC-E and
   FHC-G8/G9 chained on FHC-G6. Substrate stack (watchdog/supervisor/overnight) down - do NOT blindly
   restart (see 2026-09-13T18:28Z item).
+
+## 2026-09-14T01:13Z - NEW: RG-23/RG-9 packet files absent (anchor check fails); FHC-G1 anchor ritual applied
+
+- What/why: `dispatch_ready` still reports RG-23-CERTIFIED-ENTRY-WIRING and RG-9-REFLECT-SOLID-PRODUCTION
+  as ANCHOR CHECK FAILED with "packet files absent from `loop/packets/`" (`Test-Path` False for both).
+  Authoring a missing packet is not operator work -> escalate. Separately, FHC-G1's A5 anchor was stale
+  (expected 41; `grep -c 'VolumeRow'` counts LINES = 40, though the tree has 41 occurrences on 40 lines);
+  the operator re-measured and committed `b0233a1` (documented anchor ritual, not a semantic change) ->
+  FHC-G1 is now dispatchable to slot 0.
+- Start from: `Test-Path loop/packets/RG-23-CERTIFIED-ENTRY-WIRING.md`;
+  `Test-Path loop/packets/RG-9-REFLECT-SOLID-PRODUCTION.md`.
+- Carried unchanged: FHC-G6 LANDED with SPEC_GAP evidence (register adjudication human-owned); FHC-G10
+  SPEC_GAP filed; active orchestrator (opencode 37844) - do not disturb; substrate stack
+  (watchdog/supervisor/overnight) down - do not blindly restart.

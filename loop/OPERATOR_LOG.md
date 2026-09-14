@@ -10560,3 +10560,33 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   FHC-G6/FHC-G10 dispositions carried unchanged.
 - Leaving: slot 0 FHC-G6 + slot 1 FHC-G10 both FINISHED-UNLANDED (SPEC_GAP) + slots 2 residue + slots 3-7
   landed residue / HEAD `3da98ca` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-14T01:13Z - operator cycle: FHC-G1 anchor ritual (A5 41->40) unblocks the flux-calculus frontier; nothing landable
+
+- Health (step 1): `slot_status` = 0 RUNNING; slot 0 IDLE (FHC-G6 branch; `f4088c7` now an ancestor ->
+  G6 landed), slot 1 IDLE (FHC-G10, no work), slot 2 IDLE residue, slots 3-7 FINISHED landed residue.
+  Heartbeat exactly 1 (27872; a second `-match` is this operator's own query shell). operator runner
+  exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead). cargoq UP (ping ok, queued 0,
+  running false). Disk 17.93 GB free (above 15); RAM 3.87 GB free (above 3). No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet since 2026-09-11.
+- Landable (step 2): NONE. FHC-G6 now LANDED (orchestrator merge `97aaf27`; `f4088c7` an ancestor of
+  HEAD; slot RESULT.json recycled). FHC-G10 SPEC_GAP filed, no work. Slots 3-7 worker commits all
+  ancestors of HEAD. Nothing to merge.
+- Unblock (step 3): no RUNNING worker; no IDLE slot holding resumable work / QUESTION / APIError 402.
+  Nothing to resume or redispatch.
+- Registry hygiene (step 4): **FHC-G1-RATIONAL-FLUX A5 anchor re-measured 41 -> 40**
+  (`grep -c 'VolumeRow' truck123d/src/bd_bridge.rs` counts LINES = 40; the tree has 41 occurrences on
+  40 lines). Updated the yaml anchor and the RESULT template; committed `b0233a1`. FHC-G1 now passes
+  `gen_packet --check`. RG-23/RG-9 still fail (packet files absent from `loop/packets/`) -> ESCALATIONS.
+  No BLOCKED row mechanically flippable.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` now = "FHC-G1-RATIONAL-FLUX ->
+  slot 0; dispatched 1". The next heartbeat cycle should dispatch it.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T01:13Z] block.
+  Traps/history untouched.
+- Escalation (step 7): NEW entry appended (RG-23/RG-9 packet files absent; FHC-G1 anchor-ritual note).
+  FHC-G6/FHC-G10 dispositions carried.
+- Note: commit `b0233a1` also carried a `scripts/kernel-gates.sh` mode change (100644->100755, +x) that
+  was already staged in the index before the operator's `git add` of the packet; harmless.
+- Leaving: HEAD `b0233a1` + this cycle's STATE/log/escalation commit; FHC-G1 READY for heartbeat
+  dispatch to slot 0; RG-23/RG-9 authoring gap escalated.
