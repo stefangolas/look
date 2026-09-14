@@ -12,7 +12,6 @@
     unused_import_braces,
     unused_qualifications
 )]
-
 // Clippy 1.97 cross-platform baseline hygiene (orchestrator, 2026-09-14;
 // recorded in loop/STATE.md traps): the hosted-runner toolchain churn and
 // the unix-branch surface (which cannot lint on a Windows host) manufactured
