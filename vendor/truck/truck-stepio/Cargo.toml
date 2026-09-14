@@ -46,4 +46,3 @@ proptest = { version = "1.11.0", features = ["attr-macro"] }
 type_complexity = "allow"
 unnecessary_map_or = "allow"
 unnecessary_filter_map = "allow"
-map_or_identity = "allow"

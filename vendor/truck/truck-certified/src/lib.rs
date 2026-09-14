@@ -26,8 +26,7 @@
     clippy::single_match,
     clippy::type_complexity,
     clippy::unnecessary_map_or,
-    clippy::unnecessary_filter_map,
-    clippy::map_or_identity
+    clippy::unnecessary_filter_map
 )]
 #![warn(
     missing_docs,
