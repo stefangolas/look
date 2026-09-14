@@ -23,7 +23,11 @@
     clippy::new_without_default,
     clippy::ptr_arg,
     clippy::should_implement_trait,
-    clippy::single_match
+    clippy::single_match,
+    clippy::type_complexity,
+    clippy::unnecessary_map_or,
+    clippy::unnecessary_filter_map,
+    clippy::map_or_identity
 )]
 #![warn(
     missing_docs,
