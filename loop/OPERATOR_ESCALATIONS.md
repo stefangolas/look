@@ -2855,3 +2855,22 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: FHC-G1 prior SPEC_GAP (now retrying on slot 1); RG-23/RG-9 packet files absent +
   write-set clash; FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; dead substrate stack
   (watchdog/supervisor/overnight); active orchestrator opencode 37844 - do not disturb.
+
+## 2026-09-14T07:55Z - registry: stale duplicate READY row can re-dispatch the LANDED FHC-G1
+
+- What/why: `loop/PACKETS.jsonl` holds two FHC-G1-RATIONAL-FLUX rows - a stale `status: READY` row
+  (line 356) and the operator's `status: DONE` row (line 367). `dispatch_ready.rows()` does NOT dedup by
+  id, so it evaluates the stale READY row; `landed()` is false for it (status READY, no `landed <sha>`
+  note), and slot 1 still holds a dead dispatch for FHC-G1 (no RESULT). The dry-run therefore prints
+  `FHC-G1-RATIONAL-FLUX: DEAD dispatch (slot 1 holds no matching RESULT) - would reset + delete +
+  redispatch` and, live, would reset slot 1 and re-run a packet that is already merged (`f105af4`/`c40dfd9`).
+  The only thing stopping it today is that FHC-G1's anchors are now stale (A1 expected 6/tree 7, A5
+  expected 40/tree 55), so `gen_packet --check` fails - accidental protection, not a designed guard.
+- Why human/orchestrator: fixing it means editing `loop/PACKETS.jsonl` (remove/resolve the stale READY
+  row, or append a last-wins DONE row) or clearing slot 1's dead dispatch via `run_packet --reset-only`.
+  The operator charter limits the operator to three files (STATE/OPERATOR_LOG/OPERATOR_ESCALATIONS), so
+  neither is in scope. Do NOT "fix" FHC-G1's packet anchors without also resolving the stale row - that
+  would turn the accidental protection into an actual duplicate dispatch.
+- Start from: `Select-String -Path loop/PACKETS.jsonl -Pattern 'FHC-G1-RATIONAL-FLUX'`;
+  `loop/dispatch_ready.py:88` (`rows()`), `:102` (`landed()`), `:610` (dead-dispatch branch);
+  `git log --oneline -3 -- loop/PACKETS.jsonl`.

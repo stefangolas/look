@@ -75,6 +75,30 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T07:55Z]: 1 RUNNING (slot 0, FHC-D-SURFACE-RESIDUE) / 0
+> landed-this-cycle / 2 IDLE residue (slots 1-2) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked /
+> 0 registry flips / 0 dispatched-live. HEAD `3ff538d` (the 07:40Z operator commit). Board re-derived by
+> command.
+> **SLOT 0 FHC-D RUNNING** - the heartbeat dispatched it at ~07:38Z (live run: FHC-D -> slot 0, then G8/G9
+> refused on the bd_bridge.rs clash). pid 13680 alive; events 6.2 min old; branch @3ff538d = base (no work
+> yet); no RESULT. server.log shows the worker's scoped checks progressing (surface_residue green 25s; a
+> multi-test batch exit 101 while it isolates). Do NOT disturb.
+> **FRONTIER**: FHC-G8-PLANARITY-ROUTER, FHC-G9-GREEN-TRIM-INTEGRATION, RG-23, RG-9 are all READY with
+> `needs FHC-G1` satisfied but ALL list `truck123d/src/bd_bridge.rs` -> write-set clash with the RUNNING
+> FHC-D. Real idle: 0 beyond slot 0; the heartbeat will refill as FHC-D lands and frees bd_bridge.rs.
+> **REGISTRY HAZARD (escalated)**: 366 lines / 364 unique; FHC-G1 has a STALE READY row (line 356) in
+> addition to its DONE row (line 367). `rows()` does not dedup, so `dispatch_ready` reads the stale READY
+> row and, with slot 1 holding a dead dispatch for FHC-G1, prints "DEAD dispatch - would reset + delete +
+> redispatch" for a LANDED packet. Only the now-stale FHC-G1 anchors (A1 expected 6/tree 7, A5 expected
+> 40/tree 55) currently stop the duplicate. See OPERATOR_ESCALATIONS.
+> **HEALTH**: heartbeat exactly 1 (27872); operator runner 1 (27876); watchdog/supervisor/overnight 0
+> (carried dead, not restarted); cargoq UP idle; disk 9.07 GB free (above 8 floor, below 15 goal); RAM
+> 3.41 GB free (above 3 floor). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` shows one DIRECT
+> clippy bypass at 2026-09-14 03:05:15 (server is up now).
+> **OPERATOR ACTION**: none required mechanically - nothing landable (slots 3-7 all ancestors of HEAD),
+> slot 0 progressing, slots 1-2 stale residue left as-is, live dispatch left to the heartbeat. STATE + log
+> + escalation written. Leaving: HEAD `3ff538d` + this cycle's commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T07:40Z]: 0 RUNNING / 1 landed-this-cycle (FHC-G1-RATIONAL-FLUX)
 > / 2 IDLE residue (slots 1-2) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 1 registry flip / 0
 > dispatched-live. HEAD `aa1c044` (this cycle's anchor-ritual commit; parents `5af6e85` <- `c40dfd9` merge <-
@@ -174,6 +198,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T07:55Z] board: 1 RUNNING (slot 0 FHC-D-SURFACE-RESIDUE, pid 13680 alive, events
+  6.2 min old, changed=2, branch @3ff538d = base, no RESULT) + 2 IDLE residue (slot 1 FHC-G1 stale
+  duplicate, no RESULT; slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
+  landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live; HEAD `3ff538d` (the 07:40Z operator
+  commit). Board re-derived by command.
+- [operator 2026-09-14T07:55Z] landable: NONE. Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD (`git merge-base --is-ancestor` TRUE);
+  slot 0 no RESULT; slots 1/2 no RESULT.
+- [operator 2026-09-14T07:55Z] unblock: NONE. Slot 0 alive/progressing (cargoq shows its scoped test
+  sequence; surface_residue green, then a batch exit 101 as it isolates). Slots 1-2 stale residue of
+  landed/DONE packets -> did NOT reset/redispatch. Only QUESTION.md on disk is slot 5 (2026-09-05 residue).
+- [operator 2026-09-14T07:55Z] registry re-derived READ-ONLY (366 lines / 364 unique, last-wins): 269
+  DONE / 83 READY / 10 BLOCKED / 2 SUPERSEDED. 3 duplicate ids (MONO-9-FUSE-FOLD x2 DONE, RDEF-M1-LATTICE-V2
+  x2 DONE, FHC-G1 x2 = stale READY line 356 + DONE line 367). NOT edited - see escalation. All 10 BLOCKED
+  owner/semantic parked; none mechanically flippable.
+- [operator 2026-09-14T07:55Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready
+  --dry-run --max-workers=4` = 0 real: FHC-G8/FHC-G9/RG-23/RG-9 write-set clash with the RUNNING FHC-D on
+  `truck123d/src/bd_bridge.rs`; FHC-G1 flagged DEAD dispatch (stale READY row + slot-1 dead dispatch) -
+  ESCALATED.
+- [operator 2026-09-14T07:55Z] health: heartbeat exactly 1 (27872; second `-match` = operator's own query
+  shell). operator_runner 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not restarted). cargoq
+  UP idle. **Disk 9.07 GB free (above 8 floor, below 15 goal); RAM 3.41 GB free (above 3 floor).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` one DIRECT clippy at 2026-09-14 03:05:15.
+- [operator 2026-09-14T07:55Z] Observation: main worktree dirty tracked set `loop/cargoq/server.log` +
+  `truck123d/tests/rdef_m2_sandwich.rs` (outside operator scope; not touched); untracked
+  `benchmarks/*`/`loop/baselines/*`/`scratch/*` growth unchanged.
 
 - [operator 2026-09-14T07:40Z] board: 0 RUNNING + 1 landed-this-cycle (FHC-G1-RATIONAL-FLUX) + 2 IDLE residue
   (slots 1-2) + 5 FINISHED landed residue (slots 3-7) / 1 registry flip / 0 dispatched-live; HEAD `aa1c044`.

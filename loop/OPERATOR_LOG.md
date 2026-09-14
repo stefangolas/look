@@ -11129,3 +11129,37 @@ Actions:
 - ESCALATION (step 7): the 01:35Z FHC-G1 SPEC_GAP escalation is RESOLVED by this landing. No NEW escalation;
   the 0xC0000409/RAM-zone line and dead substrate stack are carried (RAM above floor).
 - Leaving: HEAD `aa1c044` + this cycle's STATE/log commit; FHC-G1 landed; frontier dispatchable.
+
+## [operator 2026-09-14T07:55Z]
+
+- Board (re-derived by command): 1 RUNNING (slot 0, FHC-D-SURFACE-RESIDUE) / 0 landed-this-cycle / 2 IDLE
+  residue (slots 1-2) / 5 FINISHED landed residue (slots 3-7). HEAD `3ff538d`.
+- LAND (step 2): NONE. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 are all ancestors
+  of HEAD (`git merge-base --is-ancestor` TRUE). Slot 0 no RESULT.json; slots 1/2 no RESULT.json. Nothing
+  to merge.
+- UNBLOCK (step 3): NONE. Slot 0 FHC-D worker is alive and progressing (pid 13680, events 6.2 min old,
+  changed=2, branch @3ff538d = base, no RESULT; server.log shows its scoped checks - surface_residue green
+  25s, then a batch exit 101 as it isolates). Do not disturb. Slots 1-2 are stale residue of landed/DONE
+  packets (slot 1 = FHC-G1 duplicate branch @e1bda17 = base, no work; slot 2 = TTC-RECENSUS-F1-R3 row DONE)
+  - did NOT reset/redispatch (would duplicate landed work). Only QUESTION.md on disk is slot 5 (2026-09-05
+  landed residue).
+- REGISTRY (step 4): re-derived READ-ONLY (366 lines / 364 unique, last-wins): **269 DONE / 83 READY / 10
+  BLOCKED / 2 SUPERSEDED.** All 10 BLOCKED owner/semantic parked; none mechanically flippable. 3 duplicate
+  ids exist (MONO-9-FUSE-FOLD x2 DONE, RDEF-M1-LATTICE-V2 x2 DONE, FHC-G1 x2 = stale READY + DONE). NOT
+  edited - PACKETS.jsonl is outside the operator's three-file scope; the FHC-G1 duplicate is a live
+  dispatch hazard -> escalated.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = **0 real dispatchable**: FHC-G8 /
+  FHC-G9 / RG-23 / RG-9 all write-set clash with the RUNNING FHC-D on `truck123d/src/bd_bridge.rs`; FHC-G1
+  flagged DEAD dispatch (would reset + delete + redispatch a LANDED packet) - see escalation.
+- HEALTH (step 1): heartbeat exactly 1 (27872; the second `-match` is this operator's own query shell);
+  operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead, not restarted); cargoq UP, idle
+  (ping ok). **Disk 9.07 GB free (above the 8 GB floor, below the 15 GB goal); RAM 3.41 GB free (above the
+  3 GB floor).** No `%TEMP%/look-verify-baseline-*` leaks. `fallback.log` shows one DIRECT `cargo clippy`
+  bypass at 2026-09-14 03:05:15 (server is up now; no action).
+- ESCALATION (step 7): one NEW item - the stale duplicate READY row for FHC-G1 makes `dispatch_ready`
+  consider re-dispatching the already-landed FHC-G1; only its now-stale anchors prevent the duplicate. See
+  OPERATOR_ESCALATIONS.md. Carried unchanged: RG-23/RG-9 packet files absent; FHC-G10 SPEC_GAP; the
+  0xC0000409/RAM-zone line (RAM above floor); dead substrate stack.
+- Leaving: HEAD `3ff538d` + this cycle's STATE/log/escalation commit; slot-0 FHC-D worker running;
+  registry untouched.
