@@ -3027,3 +3027,18 @@ uncommitted - left for the orchestrator, no dispatch impact.
   running, so nothing depends on it this cycle.
 - START FROM: `git -C C:/Users/stefa/look diff -- truck123d/tests/rdef_m2_sandwich.rs`; decide commit
   (clippy fix) vs `git checkout --` (leftover).
+
+## [operator 2026-09-14T14:58Z] unknown long-lived opencode process resident (RAM below the 3 GB floor)
+
+- WHAT: an `opencode.exe` (pid 17560, up since 2026-09-14 01:11:54 local, ~490 MB working set, ~1.6 h CPU
+  over ~13.7 h wall) with a `pyright-langserver` child (node pid 16408) and a bare `cmd.exe` parent
+  (14864). Its command line carries NO `run`/charter arguments, so it is neither a loop worker (workers run
+  `opencode run -m ... <packet>`) nor this operator instance (pid 27548, parent = the operator's cmd.exe
+  3736). With 0 RUNNING slots it is not a live worker.
+- WHY HUMAN/ORCHESTRATOR: it may be the owner's/orchestrator's interactive session, which the operator
+  must not kill; but it is a material contributor to RAM sitting BELOW the 3 GB floor (2.10 GB free, 0
+  workers) on a 15.7 GB machine. The operator charter permits killing only its own timed-out predecessor's
+  leftovers; this process is unclassifiable from the operator's vantage.
+- OPERATOR ACTION: did NOT kill or signal it; reported only. No worker depends on it this cycle.
+- START FROM: `Get-CimInstance Win32_Process -Filter "ProcessId=17560"` and its parent chain
+  (14864 <- 13268); decide owner-interactive (leave) vs orphan (kill to reclaim ~490 MB).
