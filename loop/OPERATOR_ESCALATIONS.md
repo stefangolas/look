@@ -3042,3 +3042,31 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - OPERATOR ACTION: did NOT kill or signal it; reported only. No worker depends on it this cycle.
 - START FROM: `Get-CimInstance Win32_Process -Filter "ProcessId=17560"` and its parent chain
   (14864 <- 13268); decide owner-interactive (leave) vs orphan (kill to reclaim ~490 MB).
+
+## [operator 2026-09-14T15:21Z] dirty main worktree: uncommitted corpus/ttc/door.py instrumentation (owner directive)
+
+- WHAT: `git status` in the main worktree (`C:/Users/stefa/look`, HEAD `af74ea6`) now shows
+  `M corpus/ttc/door.py` (+24 lines). The diff adds per-row `timings` (`solids_ms`/`volume_ms`/`bbox_ms`) to
+  `geometry_facts`, `import faulthandler`, and a `LOOK_DOOR_STACKDUMP`/`LOOK_DOOR_TIMEOUT` (default 120 s)
+  `faulthandler.dump_traceback_later` ceiling in `main()`, with the comment "Owner directive 2026-09-14:
+  120 s is the acceptable performance ceiling for one corpus row".
+- WHY HUMAN/ORCHESTRATOR: `corpus/` is explicitly owner territory (the operator charter may not edit corpus
+  scripts and may not commit). The change reads as intentional owner/orchestrator WIP (it cites an owner
+  directive and matches the "CEILING verdict" corpus-ceiling work), not a leftover probe.
+- OPERATOR ACTION: did NOT stage, commit, revert, or check out the file; reported only. No worker is running,
+  so nothing depends on it this cycle. Carried alongside the 14:34Z rdef_m2_sandwich.rs dirt.
+- START FROM: `git -C C:/Users/stefa/look diff -- corpus/ttc/door.py`; decide commit (owner WIP) vs
+  `git checkout --` (leftover). Also resolve the carried 14:34Z test-file dirt in the same pass.
+
+## [operator 2026-09-14T15:21Z] second resident opencode process (pid 33620)
+
+- WHAT: a second `opencode.exe` (pid 33620, up since 2026-09-14 11:20:12 local, ~559 MB working set, parent
+  `29164`) is resident alongside the 14:58Z-escalated pid 17560 (779 MB). Neither carries `run`/charter
+  arguments, so neither is a slot worker; with 0 RUNNING slots, neither is a live worker.
+- WHY HUMAN/ORCHESTRATOR: same class as the 14:58Z entry - unclassifiable from the operator's vantage
+  (possible owner/orchestrator interactive sessions or the operator runner's own opencode), and a material
+  contributor to RAM sitting BELOW the 3 GB floor (2.14 GB free, 0 workers). The operator must not kill an
+  unclassified resident.
+- OPERATOR ACTION: did NOT kill or signal either; reported only.
+- START FROM: `Get-CimInstance Win32_Process -Filter "Name='opencode.exe'"` and each parent chain; decide
+  interactive (leave) vs orphan (kill to reclaim ~1.3 GB combined).
