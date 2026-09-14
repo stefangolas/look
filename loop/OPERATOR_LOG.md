@@ -11233,3 +11233,33 @@ Actions:
   (BELOW 8 GB floor); RAM 2.5 GB free (below 3 floor, no workers).** No `%TEMP%/look-verify-baseline-*` leaks;
   `fallback.log` quiet (one 03:05:15 clippy bypass carried). `janitor ensure --need 5` = OK.
 - Leaving: HEAD `f6f42b8` + this cycle's STATE/log/escalation commit.
+
+## [operator 2026-09-14T09:06Z] cycle report
+
+- BOARD: 1 RUNNING (slot 0, FHC-G8-PLANARITY-ROUTER, fresh) / 0 landed-this-cycle / 7 FINISHED residue
+  (slot 1 = FHC-D duplicate `000cb11` NOT landable; slots 3-7 landed) / 1 IDLE residue (slot 2,
+  TTC-RECENSUS-F1-R3 row DONE) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `1b34431`.
+  Board re-derived by command.
+- LANDED (step 2): NONE. Slot 1 FHC-D duplicate `000cb11` NOT an ancestor of HEAD (`git merge-base
+  --is-ancestor` exit 1); packet FHC-D already DONE - do NOT merge (carried escalation). Slots 3-7 worker
+  commits e6553db/3c2109b/ee97499/713f205/5cf4811 all ancestors of HEAD. Slot 2 IDLE residue (row DONE).
+- UNBLOCK (step 3): NONE. Slot 0 FHC-G8 alive/progressing (pid 25800 = cmd worker-cmd.bat; events 2.5 min
+  old, changed=2, branch @1b34431 = base); slot 2 IDLE residue of a landed packet -> did NOT
+  reset/redispatch. Only QUESTION.md on disk is slot 5 (2026-09-05 residue). No action.
+- REGISTRY (step 4): 364 unique, last-wins = 270 DONE / 82 READY / 10 BLOCKED / 2 SUPERSEDED. No
+  mechanical flip: BG-CK-SPLINE-CENSUS needs BG-CK-P0-PREVALENCE (DONE) but is owner-cancelled;
+  DEF-TESS-ANALYTIC-SEAM/DEF-SEEDRAY-B/TOR-C needs still READY; the rest needs=[]/None. FHC-G1 stale
+  READY row (line 356) carried - do NOT re-measure its anchors. NOT edited.
+- DISPATCH (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free);
+  slot-assigned packets: 6"; FHC-G9/RG-23/RG-9/FHC-G1 all write-set clash with the RUNNING FHC-G8 on
+  `truck123d/src/bd_bridge.rs`; `dispatched 0` = REAL idle.
+- HEALTH (step 1): heartbeat exactly 1 (27872; second `-match` = this operator's own query shell);
+  operator_runner 1 (27876); watchdog/supervisor/overnight 0 (carried dead, not restarted); cargoq UP
+  (running the orchestrator's `test -p look --test geometry_fingerprint --locked`). **Disk 7.15 GB free
+  (BELOW the 8 GB floor, below 15 goal); RAM 2.97 GB free (BELOW the 3 GB floor, 1 worker).** No
+  `%TEMP%/look-verify-baseline-*` leaks; `fallback.log` quiet (last DIRECT clippy 2026-09-14 03:05:15).
+  `janitor ensure --need 5` = OK (no reclaim); slot-1 idle wt/target 1.6 GB reclaimable on re-fork.
+- ESCALATIONS: none new. Carried: FHC-D slot-1 duplicate `000cb11` (do not merge); FHC-G1 stale READY
+  row (line 356); disk/RAM below floors. No new entry added to OPERATOR_ESCALATIONS.md this cycle.
+- Leaving: HEAD `1b34431` + this cycle's STATE/log commit.
