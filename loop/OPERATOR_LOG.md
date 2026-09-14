@@ -10525,3 +10525,38 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   stack down; RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
 - Leaving: slot 0 FHC-G6 + slot 1 FHC-G10 both FINISHED-UNLANDED (SPEC_GAP) + slots 2 residue + slots 3-7
   landed residue / HEAD `c77434c` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-14T00:47Z - operator cycle: quiet re-confirmation; nothing landable/unblockable/flippable; real idle
+
+- Health sweep (step 1): heartbeat exactly 1 (27872; the second `CommandLine -match` hit is the
+  operator's own query shell, created this cycle - verified by command lines). watchdog/supervisor/
+  overnight 0 (carried dead; did NOT restart). cargoq UP (ping ok, queued 0, running false). Disk
+  17.28 GB free (>15); RAM 3.83 GB free (>3). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log`
+  quiet since 2026-09-11.
+- Board (step 2/3): 0 RUNNING + 2 FINISHED-UNLANDED + 1 IDLE residue + 5 FINISHED landed residue; HEAD
+  advanced `c77434c` -> `3da98ca` (the 00:25Z operator STATE/log/escalation commit; loop/ only). Slots
+  3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all
+  ancestors of HEAD (`git merge-base --is-ancestor` TRUE).
+- Landable (step 2): NONE. Slot 0 FHC-G6 status DONE + top-level `spec_gap` (carried) -> do NOT land;
+  `f4088c7` NOT an ancestor. Slot 1 FHC-G10 status **SPEC_GAP** -> do NOT land (worker commit = base,
+  wt at base). No slot with resumable work; no active `QUESTION.md`; no APIError 402; no worker to
+  unblock.
+- Registry hygiene (step 4): re-derived by script (363 unique, last-wins): 265 DONE / 87 READY / 10
+  BLOCKED / 1 SUPERSEDED. All 10 BLOCKED owner/semantic parked, none mechanically flippable (BG-CK-
+  SPLINE-CENSUS has needs landed but is owner-cancelled; DEF-TESS/DEF-SEEDRAY-B/TOR-C have unlanded
+  needs; rest owner/semantic). Nothing flipped/edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free);
+  slot-assigned packets: 6"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent from `loop/packets/`);
+  FHC-G1/D/E + FHC-G8/G9 chained on FHC-G6; `dispatched 0` = REAL idle.
+- Observation (NEW): main-worktree dirty set expanded since 00:25Z - now also `truck123d/Cargo.toml` and
+  `truck123d/tests/rdef_m2_sandwich.rs` (mtimes 00:34-00:45Z) alongside `truck123d/src/bd_bridge.rs`,
+  `truck123d/src/lib.rs`, `loop/packets/FHC-G1-RATIONAL-FLUX.md`, `loop/LEDGER.jsonl`,
+  `loop/PACKETS.jsonl`; new opencode PID 23724 at 00:46:31Z. Likely an ACTIVE orchestrator session;
+  outside operator scope, flagged in ESCALATIONS, not touched.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-14T00:47Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): NEW short entry appended (expanded dirty worktree / likely-active orchestrator);
+  FHC-G6/FHC-G10 dispositions carried unchanged.
+- Leaving: slot 0 FHC-G6 + slot 1 FHC-G10 both FINISHED-UNLANDED (SPEC_GAP) + slots 2 residue + slots 3-7
+  landed residue / HEAD `3da98ca` + this cycle's STATE/log/escalation commit.

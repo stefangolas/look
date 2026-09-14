@@ -2788,3 +2788,18 @@ uncommitted - left for the orchestrator, no dispatch impact.
 - Carried unchanged: RG-23/RG-9 authoring (packet files absent, anchor check fails); slot-4/7 wt RESULT
   residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844` (do NOT
   disturb).
+
+## 2026-09-14T00:47Z - NEW: main-worktree dirty set expanded; likely ACTIVE orchestrator session
+
+- What/why: since the 00:25Z cycle the uncommitted main-worktree set grew from `truck123d/src/bd_bridge.rs`
+  + `truck123d/src/lib.rs` to ALSO include `truck123d/Cargo.toml` and `truck123d/tests/rdef_m2_sandwich.rs`
+  (mtimes 00:34-00:45Z, i.e. within ~13 min of this cycle), plus `loop/packets/FHC-G1-RATIONAL-FLUX.md`,
+  `loop/LEDGER.jsonl`, `loop/PACKETS.jsonl`; a new opencode PID 23724 appeared at 00:46:31Z. This reads as
+  an ACTIVE orchestrator/human session editing the tree. The operator did NOT touch any of it.
+- Start from: `git -C C:\Users\stefa\look status --porcelain` and
+  `git -C C:\Users\stefa\look diff -- truck123d/`.
+- Carried unchanged: slot 0 FHC-G6 FINISHED-UNLANDED (`f4088c7` NOT an ancestor; DONE + top-level
+  `spec_gap`) -> do NOT land; adjudicate. Slot 1 FHC-G10 SPEC_GAP -> do NOT land; adjudicate/rescope
+  (see 00:25Z entry). RG-23/RG-9 packet files absent (anchor check fails); FHC-G1 -> FHC-D -> FHC-E and
+  FHC-G8/G9 chained on FHC-G6. Substrate stack (watchdog/supervisor/overnight) down - do NOT blindly
+  restart (see 2026-09-13T18:28Z item).

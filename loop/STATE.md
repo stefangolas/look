@@ -75,42 +75,38 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T00:25Z]: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0
+> LATEST GROUND TRUTH [operator 2026-09-14T00:47Z]: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0
 > FHC-G6-CERT-COST-SCALE `f4088c7` status DONE + top-level `spec_gap`; slot 1 FHC-G10-PLACEMENT-
-> COVARIANCE-CACHE status **SPEC_GAP**, no worker commit, wt at base `cfaa924`) + 1 IDLE residue (slot 2
+> COVARIANCE-CACHE status **SPEC_GAP**, wt at base `cfaa924`) + 1 IDLE residue (slot 2
 > TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0
-> unblocked / 0 flipped / 0 dispatched. HEAD `c77434c` (the vendor truck-certified clippy-1.97 baseline
-> hygiene commit, owner-direct, zero code change; parent `ee8e393`). Board re-derived by command.
-> **FHC-G6**: slot 0 `RESULT.json` present (status DONE + top-level `spec_gap`: dominant phase = per-patch
-> interval certification in binding-layer `volume_facts`, outside `write_allow`; no whitelisted bd_bridge
-> fix applies) -> do NOT land; commit `f4088c7` NOT an ancestor of HEAD. Adjudication (land instrumentation
-> + route the gap, or hold/re-fork) remains human-owned; carried.
-> **FHC-G10**: slot 1 went RUNNING -> FINISHED this cycle with status **SPEC_GAP** (stop condition: "the
-> covariance law cannot be made exact over the landed representation"; the certified fold solver is
-> per-sub-cell, so the bracket is not placement-covariant at the last bits; secondary: exact invariants
-> cost ~6.6 s/patch). No files landed, wt at HEAD, worker commit = base. -> do NOT land; ESCALATED
-> (new, 2026-09-14T00:25Z). This frees the bd_bridge.rs write-set that RG-23/RG-9 were clashing with.
+> unblocked / 0 flipped / 0 dispatched. HEAD `3da98ca` (the 00:25Z operator STATE/log/escalation
+> commit; parent `c77434c`, the vendor clippy-1.97 hygiene commit). Board re-derived by command.
+> **FHC-G6**: slot 0 `RESULT.json` (status DONE + top-level `spec_gap`: dominant phase = per-patch
+> interval certification in binding-layer `volume_facts`, outside `write_allow`) -> do NOT land;
+> `f4088c7` NOT an ancestor of HEAD. Adjudication remains human-owned; carried.
+> **FHC-G10**: slot 1 `RESULT.json` status **SPEC_GAP** (covariance law not exact over the landed
+> per-sub-cell representation; wt at base, worker commit = base) -> do NOT land; ESCALATED 00:25Z,
+> carried. This frees the bd_bridge.rs write-set RG-23/RG-9 were clashing with.
 > **Frontier**: FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 chained on FHC-G6. RG-23/RG-9 still fail
-> `gen_packet --check` (ANCHOR CHECK FAILED - packet files absent from `loop/packets/`). New untracked
-> packet files exist for FHC-G8/G9/G10/G11/G12/G13/G14 + ROUTING-REACH (G11-G14/ROUTING-REACH
-> unregistered).
+> `gen_packet --check` (ANCHOR CHECK FAILED - packet files absent from `loop/packets/`). Untracked
+> packet files exist for FHC-G8/G9/G10/G11/G12/G13/G14 + ROUTING-REACH (unregistered).
 > **Registry** (363 rows, last-wins): 265 DONE / 87 READY / 10 BLOCKED / 1 SUPERSEDED; none flippable
-> (all 10 BLOCKED are owner/semantic parked: OWNER_BLOCKED, owner-cancelled, SUPERSEDED, SPEC_GAP,
-> human-gated, orchestrator-held, owner inputs). `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+> (all 10 BLOCKED owner/semantic parked). `dispatch_ready --dry-run --max-workers=4`: "slots: 8
 > (0 running, 8 free); slot-assigned packets: 6"; `dispatched 0` = REAL idle. Slots 3-7 worker commits
 > e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
 > (`merge-base --is-ancestor` TRUE); nothing landable.
-> **SUBSTRATE**: heartbeat exactly 1 (27872); watchdog/supervisor/overnight remain DEAD (carried). cargoq
-> UP (queued 0, running `test -p truck123d --lib --locked` - no live worker, warm/leftover job). Disk
-> 17.24 GB free (above 15); RAM 5.07 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks;
+> **SUBSTRATE**: heartbeat exactly 1 (27872); the second `-match` hit is the operator's own query shell.
+> watchdog/supervisor/overnight remain DEAD (carried). cargoq UP (ping ok, queued 0, running false).
+> Disk 17.28 GB free (above 15); RAM 3.83 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks;
 > `fallback.log` quiet since 2026-09-11.
-> **Observation**: main worktree carries uncommitted `truck123d/src/bd_bridge.rs` (+6/-1) and
-> `truck123d/src/lib.rs` (+21), plus modified `loop/packets/FHC-G1-RATIONAL-FLUX.md` and
-> `loop/LEDGER.jsonl`/`loop/PACKETS.jsonl` (orchestrator in-progress, outside operator scope; flagged,
-> not touched). The previously-flagged `vendor/truck/truck-certified/src/lib.rs` allow block is now
-> committed as HEAD `c77434c`.
+> **Observation (NEW this cycle)**: the main-worktree dirty set has EXPANDED since 00:25Z - now also
+> `truck123d/Cargo.toml` and `truck123d/tests/rdef_m2_sandwich.rs` (mtimes 00:34-00:45Z, within ~13 min
+> of this cycle) alongside `truck123d/src/bd_bridge.rs` and `truck123d/src/lib.rs`, plus modified
+> `loop/packets/FHC-G1-RATIONAL-FLUX.md`, `loop/LEDGER.jsonl`, `loop/PACKETS.jsonl`; a new opencode PID
+> 23724 appeared at 00:46:31Z. Looks like an ACTIVE orchestrator session; outside operator scope -
+> flagged in ESCALATIONS, not touched.
 > Leaving: slot 0 FHC-G6 + slot 1 FHC-G10 both FINISHED-UNLANDED (SPEC_GAP) + slots 2 residue + slots 3-7
-> landed residue / HEAD `c77434c` + this cycle's STATE/log/escalation commit.
+> landed residue / HEAD `3da98ca` + this cycle's STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -155,6 +151,31 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T00:47Z] board: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE
+  `f4088c7` status DONE + top-level `spec_gap`; slot 1 FHC-G10 status **SPEC_GAP**, wt at base `cfaa924`)
+  + 1 IDLE residue (slot 2 TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0
+  landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched; HEAD `3da98ca` (00:25Z operator commit,
+  parent `c77434c`). Board re-derived by command.
+- [operator 2026-09-14T00:47Z] landable: NONE. Slot 0 DONE+spec_gap -> do NOT land (`f4088c7` NOT an
+  ancestor); slot 1 SPEC_GAP -> do NOT land (worker commit = base). Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE).
+- [operator 2026-09-14T00:47Z] registry re-derived (363 unique, last-wins): 265 DONE / 87 READY / 10
+  BLOCKED / 1 SUPERSEDED. All 10 BLOCKED owner/semantic parked, none mechanically flippable (BG-CK-
+  SPLINE-CENSUS has needs landed but is owner-cancelled; DEF-TESS/DEF-SEEDRAY-B/TOR-C have unlanded
+  needs; rest owner/semantic). Nothing flipped/edited.
+- [operator 2026-09-14T00:47Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch).
+  `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 6";
+  RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1/D/E + FHC-G8/G9 chained on FHC-G6;
+  `dispatched 0` = REAL idle.
+- [operator 2026-09-14T00:47Z] health: heartbeat exactly 1 (27872; second `-match` hit = operator's own
+  query shell); watchdog/supervisor/overnight 0 (carried dead). cargoq UP (ping ok, queued 0, running
+  false). Disk 17.28 GB free (above 15); RAM 3.83 GB free (above 3). No `%TEMP%/look-verify-baseline-*`
+  leaks; `fallback.log` quiet since 2026-09-11.
+- [operator 2026-09-14T00:47Z] Observation (NEW): main-worktree dirty set expanded since 00:25Z - now
+  also `truck123d/Cargo.toml` + `truck123d/tests/rdef_m2_sandwich.rs` (mtimes 00:34-00:45Z) alongside
+  bd_bridge.rs/lib.rs; opencode 23724 spawned 00:46:31Z. Likely ACTIVE orchestrator session; flagged,
+  not touched.
 - [operator 2026-09-14T00:25Z] board: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE,
   `f4088c7`, status DONE + top-level `spec_gap`; slot 1 FHC-G10-PLACEMENT-COVARIANCE-CACHE, status
   **SPEC_GAP**, worker commit = base `cfaa924`, wt at HEAD) + 1 IDLE residue (slot 2 TTC-RECENSUS-F1-R3
