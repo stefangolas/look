@@ -12,6 +12,7 @@ Usage: python loop/slot_status.py [--stall-minutes 12] [--kill-stalled]
 import argparse
 import ctypes
 import datetime
+import json
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,41 @@ def process_alive(pid):
 def git_status_count(wt):
     res = subprocess.run(['git', '-C', str(wt), 'status', '--porcelain'], capture_output=True, text=True, encoding='utf-8', errors='replace')
     return len([l for l in res.stdout.splitlines() if l != ''])
+
+
+def read_attempt(slot):
+    """The slot's frozen attempt identity, or ('-', '-').
+
+    `attempt.json` carries the full record (base_sha, slot, branch);
+    `attempt_id` is the one-line form. Either is enough to name the attempt.
+    """
+    record = slot / 'attempt.json'
+    if record.is_file():
+        try:
+            data = json.loads(record.read_text(encoding='utf-8'))
+            return data.get('attempt_id', '-'), data.get('base_sha', '-')
+        except (ValueError, OSError):
+            pass
+    one = slot / 'attempt_id'
+    if one.is_file():
+        return one.read_text(encoding='ascii').strip(), '-'
+    return '-', '-'
+
+
+def read_result(slot, wt):
+    """(location, data) for the worker's published result, outbox first.
+
+    The supervisor publishes to slots/<N>/outbox/RESULT.json; the worktree
+    root is accepted for pre-machinery slots.
+    """
+    for location, path in (('outbox', slot / 'outbox' / 'RESULT.json'),
+                           ('wt', wt / 'RESULT.json')):
+        if path.is_file():
+            try:
+                return location, json.loads(path.read_text(encoding='utf-8-sig'))
+            except (ValueError, OSError):
+                return location, None
+    return '-', None
 
 
 def git_branch_and_head(wt):
@@ -169,12 +205,20 @@ def main():
             size = st.st_size
             age_min = round((datetime.datetime.now().timestamp() - st.st_mtime) / 60, 1)
 
-        if (wt / 'RESULT.json').is_file():
+        result_location, result_data = read_result(slot, wt)
+        if result_location != '-':
             result = 'RESULT.json'
         elif (wt / 'QUESTION.md').is_file():
             result = 'QUESTION.md'
         else:
             result = '-'
+
+        attempt_id, base_sha = read_attempt(slot)
+        execution_status, outcome = '-', '-'
+        if result_data:
+            execution_status = result_data.get('execution_status', '-')
+            outcome = (result_data.get('outcome')
+                       or result_data.get('status') or '-')
 
         dirty = git_status_count(wt) if wt.is_dir() else 0
         branch, head, no_work = git_branch_and_head(wt) if wt.is_dir() else ('-', '-', False)
@@ -201,8 +245,8 @@ def main():
         pid_col = worker_pid if alive else '-'
         age_col = age_min if age_min is not None else '-'
         git_col = f"{branch}@{head}" + (' (=base, no work)' if no_work else '')
-        print("slot {:<3} {:<9} packet={:<28} pid={:<7} events={:>8} bytes, {} min old  changed={}  {}  git={}".format(
-            slot.name, state, Path(packet).name, pid_col, size, age_col, dirty, result, git_col))
+        print("slot {:<3} {:<9} packet={:<28} pid={:<7} events={:>8} bytes, {} min old  changed={}  {}  git={}  attempt={}  exec={}  outcome={}".format(
+            slot.name, state, Path(packet).name, pid_col, size, age_col, dirty, result, git_col, attempt_id, execution_status, outcome))
 
         if args.disk:
             outer, inner = slot_disk_gb(slot)
