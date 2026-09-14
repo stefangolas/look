@@ -10975,3 +10975,49 @@ Actions:
   (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator (HANDOFF `63c1272` +
   CI fix-forward `cba1c30`).
 - Leaving: HEAD `d910d3b` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
+
+## 2026-09-14 06:20 UTC (operator cycle)
+
+- Board (step 1, health sweep): 1 RUNNING + 2 IDLE residue (slots 1-2) + 5 FINISHED landed residue
+  (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped / 0 dispatched-live. HEAD `1538dab`
+  (the 05:56Z operator STATE/log commit). `slot_status` re-derived the board by command.
+  - Slot 0 RUNNING FHC-G1-RATIONAL-FLUX: opencode worker 28304 (parent cmd 39724) alive, CPU 656 s,
+    child powershell 26064 running since 02:08:33 local; events 8.4 min old (step_start, no following
+    tool call), changed=3, branch `packet/FHC-G1-RATIONAL-FLUX@1ddd138` (=base, no work), no RESULT.
+  - Slot 1 IDLE FHC-G1 dead residue (pid=-, events 100 min old, changed=0, RESULT absent). Slot 2 IDLE
+    TTC-RECENSUS-F1-R3 row DONE (landed).
+- Health: heartbeat exactly 1 (27872, alive since 09-09; the second `-match` is the operator's own query
+  shell). operator_runner exactly 1 (27876). watchdog/supervisor/overnight 0 (carried dead, not
+  restarted). cargoq UP (ping ok, queued 3, running=true). Disk 14.89 GB free (above 8 GB floor, below
+  15 GB goal); RAM 3.59 GB free (above 3 GB floor). No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet since 2026-09-11.
+- Landing (step 2): NONE. Slot 0 no RESULT.json; slot 1 no RESULT.json (dead residue); slots 3-7
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 e1bda17/f0ae3ab all ancestors of
+  HEAD (`git merge-base --is-ancestor` TRUE, exit 0 each); slot 0 base `1ddd138` also ancestor. RESULT
+  statuses: slot 3 DONE / 4 LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED (all already landed).
+- Unblock (step 3): NONE. Slot 0 alive/progressing - `cargoq/server.log` shows the slot-0
+  `cargo test --profile quick -p truck123d --lib --locked -j 1` TIMED OUT after 2400 s at 02:17:55 local
+  (the prior identical run crashed 0xC0000409 at 01:28:19); cargoq immediately started the next queued
+  job `cargo test -p look --test geometry_fingerprint`. Slot 1 dead residue of the same packet as the
+  RUNNING slot-0 run -> did NOT reset/redispatch; the heartbeat's 02:07:23 attempt was safely refused
+  ("branch packet/FHC-G1-RATIONAL-FLUX is held by worktree slots/0/wt ... release manually"). Slot 2
+  landed residue. No QUESTION.md in slots 1/2. No action.
+- Registry hygiene (step 4): re-derived READ-ONLY (364 unique / 366 lines, last-wins): 268 DONE / 84
+  READY / 10 BLOCKED / 2 SUPERSEDED (PACKETS.jsonl mtime 04:08:38Z, unchanged). All 10 BLOCKED
+  owner/semantic parked or needs still READY (DEF-TESS needs DEF-VENDOR-FIXTURES READY; DEF-SEEDRAY-B
+  needs DEF-SEEDRAY-A READY; TOR-C needs ADM-001/002 READY); BG-CK-SPLINE-CENSUS has needs DONE but is
+  owner-cancelled. None mechanically flippable. Not edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (1 running, 7 free);
+  slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (their registry `packet` field is empty, so
+  no packet file exists); FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T06:20Z] block and
+  prepended the labeled [operator 2026-09-14T06:20Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): no NEW escalation. Carried unchanged: the 0xC0000409 / RAM-zone line (RAM now
+  above the 3 GB floor, but the slot-0 lib test now TIMES OUT after 2400 s rather than crashing - the
+  worker churns; next operator should watch whether it ever produces a RESULT); FHC-G1 prior SPEC_GAP
+  adjudication (retrying on slot 0); RG-23/RG-9 packet files absent; FHC-D/G8/G9 blocked on FHC-G1; dead
+  substrate stack (watchdog/supervisor/overnight) - do not blindly restart; active orchestrator
+  (HANDOFF `63c1272` + CI fix-forward `cba1c30`).
+- Leaving: HEAD `1538dab` + this cycle's STATE/log commit; slot-0 worker running; registry untouched.
