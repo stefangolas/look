@@ -75,6 +75,33 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
+> LATEST GROUND TRUTH [operator 2026-09-14T11:53Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
+> residue (slot 0, FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7; slots 1-2 = the 11:07Z
+> FHC-G8/FHC-G9 landings) / 0 unblocked / 0 registry flips / 0 dispatched-live. HEAD `74ee690` (the
+> 11:31Z operator commit). Board re-derived by command.
+> **LANDABLE: NONE.** Worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 (slots 3-7) and the 11:07Z
+> landings da55a1a (FHC-G8) / f815d36 (FHC-G9) are all ancestors of HEAD (`git merge-base --is-ancestor`
+> exit 0 each); slot 0 SPEC_GAP not landable; FHC-D `000cb11` NOT an ancestor but its packet is DONE
+> (carried, do NOT merge).
+> **UNBLOCK: NONE.** 0 RUNNING; all 8 `worker.pid` files dead; slot 0 is the SPEC_GAP residue of a packet
+> whose DONE implementation already landed (slot 1) -> did NOT reset/redispatch. Only QUESTION.md is slot 5
+> (2026-09-05 residue).
+> **REGISTRY (step 4):** re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY / 10 BLOCKED /
+> 2 SUPERSEDED. 78/80 READY carry a `landed <hex>` note (skipped correctly); only RG-23/RG-9 lack one
+> (packet files ABSENT). Stale FHC-G1 READY row (line 356) carried - do NOT re-measure. No mechanical flip.
+> NOT edited.
+> **DISPATCH (step 5):** did NOT run live (heartbeat 27872 owns dispatch; manual+heartbeat = double-dispatch
+> race). `dispatch_ready --dry-run --max-workers=4` = `slots: 8 (0 running, 8 free); slot-assigned packets:
+> 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent); FHC-G1 stale anchors A1 6->7,
+> A5 40->56 = REAL idle.
+> **HEALTH:** heartbeat exactly 1 (27872); operator_runner 1 (27876); watchdog/supervisor/overnight 0
+> (carried dead, not restarted). cargoq UP idle (ping ok, queued 0, running false). Disk 13.03 GB free
+> (above 8 floor, below 15 goal); RAM 2.59 GB free (BELOW 3 GB floor, 0 workers). No
+> `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet (last DIRECT clippy 2026-09-14 03:05:15,
+> carried).
+> **OPERATOR ACTION:** health sweep; re-derived landability (none); registry read-only (no flip); did NOT
+> run live dispatch; STATE + log written. Leaving: HEAD `74ee690` + this cycle's STATE/log commit.
+
 > LATEST GROUND TRUTH [operator 2026-09-14T11:31Z]: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP
 > residue (slot 0, FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0 registry
 > flips / 0 dispatched-live. HEAD `c738886` (the 11:07Z operator STATE/log commit). Board re-derived by command.
@@ -486,6 +513,25 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
    came back PROVEN in v2; check for its remaining answers.
 
 ## State of the machine, as left
+
+- [operator 2026-09-14T11:53Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
+  FHC-G8 duplicate) / 7 FINISHED landed residue (slots 1-7) / 0 unblocked / 0 registry flips / 0
+  dispatched-live; HEAD `74ee690`. Board re-derived by command.
+- [operator 2026-09-14T11:53Z] landable: NONE. Slots 3-7 commits + the 11:07Z da55a1a/f815d36 all ancestors
+  of HEAD; slot 0 SPEC_GAP; FHC-D `000cb11` not an ancestor but packet DONE (carried, do not merge).
+- [operator 2026-09-14T11:53Z] unblock: NONE. 0 running, all 8 worker.pid dead; slot 0 is SPEC_GAP residue of
+  a packet whose DONE implementation already landed (slot 1) -> did NOT reset/redispatch. Only QUESTION.md
+  is slot 5 (2026-09-05 residue).
+- [operator 2026-09-14T11:53Z] registry re-derived READ-ONLY (364 unique, last-wins): 272 DONE / 80 READY /
+  10 BLOCKED / 2 SUPERSEDED. 78/80 READY carry a landed-note; only RG-23/RG-9 lack one (packet files
+  absent). Stale FHC-G1 READY row carried (do NOT re-measure). No flip. NOT edited.
+- [operator 2026-09-14T11:53Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch). dry-run =
+  `slots: 8 (0 running, 8 free); slot-assigned packets: 6; dispatched 0`; RG-23/RG-9 ANCHOR CHECK FAILED
+  (packet files absent); FHC-G1 stale anchors A1 6->7, A5 40->56 = REAL idle.
+- [operator 2026-09-14T11:53Z] health: heartbeat 1 (27872); operator_runner 1 (27876); watchdog/supervisor/
+  overnight 0 (carried dead). cargoq UP idle. Disk 13.03 GB free (above 8 floor, below 15 goal); RAM 2.59 GB
+  free (BELOW 3 GB floor, 0 workers). No `%TEMP%/look-verify-baseline-*` leaks; fallback.log quiet
+  (2026-09-14 03:05:15 clippy bypass carried).
 
 - [operator 2026-09-14T11:31Z] board: 0 RUNNING / 0 landed-this-cycle / 1 FINISHED SPEC_GAP residue (slot 0,
   FHC-G8 duplicate) / 5 FINISHED landed residue (slots 3-7) / 0 unblocked / 0 registry flips / 0
