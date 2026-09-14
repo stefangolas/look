@@ -10652,3 +10652,36 @@ landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cf
   SPEC_GAP, and the dead substrate stack all carried unchanged.
 - Leaving: HEAD `85cc0ba` + this cycle's STATE/log commit; FHC-G1 SPEC_GAP escalated; the flux-calculus
   frontier parked pending adjudication.
+
+## 2026-09-14T02:20Z - operator cycle: no material change; nothing landable/unblockable/flippable; real idle
+
+- Health (step 1): `slot_status` = 0 RUNNING; slot 0 FINISHED (FHC-G1, RESULT status SPEC_GAP, commit =
+  base, no work); slot 1 IDLE (FHC-G10, no work); slot 2 IDLE residue; slots 3-7 FINISHED landed
+  residue. Heartbeat exactly 1 (27872; a second `-match` is this operator's own query shell).
+  watchdog/supervisor/overnight 0 (carried dead; did NOT restart). cargoq UP (ping ok, queued 0, running
+  false). Disk 16.70 GB free (>15); RAM 4.26 GB free (>3). No `%TEMP%/look-verify-baseline-*` leaks;
+  `fallback.log` quiet since 2026-09-11.
+- Landable (step 2): NONE. Slot 0 RESULT status **SPEC_GAP** -> do NOT land. Slots 3-7 worker commits
+  e6553db/3c2109b/ee97499/713f205/5cf4811 and slot 0 base f03f378 all ancestors of HEAD
+  (`git merge-base --is-ancestor` TRUE). wt/RESULT statuses 0 SPEC_GAP / 3 DONE / 4
+  LANDED-WITH-FINDINGS / 5 DONE / 6 DONE / 7 LANDED; absent 1/2. HEAD advanced `85cc0ba` -> `417a251`
+  (the 01:57Z operator commit; no new packet code).
+- Unblock (step 3): no RUNNING worker; no IDLE slot holding resumable work / QUESTION / APIError 402.
+  Slot 1 FHC-G10 is a known SPEC_GAP (redispatch inappropriate); slot 2 is landed residue. Nothing to
+  resume or redispatch.
+- Registry hygiene (step 4): re-derived by script (363 unique, last-wins): 267 DONE / 84 READY / 10
+  BLOCKED / 2 SUPERSEDED. All 10 BLOCKED owner/semantic parked or needs unlanded, none mechanically
+  flippable (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-parked; SEM-PCURVE-MASTER
+  SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP; DEF-TESS/DEF-SEEDRAY-B/TOR-C needs unlanded; MONO-10/RDEF-
+  M4/RDEF-M5 owner inputs). Nothing flipped/edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch; manual + heartbeat is the known
+  double-dispatch race). `dispatch_ready --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free);
+  slot-assigned packets: 5"; RG-23/RG-9 ANCHOR CHECK FAILED (packet files absent from `loop/packets/`);
+  FHC-D/FHC-G8/FHC-G9 blocked on FHC-G1; `dispatched 0` = REAL idle.
+- STATE (step 6): replaced the LATEST GROUND TRUTH block with the [operator 2026-09-14T02:20Z] block and
+  prepended the labeled [operator 2026-09-14T02:20Z] bullets to "State of the machine, as left".
+  Traps/history untouched.
+- Escalation (step 7): none new. FHC-G1-RATIONAL-FLUX SPEC_GAP (01:35Z), RG-23/RG-9 anchor gap, FHC-G10
+  SPEC_GAP, and the dead substrate stack all carried unchanged.
+- Leaving: HEAD `417a251` + this cycle's STATE/log commit; FHC-G1 SPEC_GAP escalated; the flux-calculus
+  frontier parked pending adjudication.
