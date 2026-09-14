@@ -2758,3 +2758,33 @@ uncommitted - left for the orchestrator, no dispatch impact.
   `loop/packets/FHC-G1-RATIONAL-FLUX.md` (orchestrator in-progress, outside operator scope); slot-4/7 wt
   RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844`
   (do NOT disturb).
+
+## 2026-09-14T00:25Z - NEW: FHC-G10-PLACEMENT-COVARIANCE-CACHE lands SPEC_GAP (slot 1); FHC-G6 carried
+
+- What/why: slot 1 FHC-G10-PLACEMENT-COVARIANCE-CACHE transitioned RUNNING -> FINISHED this cycle with
+  `RESULT.json` status **SPEC_GAP** (not DONE). Stop condition: "the covariance law cannot be made exact
+  over the landed representation". The intrinsic law is exact for the whole patch, but the certified fold
+  solver certifies each adaptively-subdivided cell from f64-rounded PLACED control points, so the
+  certified bracket is not placement-covariant at the last bits independent of the proposed
+  `invariant_memo` cache; test 3's "identical final facts records across different poses" is
+  unsatisfiable (bbox differs by construction). Secondary blocker: exact invariants cost ~6.6 s/patch in
+  the debug test profile. No files landed; working tree at base `cfaa924` (worker commit = base); door
+  spot-check not run. Operator did NOT land (charter: anything but a clean DONE).
+- Start from: `loop/slots/1/wt/RESULT.json`; adjudicate - rescope the packet to whole-patch facts, or
+  route the solver restructure (covariance-exact whole flux) as a new/amended packet. This also frees the
+  `truck123d/src/bd_bridge.rs` write-set that RG-23/RG-9 were clashing with, but those rows still fail
+  `gen_packet --check` (packet files absent from `loop/packets/`).
+- Carried unchanged: slot 0 FHC-G6-CERT-COST-SCALE FINISHED-UNLANDED (`f4088c7` NOT an ancestor of HEAD
+  `c77434c`; status DONE + top-level `spec_gap` = packet stop condition) -> do NOT land; adjudicate (a)
+  land the instrumentation-only change + route the gap to `docs/F1_HYPERCAR_GAP_REGISTER.md` section 5, or
+  (b) hold/re-fork. FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 stay chained behind it.
+- Substrate stack (watchdog/supervisor/overnight) still down - carried; do NOT blindly restart (the
+  supervisor would also restart the overnight driver, which is an orchestration decision).
+- NEW observation (outside operator scope): main worktree now carries uncommitted
+  `truck123d/src/bd_bridge.rs` (+6/-1) and `truck123d/src/lib.rs` (+21), plus modified
+  `loop/packets/FHC-G1-RATIONAL-FLUX.md` and `loop/LEDGER.jsonl`/`loop/PACKETS.jsonl`. The previously
+  flagged `vendor/truck/truck-certified/src/lib.rs` allow block is now committed as HEAD `c77434c`
+  (owner-direct clippy-1.97 hygiene). Start from: `git -C C:\Users\stefa\look diff -- truck123d/src/`.
+- Carried unchanged: RG-23/RG-9 authoring (packet files absent, anchor check fails); slot-4/7 wt RESULT
+  residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844` (do NOT
+  disturb).

@@ -75,35 +75,42 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## Where we are
 
-> LATEST GROUND TRUTH [operator 2026-09-14T00:00Z]: 1 RUNNING (slot 1 FHC-G10-PLACEMENT-COVARIANCE-CACHE,
-> pid 38112, opencode 23872 alive; events 10 min old at probe; cargoq running `test -p truck123d --test
-> placement_cache -- --nocapture`) + 1 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE, commit `f4088c7`
-> + `RESULT.json`; status DONE but top-level `spec_gap` stop condition) + 1 IDLE residue (slot 2
+> LATEST GROUND TRUTH [operator 2026-09-14T00:25Z]: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0
+> FHC-G6-CERT-COST-SCALE `f4088c7` status DONE + top-level `spec_gap`; slot 1 FHC-G10-PLACEMENT-
+> COVARIANCE-CACHE status **SPEC_GAP**, no worker commit, wt at base `cfaa924`) + 1 IDLE residue (slot 2
 > TTC-RECENSUS-F1-R3 row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0
-> unblocked / 0 flipped / 0 dispatched. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent
-> `cfaa924`). Board re-derived by command.
-> **FHC-G6**: slot 0 `RESULT.json` still present (status DONE + top-level `spec_gap`: dominant phase =
-> per-patch interval certification in binding-layer `volume_facts`, outside `write_allow`; no whitelisted
-> bd_bridge fix applies) -> do NOT land; commit `f4088c7` NOT an ancestor of HEAD. Adjudication (land
-> instrumentation + route the gap, or hold/re-fork) remains human-owned; carried.
-> **Frontier**: FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 chained on FHC-G6; RG-23/RG-9 write-set clash with
-> the RUNNING G10 on `truck123d/src/bd_bridge.rs` (packet files still absent). New untracked packet files
-> exist for FHC-G8/G9/G10/G11/G12/G13/G14 + ROUTING-REACH (G11-G14/ROUTING-REACH unregistered).
+> unblocked / 0 flipped / 0 dispatched. HEAD `c77434c` (the vendor truck-certified clippy-1.97 baseline
+> hygiene commit, owner-direct, zero code change; parent `ee8e393`). Board re-derived by command.
+> **FHC-G6**: slot 0 `RESULT.json` present (status DONE + top-level `spec_gap`: dominant phase = per-patch
+> interval certification in binding-layer `volume_facts`, outside `write_allow`; no whitelisted bd_bridge
+> fix applies) -> do NOT land; commit `f4088c7` NOT an ancestor of HEAD. Adjudication (land instrumentation
+> + route the gap, or hold/re-fork) remains human-owned; carried.
+> **FHC-G10**: slot 1 went RUNNING -> FINISHED this cycle with status **SPEC_GAP** (stop condition: "the
+> covariance law cannot be made exact over the landed representation"; the certified fold solver is
+> per-sub-cell, so the bracket is not placement-covariant at the last bits; secondary: exact invariants
+> cost ~6.6 s/patch). No files landed, wt at HEAD, worker commit = base. -> do NOT land; ESCALATED
+> (new, 2026-09-14T00:25Z). This frees the bd_bridge.rs write-set that RG-23/RG-9 were clashing with.
+> **Frontier**: FHC-G1 -> FHC-D -> FHC-E and FHC-G8/G9 chained on FHC-G6. RG-23/RG-9 still fail
+> `gen_packet --check` (ANCHOR CHECK FAILED - packet files absent from `loop/packets/`). New untracked
+> packet files exist for FHC-G8/G9/G10/G11/G12/G13/G14 + ROUTING-REACH (G11-G14/ROUTING-REACH
+> unregistered).
 > **Registry** (363 rows, last-wins): 265 DONE / 87 READY / 10 BLOCKED / 1 SUPERSEDED; none flippable
-> (MONO-10 needs MONO-8 DONE and RDEF-M4 needs RDEF-M3 DONE, but both are owner/semantic gated; the rest
-> have unlanded needs or are owner-parked). `dispatch_ready --dry-run --max-workers=4`: "slots: 8
-> (1 running, 7 free); slot-assigned packets: 6"; `dispatched 0` = REAL idle. Slots 3-7 worker commits
+> (all 10 BLOCKED are owner/semantic parked: OWNER_BLOCKED, owner-cancelled, SUPERSEDED, SPEC_GAP,
+> human-gated, orchestrator-held, owner inputs). `dispatch_ready --dry-run --max-workers=4`: "slots: 8
+> (0 running, 8 free); slot-assigned packets: 6"; `dispatched 0` = REAL idle. Slots 3-7 worker commits
 > e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of HEAD
 > (`merge-base --is-ancestor` TRUE); nothing landable.
-> **SUBSTRATE**: heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last 19:52:50 local); watchdog/
-> supervisor/overnight remain DEAD (carried). cargoq UP (queued 1, running placement_cache = slot-1 G10).
-> Disk 17.67 GB free (above 15); RAM 4.87 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks;
+> **SUBSTRATE**: heartbeat exactly 1 (27872); watchdog/supervisor/overnight remain DEAD (carried). cargoq
+> UP (queued 0, running `test -p truck123d --lib --locked` - no live worker, warm/leftover job). Disk
+> 17.24 GB free (above 15); RAM 5.07 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks;
 > `fallback.log` quiet since 2026-09-11.
-> **Observation**: main worktree still carries the uncommitted `vendor/truck/truck-certified/src/lib.rs`
-> clippy-1.97 `#![allow(...)]` block and modified `loop/packets/FHC-G1-RATIONAL-FLUX.md` (orchestrator
-> in-progress, outside operator scope; flagged, not touched).
-> Leaving: slot 1 FHC-G10 RUNNING + slot 0 FHC-G6 FINISHED-UNLANDED + slots 2 residue + slots 3-7
-> landed residue / HEAD `dd72958` + this cycle's STATE/log/escalation commit.
+> **Observation**: main worktree carries uncommitted `truck123d/src/bd_bridge.rs` (+6/-1) and
+> `truck123d/src/lib.rs` (+21), plus modified `loop/packets/FHC-G1-RATIONAL-FLUX.md` and
+> `loop/LEDGER.jsonl`/`loop/PACKETS.jsonl` (orchestrator in-progress, outside operator scope; flagged,
+> not touched). The previously-flagged `vendor/truck/truck-certified/src/lib.rs` allow block is now
+> committed as HEAD `c77434c`.
+> Leaving: slot 0 FHC-G6 + slot 1 FHC-G10 both FINISHED-UNLANDED (SPEC_GAP) + slots 2 residue + slots 3-7
+> landed residue / HEAD `c77434c` + this cycle's STATE/log/escalation commit.
 
 
 ## Pick up here
@@ -148,6 +155,45 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 
 ## State of the machine, as left
 
+- [operator 2026-09-14T00:25Z] board: 0 RUNNING + 2 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE,
+  `f4088c7`, status DONE + top-level `spec_gap`; slot 1 FHC-G10-PLACEMENT-COVARIANCE-CACHE, status
+  **SPEC_GAP**, worker commit = base `cfaa924`, wt at HEAD) + 1 IDLE residue (slot 2 TTC-RECENSUS-F1-R3
+  row DONE) + 5 FINISHED landed residue (slots 3-7) / 0 landed-this-cycle / 0 unblocked / 0 flipped /
+  0 dispatched; HEAD `c77434c` (vendor truck-certified clippy-1.97 baseline hygiene, owner-direct, zero
+  code change; parent `ee8e393`). Board re-derived by command.
+- [operator 2026-09-14T00:25Z] landable: NONE. Slot 0 `RESULT.json` status DONE but top-level `spec_gap`
+  (per-patch interval certification in binding-layer volume_facts, outside write_allow) -> do NOT land;
+  `f4088c7` NOT an ancestor of HEAD. Slot 1 `RESULT.json` status **SPEC_GAP** (covariance law not exact
+  over the landed per-sub-cell representation) -> do NOT land; slot-1 worker commit = base, no files
+  landed. Slots 3-7 worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2
+  fd40760/f0ae3ab all ancestors of HEAD (`git merge-base --is-ancestor` TRUE). Slot RESULT.json present
+  0/1/3/4/5/6/7; absent 2 (residue).
+- [operator 2026-09-14T00:25Z] **NEW: slot 1 FHC-G10 transitioned RUNNING -> FINISHED with status
+  SPEC_GAP this cycle.** Stop condition: "the covariance law cannot be made exact over the landed
+  representation" - `integrate_patch`/`integrate_patch_fold` certify each adaptively-subdivided cell from
+  f64-rounded placed control points, so the certified bracket is not placement-covariant at the last
+  bits regardless of the proposed memo; secondary blocker: exact invariants cost ~6.6 s/patch in debug.
+  No files landed; wt at HEAD; door spot-check not run. -> ESCALATED (2026-09-14T00:25Z); do NOT land.
+- [operator 2026-09-14T00:25Z] registry re-derived by script (363 unique / 365 lines, last-wins): 265
+  DONE / 87 READY / 10 BLOCKED / 1 SUPERSEDED. All 10 BLOCKED owner/semantic parked, none mechanically
+  flippable (BG-AUD-FIX-004 OWNER_BLOCKED; BG-CK-SPLINE-CENSUS owner-cancelled; SEM-PCURVE-MASTER-001-FIX
+  SUPERSEDED; DEF-SPINEFRAME-GRAZE SPEC_GAP; DEF-TESS-ANALYTIC-SEAM needs DEF-VENDOR-FIXTURES;
+  DEF-SEEDRAY-B human-gated; TOR-C orchestrator-held; MONO-10 owner candidate; RDEF-M4/M5 owner inputs).
+  Nothing flipped/edited.
+- [operator 2026-09-14T00:25Z] health: heartbeat exactly 1 (27872; the `CommandLine -match` second hit
+  is the operator's own query shell). watchdog/supervisor/overnight 0 (carried dead). cargoq UP (ping ok,
+  queued 0, running `test -p truck123d --lib --locked`; no live worker - warm/leftover). Disk 17.24 GB
+  free (above 15); RAM 5.07 GB free (above 3). No `%TEMP%/look-verify-baseline-*` leaks; `fallback.log`
+  quiet since 2026-09-11.
+- [operator 2026-09-14T00:25Z] dispatch: did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready
+  --dry-run --max-workers=4` = "slots: 8 (0 running, 8 free); slot-assigned packets: 6"; RG-23/RG-9
+  ANCHOR CHECK FAILED (packet files absent); FHC-G1/D/E + FHC-G8/G9 chained on FHC-G6; `dispatched 0` =
+  REAL idle. Slot 1 SPEC_GAP frees the bd_bridge.rs write-set the RG rows were clashing with, but those
+  rows still cannot dispatch until their packet files exist.
+- [operator 2026-09-14T00:25Z] Observation: main worktree carries uncommitted
+  `truck123d/src/bd_bridge.rs` (+6/-1) and `truck123d/src/lib.rs` (+21), plus modified
+  `loop/packets/FHC-G1-RATIONAL-FLUX.md` and `loop/LEDGER.jsonl`/`loop/PACKETS.jsonl` (orchestrator
+  in-progress; flagged, not touched). The vendor lib.rs allow block is now committed as HEAD `c77434c`.
 - [operator 2026-09-14T00:00Z] board: 1 RUNNING (slot 1 FHC-G10-PLACEMENT-COVARIANCE-CACHE, pid 38112 ->
   opencode 23872 alive; events 10 min old; cargoq `test -p truck123d --test placement_cache -- --nocapture`
   START 19:51:17 local) + 1 FINISHED-UNLANDED (slot 0 FHC-G6-CERT-COST-SCALE, commit f4088c7 + RESULT.json,
