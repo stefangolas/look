@@ -47,6 +47,13 @@ serde_yaml = "0.9"
 thiserror = "2.0"
 wgpu = "30.0"
 
+ruststep = { git = "https://github.com/stefangolas/ruststep", rev = "67f1f7c" }
+truck-assembly = { path = "vendor/truck/truck-assembly" }
+truck-meshalgo = { path = "vendor/truck/truck-meshalgo" }
+truck-polymesh = { path = "vendor/truck/truck-polymesh" }
+truck-stepio = { path = "vendor/truck/truck-stepio" }
+truck-topology = { path = "vendor/truck/truck-topology" }
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
