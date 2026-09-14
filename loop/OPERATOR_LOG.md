@@ -10450,3 +10450,43 @@ landed residue. HEAD `cfaa924` (rustfmt drift commit; parent `e6519b8`).
   carried substrate stack down, RG-23/RG-9 authoring, dirty vendor file, TOR-C.
 - Leaving: slot 1 FHC-G10 RUNNING + slot 0 FHC-G6 FINISHED-UNLANDED + slots 2 residue + slots 3-7
   landed residue / HEAD `cfaa924` + this cycle's STATE/log/escalation commit.
+
+## 2026-09-14T00:00Z - operator cycle: quiet re-confirmation; FHC-G6 SPEC_GAP carried; FHC-G10 running healthy; nothing landable/unblockable/flippable; real idle
+
+Board at start (re-derived by `python loop/slot_status.py`): slot 0 FINISHED FHC-G6-CERT-COST-SCALE
+(RESULT.json present, commit `f4088c7`); slot 1 RUNNING FHC-G10-PLACEMENT-COVARIANCE-CACHE (pid 38112 ->
+opencode 23872 alive, events 10 min old, changed=2; cargoq `test -p truck123d --test placement_cache --
+--nocapture` START 19:51:17 local); slot 2 IDLE residue TTC-RECENSUS-F1-R3 (row DONE); slots 3-7 FINISHED
+landed residue. HEAD `dd72958` (the 23:37Z operator STATE/log commit; parent `cfaa924`).
+
+- Health sweep (step 1): heartbeat exactly 1 (27872; `dispatch_heartbeat.log` last 19:52:50 local,
+  "dispatched 0; workers now ~1/3"); a `-match` double-counts only the operator's own query shell.
+  watchdog/supervisor/overnight 0 (carried dead). cargoq UP (ping ok, queued 1, running placement_cache
+  = slot-1 G10). Disk 17.67 GB free (>15); RAM 4.87 GB free (>3). No `%TEMP%/look-verify-baseline-*`
+  leaks; `fallback.log` quiet since 2026-09-11.
+- Land (step 2): nothing. Slot 0 FHC-G6 RESULT re-read: status DONE but carries a top-level `spec_gap`
+  (per-patch interval certification in binding-layer `volume_facts`, outside `write_allow`; no
+  whitelisted bd_bridge fix applies) -> do NOT land; commit `f4088c7` NOT an ancestor of HEAD. Slots 3-7
+  worker commits e6553db/3c2109b/ee97499/713f205/5cf4811 and slots 1/2 fd40760/f0ae3ab all ancestors of
+  HEAD (re-verified via `git merge-base --is-ancestor`). Slot RESULT.json present 0/3/4/5/6/7.
+- Unblock (step 3): slot 1 RUNNING healthy (opencode 23872 alive; cargoq placement_cache live) - do NOT
+  disturb. No slot with resumable work; no active `QUESTION.md`; no APIError 402. Slot 2 landed-row
+  residue (row DONE) - reset/redispatch inappropriate.
+- Registry hygiene (step 4): re-derived by script (363 unique / 365 lines, last-wins): 265 DONE / 87
+  READY / 10 BLOCKED / 1 SUPERSEDED. No BLOCKED row mechanically flippable: MONO-10 (needs MONO-8 DONE)
+  and RDEF-M4 (needs RDEF-M3 DONE) have all needs landed but are owner/semantic gated ("do not author
+  until owner rules on R3 mesh predicate"; "requires TANGENCY-SYSTEM conflict adjudication"); the rest
+  have unlanded needs or are owner-parked. Nothing flipped/edited.
+- Dispatch (step 5): did NOT run live (heartbeat 27872 owns dispatch). `dispatch_ready --dry-run
+  --max-workers=4` = "slots: 8 (1 running, 7 free); slot-assigned packets: 6"; RG-23/RG-9 write-set
+  clash with the RUNNING G10 on `truck123d/src/bd_bridge.rs` (packet files absent); FHC-G1/D/E and
+  FHC-G8/G9 chained on G6; `dispatched 0` = REAL idle.
+- Observation: main worktree still carries the uncommitted `vendor/truck/truck-certified/src/lib.rs`
+  clippy allow block + modified `loop/packets/FHC-G1-RATIONAL-FLUX.md` (orchestrator in-progress;
+  flagged, not touched).
+- STATE (step 6): replaced the LATEST GROUND TRUTH block and prepended the labeled
+  [operator 2026-09-14T00:00Z] bullets to "State of the machine, as left". Traps/history untouched.
+- Escalation (step 7): carry appended for slot 0 FHC-G6 (unchanged disposition). Carried: substrate
+  stack down; RG-23/RG-9 authoring; slot-4/7 wt RESULT residue; FRAME-REVOLVE F1 pin; TOR-C.
+- Leaving: slot 1 FHC-G10 RUNNING + slot 0 FHC-G6 FINISHED-UNLANDED + slots 2 residue + slots 3-7
+  landed residue / HEAD `dd72958` + this cycle's STATE/log/escalation commit.

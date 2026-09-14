@@ -2742,3 +2742,19 @@ uncommitted - left for the orchestrator, no dispatch impact.
   (packet files absent, anchor check fails; new untracked FHC-G8/G9/G10/G11/G12/G13/G14 +
   ROUTING-REACH packet files exist, G11-G14/ROUTING-REACH unregistered); slot-4/7 wt RESULT residue;
   FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844` (do NOT disturb).
+
+## 2026-09-14T00:00Z - operator cycle: carry unchanged (no new evidence)
+
+- Re-verified this cycle: slot 0 FHC-G6-CERT-COST-SCALE remains FINISHED-UNLANDED (`f4088c7` NOT an
+  ancestor of HEAD `dd72958`; RESULT status DONE + top-level `spec_gap` = packet stop condition). Do NOT
+  land; adjudicate (a) land the instrumentation-only change + route the `spec_gap` to
+  `docs/F1_HYPERCAR_GAP_REGISTER.md` section 5, or (b) hold/re-fork. FHC-G1 -> FHC-D -> FHC-E and
+  FHC-G8/G9 stay chained behind it. Start from: `git show f4088c7 --stat` and `loop/slots/0/wt/RESULT.json`.
+- Substrate stack (watchdog/supervisor/overnight) still down - carried; do NOT blindly restart (the
+  supervisor would also restart the overnight driver, which is an orchestration decision; see the
+  2026-09-13T18:28Z item for the restart commands). Priority: medium.
+- Carried unchanged: RG-23/RG-9 authoring (packet files absent, anchor check fails); the main-worktree
+  uncommitted `vendor/truck/truck-certified/src/lib.rs` clippy allow block + modified
+  `loop/packets/FHC-G1-RATIONAL-FLUX.md` (orchestrator in-progress, outside operator scope); slot-4/7 wt
+  RESULT residue; FRAME-REVOLVE F1 non_z_axis pin; TOR-C flip-or-pin; leftover idle opencode `37844`
+  (do NOT disturb).
