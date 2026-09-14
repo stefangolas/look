@@ -76,7 +76,7 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## Where we are
 
 > LATEST GROUND TRUTH [operator 2026-09-14T08:42Z]: 0 RUNNING / 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE)
-> / 0 IDLE residue / 7 FINISHED residue (slots 0-7) / 0 unblocked / 1 registry flip / 0 dispatched-live.
+> / 1 IDLE residue (slot 2, TTC-RECENSUS-F1-R3 row DONE) / 7 FINISHED residue (slots 0-1, 3-7) / 0 unblocked / 1 registry flip / 0 dispatched-live.
 > HEAD `f6f42b8` (this cycle's landing commit; parents `1611e75` merge <- `628cd12`). Board re-derived by command.
 > **FHC-D-SURFACE-RESIDUE LANDED** - slot 0's worker recovered from the hung cargoq job, wrote RESULT DONE and
 > committed `628cd12`; operator scoped checks green (`cargo fmt -p truck123d -- --check` + `cargo check -p
@@ -249,8 +249,9 @@ corrected, annex C = ORACLE POLICY CHANGE), then docs/SOLVER_COVERAGE_SPEC.md
 ## State of the machine, as left
 
 - [operator 2026-09-14T08:42Z] board: 0 RUNNING + 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE) + 7 FINISHED
-  residue (slots 0-7; slot 0 landed `628cd12`, slot 1 duplicate `000cb11`) / 0 IDLE residue / 0 unblocked /
-  1 registry flip / 0 dispatched-live; HEAD `f6f42b8`. Board re-derived by command.
+  residue (slots 0-1, 3-7; slot 0 landed `628cd12`, slot 1 duplicate `000cb11`) / 1 IDLE residue (slot 2,
+  TTC-RECENSUS-F1-R3 row DONE) / 0 unblocked / 1 registry flip / 0 dispatched-live; HEAD `f6f42b8`. Board
+  re-derived by command.
 - [operator 2026-09-14T08:42Z] landed: FHC-D-SURFACE-RESIDUE. Slot 0 worker (pid 13680) recovered, wrote
   RESULT DONE, committed `628cd12` (corpus/ttc/door.py + truck123d/tests/surface_residue.rs, 764 insertions);
   operator scoped checks green (fmt 0 / check --tests 0 / surface_residue 10/10 in 13s); merge `1611e75`

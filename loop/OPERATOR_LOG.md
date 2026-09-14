@@ -11206,8 +11206,9 @@ Actions:
 
 ## [operator 2026-09-14T08:42Z] cycle report
 
-- BOARD: 0 RUNNING / 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE) / 7 FINISHED residue (slots 0-7) / 0 IDLE
-  residue / 0 unblocked / 1 registry flip / 0 dispatched-live. HEAD `f6f42b8`. Board re-derived by command.
+- BOARD: 0 RUNNING / 1 landed-this-cycle (FHC-D-SURFACE-RESIDUE) / 7 FINISHED residue (slots 0-1, 3-7) / 1
+  IDLE residue (slot 2, TTC-RECENSUS-F1-R3 row DONE) / 0 unblocked / 1 registry flip / 0 dispatched-live.
+  HEAD `f6f42b8`. Board re-derived by command.
 - LANDED (step 2): FHC-D-SURFACE-RESIDUE. Slot 0's worker (pid 13680) recovered from the hung cargoq job,
   wrote RESULT DONE and committed `628cd12` (corpus/ttc/door.py + truck123d/tests/surface_residue.rs, 764
   insertions). Operator scoped checks green: `cargo fmt -p truck123d -- --check` (0); `cargo check -p truck123d
