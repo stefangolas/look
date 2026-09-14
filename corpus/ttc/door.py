@@ -55,6 +55,7 @@ identical geometry facts; wall time is recorded but never asserted.
 
 from __future__ import annotations
 
+import faulthandler
 import importlib
 import json
 import math
@@ -4168,14 +4169,20 @@ def run_entry(tree_src: str, module: str, entry: str, args: list) -> object:
 
 def geometry_facts(obj) -> dict:
     facts = {}
+    timings = {}
+    t0 = time.perf_counter()
     try:
         facts["solid_count"] = len(obj.solids())
     except Exception as exc:  # noqa: BLE001 - door reports, never crashes
         facts["solid_count"] = f"err:{type(exc).__name__}"
+    timings["solids_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+    t0 = time.perf_counter()
     try:
         facts["volume"] = obj.volume
     except Exception as exc:  # noqa: BLE001
         facts["volume"] = f"err:{type(exc).__name__}"
+    timings["volume_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+    t0 = time.perf_counter()
     try:
         bb = obj.bounding_box()
         mn = tuple(bb.min.to_tuple())
@@ -4184,6 +4191,8 @@ def geometry_facts(obj) -> dict:
         facts["diag"] = math.sqrt(sum((mx[i] - mn[i]) ** 2 for i in range(3)))
     except Exception as exc:  # noqa: BLE001
         facts["bbox"] = f"err:{type(exc).__name__}"
+    timings["bbox_ms"] = round((time.perf_counter() - t0) * 1000.0, 3)
+    facts["timings"] = timings
     return facts
 
 
@@ -4282,6 +4291,16 @@ def _error_record(exc, module=None, entry=None):
 def main() -> int:
     argv = list(sys.argv[1:])
     global ENGINE
+    # Owner directive 2026-09-14: 120 s is the acceptable performance ceiling
+    # for one corpus row; anything above it is a CEILING verdict booking a
+    # faster solver, and the timeout must leave a call-stack dump behind so
+    # the slow path is diagnosable instead of silent. Set
+    # LOOK_DOOR_STACKDUMP=<path> to enable (the census driver sets it).
+    stackdump = os.environ.get("LOOK_DOOR_STACKDUMP")
+    ceiling_s = float(os.environ.get("LOOK_DOOR_TIMEOUT", "120"))
+    if stackdump:
+        fh_dump = open(stackdump, "w", encoding="utf-8")
+        faulthandler.dump_traceback_later(ceiling_s, exit=True, file=fh_dump)
     if len(argv) >= 2 and argv[0] == "--engine":
         ENGINE = argv[1]
         argv = argv[2:]
@@ -4372,6 +4391,11 @@ def main() -> int:
             "triangles": triangle_count(stl_path),
         },
     }
+    if stackdump:
+        try:
+            faulthandler.cancel_dump_traceback_later()
+        except Exception:  # noqa: BLE001 - watchdog already fired or absent
+            pass
     json.dump(record, sys.stdout, indent=2)
     return 0
 
